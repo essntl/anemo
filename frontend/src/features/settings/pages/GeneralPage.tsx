@@ -140,7 +140,7 @@ function ShortcutsCard() {
 export function GeneralPage() {
   const settings = useSettings()
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-(--card-gap)">
       {settings.data && (
         <GeneralForm key={JSON.stringify(settings.data.general)} initial={settings.data.general} />
       )}

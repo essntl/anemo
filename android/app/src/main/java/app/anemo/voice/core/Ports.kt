@@ -10,6 +10,9 @@ package app.anemo.voice.core
 interface WakeWordDetector {
     fun process(frame: ShortArray): Boolean
     fun reset()
+
+    /** The score of the last frame (0..1), logged with each detection. */
+    val lastScore: Float get() = 0f
 }
 
 /** Voice activity: speech probability (0..1) of an 80 ms frame. */
@@ -18,19 +21,28 @@ interface VoiceActivityDetector {
     fun reset()
 }
 
-/** The short sounds that say "I'm listening" and "I stopped". */
-interface Chimes {
-    /** Before a request recording (may be switched off in the settings). */
-    fun start()
+/**
+ * The short sounds (and buzz) that say "I heard you", "I stopped", "voice mode is on"….
+ * The optional ones ([Cue.optional]) may be switched off in the settings; the others
+ * always play, so the microphone never opens without a wake word unannounced.
+ */
+fun interface Chimes {
+    fun play(cue: Cue)
+}
 
-    /** After any recording (may be switched off in the settings). */
-    fun stop()
+/**
+ * Other apps' sound while the phone records: [duck] asks them to get quiet (transient
+ * audio focus, may duck), [release] gives the focus back.
+ */
+interface AudioFocus {
+    fun duck()
+    fun release()
 
-    /**
-     * Before a reply recording, which starts without a wake word: always plays, whatever
-     * the settings say, so the microphone never opens for a reply unannounced.
-     */
-    fun reply()
+    /** No audio focus (tests, and phones where asking fails). */
+    object None : AudioFocus {
+        override fun duck() = Unit
+        override fun release() = Unit
+    }
 }
 
 /** Text to speech. [onDone] gets true when the text was spoken to the end. */
@@ -49,6 +61,22 @@ interface VoiceBackend {
     fun sendTurn(wav: ByteArray?, conversationId: String?, status: Boolean, onResult: (TurnResult) -> Unit)
 
     fun sendReply(wav: ByteArray, approvalId: String, onResult: (ReplyResult) -> Unit)
+
+    /** Only transcribes a recording (`/voice/transcripts`): nothing starts on the server. */
+    fun transcribe(wav: ByteArray, onResult: (TranscriptResult) -> Unit)
+
+    /**
+     * A request as text, the transcript [transcribe] gave (`/voice/turns` with `text`).
+     * [voiceMode]: the phone listens again after the answer; [keepChat]: stay in
+     * [conversationId] whatever the follow-up window says.
+     */
+    fun sendText(
+        text: String,
+        conversationId: String?,
+        voiceMode: Boolean,
+        keepChat: Boolean,
+        onResult: (TurnResult) -> Unit,
+    )
 }
 
 /** One request in the app's history (the only thing the app keeps of a request). */

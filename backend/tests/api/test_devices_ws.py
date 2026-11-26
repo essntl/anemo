@@ -217,6 +217,7 @@ async def test_commands_and_results_go_to_the_right_device(authed):
         ("refused", relay.Refused),
         ("unavailable", relay.Unavailable),
         ("failed", relay.ActionFailed),
+        ("exists", relay.Exists),
         (None, relay.ActionFailed),
     ],
 )
@@ -233,6 +234,21 @@ async def test_result_codes_become_exceptions(authed, code, error):
     assert str(raised.value).startswith("That control is gone") and len(str(raised.value)) == 500
     offer = await relay.online(uuid.UUID(vm["id"]))
     assert offer is not None and offer.control is (code != "stopped")
+    await ws.disconnect()
+
+
+async def test_an_offer_with_files_is_kept_and_a_later_one_without_clears_it(authed):
+    vm = await add(authed, "VM", trust="trusted")
+    device_id = uuid.UUID(vm["id"])
+    ws, _ = await welcomed(vm["token"])
+    await ws.send({"type": "device.offer", "control": False, "shell": False, "files": True})
+    await roundtrip(ws)
+    assert await relay.online(device_id) == relay.Offer(control=False, shell=False, files=True)
+    (info,) = await relay.list_online()
+    assert info.files is True
+    await _offer(ws)  # an older client's offer has no files field
+    offer = await relay.online(device_id)
+    assert offer is not None and offer.files is False
     await ws.disconnect()
 
 

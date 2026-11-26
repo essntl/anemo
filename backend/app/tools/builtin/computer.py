@@ -1,17 +1,21 @@
-"""Computer tools: the agent sees and uses the Windows computers that run Anemo Desktop
-(docs/specs/06-desktop-client.md, docs/device-contracts.md §3).
+"""Computer tools: the agent sees and uses the Windows and macOS computers that run Anemo
+Desktop (docs/specs/06-desktop-client.md, 09-desktop-macos.md, docs/device-contracts.md §3).
 
 Every tool takes `device`, the name of a computer (Settings > Devices). Commands go to the
 device through the relay (features/devices/relay.py); the client answers with the window's
 state: a screenshot, the window's controls as a numbered list (`ref`s) and its text.
 
 Permissions: `computer.see` (looking, always "safe"), `computer.act` (clicks, typing, keys,
-opening programs, the clipboard: "moderate") and `computer.shell` (PowerShell, rated by
-policy/shell_risk.py plus the PowerShell rules below). Whatever the levels say:
+opening programs, the clipboard: "moderate") and `computer.shell` (the device's shell:
+PowerShell, rated by policy/shell_risk.py plus the PowerShell rules below, or zsh/bash on a
+Mac, rated by policy/shell_risk.py plus the macOS rules below). Whatever the levels say:
 
 - on a **watched** device every `computer_act` asks, every time (`always_ask`);
-- `computer_shell` is blocked on a watched device and when PowerShell is off in the client;
-- acting and PowerShell are blocked while "Allow control" is off in the client.
+- `computer_shell` is blocked on a watched device and when the shell is off in the client;
+- acting and the shell are blocked while "Allow control" is off in the client.
+
+The tool descriptions are the same for every device (the tool list is part of the prompt
+cache): which system and shell a computer has is said in its line of the turn context.
 
 `actions()` is synchronous, so it decides from the list of online devices that the agent
 loop refreshes before every step (`refresh`, kept in `ctx.state`). `run()` checks again,
@@ -81,6 +85,9 @@ def _info(device: relay.DeviceInfo) -> dict[str, Any]:
         "trust": device.trust,
         "control": device.control,
         "shell": device.shell,
+        "platform": device.platform,
+        "shell_kind": device.shell_kind,
+        "files": device.files,
     }
 
 
@@ -99,18 +106,40 @@ async def refresh(ctx: ToolContext) -> None:
     ctx.state[_DEVICES] = {_key(d.name): _info(d) for d in await online_devices()}
 
 
+_OS_NAMES = {"windows": "Windows", "macos": "macOS"}
+_SHELL_NAMES = {"powershell": "PowerShell", "pwsh": "PowerShell", "zsh": "zsh", "bash": "bash"}
+
+
+def is_powershell(shell_kind: object) -> bool:
+    """PowerShell (Windows PowerShell 5.1 or pwsh). Also what a device unknown to the step's
+    list is taken to have, as before there were macOS clients."""
+    return shell_kind not in ("zsh", "bash")
+
+
+def shell_name(shell_kind: object) -> str:
+    """The shell's name for the model and the user: PowerShell, zsh or bash."""
+    return _SHELL_NAMES.get(str(shell_kind), "PowerShell")
+
+
 def line(device: relay.DeviceInfo) -> str:
     if device.kind != "computer":
         return f"- {device.name}: phone (not controllable)"
+    shell = shell_name(device.shell_kind)
     if not device.control:
         control = "control is off (looking only)"
     elif device.trust == "watched":
-        control = "control allowed, every action is asked; no PowerShell"
+        control = f"control allowed, every action is asked; no {shell}"
     elif device.shell:
-        control = "control allowed, PowerShell on"
+        control = f"control allowed, {shell} on"
     else:
-        control = "control allowed, PowerShell off"
-    return f"- {device.name}: computer, {device.trust}, {control}"
+        control = f"control allowed, {shell} off"
+    # Files (device_file_get / device_file_put) work only on a trusted computer that offers them.
+    files = ", files on" if device.trust == "trusted" and device.files else ""
+    if device.platform == "windows" and is_powershell(device.shell_kind):
+        # A Windows computer reads as it always did: its shell is PowerShell.
+        return f"- {device.name}: computer, {device.trust}, {control}{files}"
+    system = _OS_NAMES.get(device.platform, device.platform)
+    return f"- {device.name}: computer ({system}, shell: {shell}), {device.trust}, {control}{files}"
 
 
 def turn_context_section(lines: list[str]) -> str:
@@ -120,7 +149,9 @@ def turn_context_section(lines: list[str]) -> str:
     return (
         "## Devices online now\n"
         "Use a computer with computer_look, computer_act and computer_shell (device = its "
-        "name).\n" + "\n".join(lines)
+        "name). A computer runs Windows with PowerShell unless its line names another system "
+        "and shell. Copy files between a computer and the workspace with device_file_get "
+        "and device_file_put when its line says files on.\n" + "\n".join(lines)
     )
 
 
@@ -131,7 +162,8 @@ def _known(ctx: ToolContext, name: str) -> dict[str, Any] | None:
 
 def known_device(ctx: ToolContext, name: str) -> dict[str, Any] | None:
     """What the last refresh saw of the device of this name ({id, name, kind, trust,
-    control, shell}), or None (not online then, or no computer tool was offered)."""
+    control, shell, platform, shell_kind, files}), or None (not online then, or no computer tool
+    was offered)."""
     return _known(ctx, name)
 
 
@@ -381,16 +413,25 @@ async def _check(ctx: ToolContext, name: str, need: Need) -> tuple[Any, str] | T
             is_error=True,
         )
     if need == "shell":
+        shell = shell_name(offer.shell_kind)
         if device.trust != "trusted":
             return ToolResult(
-                content=f"PowerShell is not offered on “{device.name}”: it is a watched "
+                content=f"{shell} is not offered on “{device.name}”: it is a watched "
                 "computer. Use computer_act, or ask the user.",
                 is_error=True,
             )
         if not offer.shell:
             return ToolResult(
-                content=f"PowerShell is switched off in Anemo Desktop on “{device.name}”. Ask "
+                content=f"{shell} is switched off in Anemo Desktop on “{device.name}”. Ask "
                 "the user to switch it on, or use computer_act.",
+                is_error=True,
+            )
+        if before is not None and is_powershell(before.get("shell_kind")) != is_powershell(
+            offer.shell_kind
+        ):
+            # Rated by the other shell's rules (the device changed meanwhile): rate it again.
+            return ToolResult(
+                content=f"“{device.name}” now has another shell ({shell}). Call the tool again.",
                 is_error=True,
             )
     if before is not None and before.get("id") != str(device.id):
@@ -534,6 +575,7 @@ _CLICKS = ("click", "double_click", "right_click")
 # automation runs ask about these unless the automation allows the tool, as in the browser.
 _REACHES_PEOPLE = {"click", "double_click", "type", "press"}
 _WIN = {"win", "windows", "super"}
+_CMD = {"cmd", "command"}
 _PROGRAM_NAME = re.compile(r"(?:[^\W_]|[ .+-])+")
 
 
@@ -545,16 +587,20 @@ _FORBIDDEN_KEYS = {"Control+Alt+Delete"}
 
 
 def clean_computer_key(key: str) -> str:
-    """A key as in the browser contract, plus `Win` as a modifier ("win+r" → "Win+r").
+    """A key as in the browser contract, plus `Win` as a modifier ("win+r" → "Win+r") and
+    `Cmd` for a Mac ("cmd+s" → "Cmd+s"; a Mac takes Win as Cmd, Windows refuses Cmd).
     Raises ValueError otherwise; Ctrl+Alt+Del is never pressed."""
     parts = [p.strip() for p in key.split("+")] if key != "+" else [key]
     win = [p for p in parts[:-1] if p.lower() in _WIN]
-    if len(win) > 1:
-        raise ValueError(f"'{key}': Win only once")
-    rest = "+".join(p for p in parts if p not in win)
+    cmd = [p for p in parts[:-1] if p.lower() in _CMD]
+    if len(win) + len(cmd) > 1:
+        raise ValueError(f"'{key}': Win or Cmd only once")
+    rest = "+".join(p for p in parts if p not in win and p not in cmd)
     cleaned = clean_key(rest)
     if cleaned in _FORBIDDEN_KEYS or cleaned.startswith("Alt+Control+Delete"):
         raise ValueError("Ctrl+Alt+Del can't be pressed")
+    if cmd:
+        return f"Cmd+{cleaned}"
     return f"Win+{cleaned}" if win else cleaned
 
 
@@ -563,8 +609,8 @@ class ActInput(BaseModel):
     action: ActKind = Field(
         description="click / double_click / right_click (ref, or x and y); type (text, "
         "optionally into ref); press (keys); scroll (direction, amount, optionally ref); "
-        "focus_window (window_ref); open (target: a program's name from the Start menu, or "
-        "an http(s) URL); clipboard_set (text)"
+        "focus_window (window_ref); open (target: a program's name from the Start menu or a "
+        "Mac's Applications, or an http(s) URL); clipboard_set (text)"
     )
     ref: str | None = Field(
         None, max_length=40, description="A control's ref from the last look, e.g. c12"
@@ -581,13 +627,18 @@ class ActInput(BaseModel):
         max_length=10,
         description="press: keys one after the other: Enter, Escape, Tab, Backspace, Delete, "
         "Space, Home, End, PageUp, PageDown, ArrowUp/Down/Left/Right, or a letter or digit, "
-        f"with modifiers ({', '.join(KEY_MODIFIERS)}, Win) in front, e.g. Control+s, Win+r",
+        f"with modifiers ({', '.join(KEY_MODIFIERS)}, Win, Cmd) in front, e.g. Control+s, "
+        "Win+r; on a Mac Cmd+s (Alt is Option there)",
     )
     direction: Literal["up", "down", "left", "right"] | None = None
     amount: int = Field(3, ge=1, le=10, description="scroll: how far (1-10)")
     window_ref: str | None = Field(None, max_length=40, description="focus_window: its ref")
     target: str | None = Field(
-        None, min_length=1, max_length=2000, description="open: a program's name or a URL"
+        None,
+        min_length=1,
+        max_length=2000,
+        description="open: a program's name (the Start menu's on Windows, the Applications "
+        "folder's on a Mac) or a URL",
     )
 
     @field_validator("keys")
@@ -854,9 +905,68 @@ def rate_powershell(command: str) -> PowerShellRisk:
     return PowerShellRisk(risk=risk, reasons=reasons, network=bool(_PS_NETWORK.search(command)))
 
 
+# zsh and bash on a Mac: the rules run_shell uses (policy/shell_risk.py), raised to dangerous
+# by these macOS commands, which those rules don't know. They err upwards, as the others.
+_MAC_DANGEROUS: list[tuple[str, str]] = [
+    (r"\bosascript\b", "runs AppleScript, which can control other apps"),
+    (r"\bdefaults\s+(write|delete|import)\b", "changes app or system settings"),
+    (r"\blaunchctl\b", "changes background services"),
+    (r"\bdiskutil\s+(erase\w*|zerodisk|secureerase|partitiondisk|reformat|apfs\s+delete\w*)\b",
+     "erases or repartitions a disk"),
+    (r"\b(csrutil|spctl|tccutil|nvram|bless|kextload|kextunload|systemextensionsctl)\b",
+     "changes the system's security"),
+    (r"\bsecurity\s+(delete-\w+|dump-keychain|find-generic-password|find-internet-password|"
+     r"add-\w+|import|set-\w+|unlock-keychain|authorizationdb)\b", "reads or changes the keychain"),
+    (r"\b(dscl|sysadminctl|dseditgroup|createhomedir)\b", "changes users"),
+    (r"\b(pmset|systemsetup|networksetup|scutil|fdesetup|softwareupdate)\b",
+     "changes the system"),
+    (r"\b(shutdown|reboot|halt)\b", "shuts the computer down"),
+    (r"\bxattr\b[^\n;|]*\s-[a-z]*[dc]", "removes the quarantine or other file attributes"),
+]  # fmt: skip
+_POSIX_NETWORK = re.compile(
+    r"(?i)(\bhttps?://|(^|[\s;|&(])(curl|wget|ssh|scp|sftp|ftp|telnet|nc|ncat|rsync|ping|"
+    r"nslookup|dig|host|traceroute|brew|npm|pnpm|yarn|npx|pip|pip3|gem|cargo|mail|sendmail|"
+    r"open\s+-a\s+mail|gh)\b|\bgit\s+(clone|pull|push|fetch)\b)"
+)
+
+
+class ShellRating(BaseModel):
+    risk: Risk
+    reasons: list[str]
+    network: bool
+
+
+def rate_posix(command: str) -> ShellRating:
+    """How risky a zsh/bash command on a Mac is: the shell_risk rules, raised by the macOS
+    rules, and whether it uses the network."""
+    base = classify(command)
+    risk: Risk = base.risk
+    reasons = list(base.reasons)
+    lowered = command.lower()
+    for pattern, reason in _MAC_DANGEROUS:
+        if re.search(pattern, lowered):
+            risk = max_risk(risk, "dangerous")
+            if reason not in reasons:
+                reasons.insert(0, reason)
+    return ShellRating(risk=risk, reasons=reasons, network=bool(_POSIX_NETWORK.search(command)))
+
+
+def rate_command(command: str, shell_kind: object) -> ShellRating:
+    """The rating by the device's shell: PowerShell rules, or zsh/bash (POSIX) rules."""
+    if is_powershell(shell_kind):
+        rated = rate_powershell(command)
+        return ShellRating(risk=rated.risk, reasons=rated.reasons, network=rated.network)
+    return rate_posix(command)
+
+
 class ShellInput(BaseModel):
     device: str = Field(min_length=1, max_length=100, description=DEVICE_DESCRIPTION)
-    command: str = Field(min_length=1, max_length=8000, description="One PowerShell command")
+    command: str = Field(
+        min_length=1,
+        max_length=8000,
+        description="One command for the computer's shell (PowerShell, zsh or bash: see the "
+        "computer's line in the turn context)",
+    )
     timeout_s: int = Field(
         SHELL_DEFAULT_TIMEOUT_S,
         ge=1,
@@ -868,11 +978,12 @@ class ShellInput(BaseModel):
 class ComputerShell(Tool):
     name = "computer_shell"
     description = (
-        "Run one PowerShell command on a trusted computer that has PowerShell switched on in "
-        "Anemo Desktop (pwsh, or Windows PowerShell 5.1; no profile, not interactive, in the "
-        "client's working folder). Returns the exit code and the output (head and tail when "
-        "long). Commands must not prompt. For Claude Code jobs use code_start, code_status "
-        "and code_cancel, not a script."
+        "Run one command in the shell of a trusted computer that has its shell switched on in "
+        "Anemo Desktop: PowerShell on Windows (pwsh, or Windows PowerShell 5.1), zsh or bash "
+        "on a Mac, as the computer's line in the turn context says. No profile, not "
+        "interactive, in the client's working folder. Returns the exit code and the output "
+        "(head and tail when long). Commands must not prompt. For Claude Code jobs use "
+        "code_start, code_status and code_cancel, not a script."
     )
     capability = SHELL
     Input = ShellInput
@@ -880,21 +991,25 @@ class ComputerShell(Tool):
     timeout_s = float(SHELL_MAX_TIMEOUT_S + SHELL_GRACE_S + 10)
 
     def actions(self, args: ShellInput, ctx: ToolContext) -> list[Action]:
-        rating = rate_powershell(args.command)
-        why = f" ({'; '.join(rating.reasons)})" if rating.reasons else ""
         device = _known(ctx, args.device)
+        # A device this step's list doesn't know is rated as PowerShell, as before; run()
+        # refuses if it turns out to have another shell, so the rating is never the wrong one.
+        kind = device.get("shell_kind") if device is not None else None
+        shell = shell_name(kind)
+        rating = rate_command(args.command, kind)
+        why = f" ({'; '.join(rating.reasons)})" if rating.reasons else ""
         blocked = _blocked_for_acting(ctx, args.device)
         if blocked is None and device is not None:
             if device["trust"] != "trusted":
-                blocked = f"PowerShell is not offered on the watched computer “{device['name']}”"
+                blocked = f"{shell} is not offered on the watched computer “{device['name']}”"
             elif not device["shell"]:
-                blocked = f"PowerShell is switched off in Anemo Desktop on “{device['name']}”"
+                blocked = f"{shell} is switched off in Anemo Desktop on “{device['name']}”"
         return [
             Action(
                 capability=SHELL,
                 resource=_resource(ctx, args.device),
                 risk=rating.risk,
-                summary=f"Run PowerShell `{_short(args.command, 80)}` on {args.device}{why}",
+                summary=f"Run {shell} `{_short(args.command, 80)}` on {args.device}{why}",
                 blocked=blocked,
                 contacts_people=rating.network,
             )
@@ -905,6 +1020,15 @@ class ComputerShell(Tool):
         if isinstance(checked, ToolResult):
             return checked
         device, name = checked
+        offer = await relay.online(device.id)
+        shell_kind = offer.shell_kind if offer is not None else None
+        if _known(ctx, args.device) is None and not is_powershell(shell_kind):
+            # actions() didn't know the device and rated the command as PowerShell; a zsh
+            # or bash command must be rated by its own rules first.
+            return ToolResult(
+                content=f"“{name}” came online during this step. Call the tool again.",
+                is_error=True,
+            )
         timeout = min(args.timeout_s, ctx.limits.max_shell_timeout_s)
         fields = {"command": args.command, "timeout_s": timeout}
         result = await _send(ctx, device, "shell", fields, timeout + SHELL_GRACE_S)
@@ -913,8 +1037,9 @@ class ComputerShell(Tool):
         exit_code = result.get("exit_code")
         stdout = head_tail(str(result.get("stdout") or ""))
         stderr = head_tail(str(result.get("stderr") or ""))
+        prompt = f"PS {name}>" if is_powershell(shell_kind) else f"{name}%"
         parts = [
-            f"PS {name}> {args.command}",
+            f"{prompt} {args.command}",
             f"[exit code {exit_code}, {result.get('duration_ms', '?')} ms]",
         ]
         if stdout:

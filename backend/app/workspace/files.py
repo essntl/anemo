@@ -12,12 +12,20 @@ import json
 import mimetypes
 import os
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from app.core.errors import AppError, Conflict, NotFound
 from app.workspace import fs_guard, safe_fs
+
+# Called with (workspace-relative path, size, mime type) after a new file was written:
+# the event triggers' `file.created` (features/triggers/files_hook.py registers it). It
+# may run in a worker thread, and must not raise.
+CreatedHook = Callable[[str, int, str], None]
+created_hooks: list[CreatedHook] = []
 
 TRASH_DIR = ".trash"
 MAX_TEXT_BYTES = 2 * 1024 * 1024
@@ -87,6 +95,20 @@ def entry(path: Path) -> Entry:
     )
 
 
+def fingerprint(relative: str) -> dict[str, Any] | None:
+    """What tells this file apart from another one put at its path later, cheaply (no
+    reading): its size and modification time, which a move keeps. A folder only says it
+    is one. None when nothing is there."""
+    path = resolve(relative)
+    try:
+        st = path.stat()
+    except FileNotFoundError:
+        return None
+    if path.is_dir():
+        return {"is_dir": True}
+    return {"is_dir": False, "size": st.st_size, "mtime_ns": st.st_mtime_ns}
+
+
 def list_dir(relative: str) -> list[Entry]:
     folder = resolve(relative)
     if not folder.is_dir():
@@ -150,6 +172,11 @@ def write_bytes(
             details={"current_hash": previous},
         )
     _atomic_write(path, data)
+    if previous is None:
+        relative_path = rel(path)
+        mime = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+        for hook in created_hooks:
+            hook(relative_path, len(data), mime)
     return path, previous, hashlib.sha256(data).hexdigest()
 
 

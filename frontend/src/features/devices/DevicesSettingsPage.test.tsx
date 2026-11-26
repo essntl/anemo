@@ -34,6 +34,9 @@ vi.mock('./api', () => ({
   useSetTrust: () => ({ mutate: setTrust, isPending: false }),
   useDeleteDevice: () => ({ mutate: remove }),
 }))
+// The file size card has its own test (DeviceFilesCard.test.tsx).
+vi.mock('./DeviceFilesCard', () => ({ DeviceFilesCard: () => null }))
+vi.mock('./DeviceCodeCard', () => ({ DeviceCodeCard: () => null }))
 const toastMessages = vi.hoisted(() => [] as string[])
 vi.mock('@/components/ui/toast', () => ({ toast: (o: { message: string }) => toastMessages.push(o.message) }))
 const confirm = vi.fn()

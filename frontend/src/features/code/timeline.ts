@@ -14,9 +14,11 @@
  *   parent_tool_use_id = X     → nested under the Task/Agent call X
  *   raw                        → plain text; stored-as-stub events → one "not stored" run
  *   result                     → the result
- *   rate_limit_event           → nothing while the plan's limit is fine (Claude Code writes
- *                                one after every request); a notice when it turns to a
- *                                warning or a limit reached
+ *   rate_limit_event           → nothing: the subscription's usage is the page's usage
+ *                                indicator (usage.ts), not a step of the job
+ *   user with isReplay         → a message the user sent while the job ran, where Claude
+ *                                Code took it in (§15); the first one is the prompt itself
+ *   command_lifecycle, control_request, control_response → nothing (bookkeeping of §15)
  *   tool_progress              → nothing (a running call already shows it is running)
  */
 import type { Schemas } from '@/api/client'
@@ -144,6 +146,8 @@ export type TimelineItem =
   | (Base & { kind: 'thinking'; text: string })
   /** A user message's own text: a sub-agent's prompt, "[Request interrupted by user]". */
   | (Base & { kind: 'user'; text: string })
+  /** A message sent while the job ran, taken in here (`at`: when its echo arrived). */
+  | (Base & { kind: 'message'; text: string; at: string })
   | (Base & { kind: 'tool'; call: ToolCall })
   | (Base & { kind: 'raw'; text: string })
   /** An event too large to keep, of which only its type is left (§6 step 4). */
@@ -151,32 +155,10 @@ export type TimelineItem =
   /** Events stored as stubs once the job held 5 MB: `count` of them, `seq`…`toSeq`. */
   | (Base & { kind: 'dropped'; toSeq: number; count: number })
   | (Base & { kind: 'result'; result: ResultInfo })
-  /** The plan's usage limit is close (`warning`) or reached (`rejected`); `resetsAt` in ms. */
-  | (Base & { kind: 'rate_limit'; status: RateLimitStatus; resetsAt?: number })
   /** An event of a type this page doesn't know. */
   | (Base & { kind: 'other'; type: string; event: Json })
 
 type Dropped = Extract<TimelineItem, { kind: 'dropped' }>
-
-export type RateLimitStatus = 'warning' | 'rejected'
-
-/** Events that never show: they come by the dozen and say nothing the timeline doesn't. */
-const QUIET_TYPES = ['tool_progress']
-
-/**
- * A rate_limit_event's `rate_limit_info`: the status (`allowed`, `allowed_warning`,
- * `rejected`; anything else counts as allowed) and when the limit resets, in ms
- * (Claude Code writes Unix seconds).
- */
-function rateLimitOf(event: Json): { status: RateLimitStatus | 'allowed'; resetsAt?: number } {
-  const info = obj(event.rate_limit_info) ?? {}
-  const raw = str(info.status)
-  const status = raw === 'allowed_warning' ? 'warning' : raw === 'rejected' ? 'rejected' : 'allowed'
-  const at = num(info.resetsAt) ?? num(info.resets_at)
-  // Seconds, though a value already in ms is taken as it is.
-  const resetsAt = at === undefined || at <= 0 ? undefined : at < 1e12 ? at * 1000 : at
-  return { status, ...(resetsAt === undefined ? {} : { resetsAt }) }
-}
 
 /** The text of a tool_result's `content`: a string, or blocks of which the text ones count. */
 function resultText(content: unknown): { text: string; images: number } {
@@ -198,13 +180,18 @@ function blocksOf(event: Json): Json[] {
   return arr(content).map(obj).filter((b): b is Json => b !== undefined)
 }
 
+/**
+ * Event types that are bookkeeping, not something the job did: kept in the stored log,
+ * left out of the timeline.
+ */
+export const HIDDEN_EVENT_TYPES: ReadonlySet<string> = new Set(['rate_limit_event', 'command_lifecycle', 'control_request', 'control_response', 'tool_progress'])
+
 /** The timeline of one job's events (in any order; sorted by seq here). */
 export function buildTimeline(events: readonly CodeEvent[]): TimelineItem[] {
   const top: TimelineItem[] = []
   const calls = new Map<string, ToolCall>()
   let dropped: Dropped | null = null
-  // The last rate-limit status seen: a notice only when it changes to a warning or a limit.
-  let limit: RateLimitStatus | 'allowed' = 'allowed'
+  let replays = 0
 
   for (const ev of [...events].sort((a, b) => a.seq - b.seq)) {
     const seq = ev.seq
@@ -220,10 +207,12 @@ export function buildTimeline(events: readonly CodeEvent[]): TimelineItem[] {
       }
       continue
     }
-    dropped = null
-
     const e = obj(ev.event) ?? {}
     const type = str(e.type) ?? ''
+    // Before the run of stubs ends: hidden events between stubs don't split it.
+    if (HIDDEN_EVENT_TYPES.has(type)) continue
+    dropped = null
+
     const parent = str(e.parent_tool_use_id)
     // A sub-agent's events go inside its Task call (at the top when that call isn't known).
     const into = (parent && calls.get(parent)?.children) || top
@@ -256,6 +245,13 @@ export function buildTimeline(events: readonly CodeEvent[]): TimelineItem[] {
         break
       }
       case 'user': {
+        if (e.isReplay === true) {
+          // Claude Code's echo of what it read on stdin: the prompt first, then each message.
+          replays += 1
+          const text = blocksOf(e).map((b) => str(b.text) ?? '').join('\n')
+          if (replays > 1 && text.trim()) into.push({ kind: 'message', key: key(), seq, trimmed, text, at: ev.created_at })
+          break
+        }
         const blocks = blocksOf(e)
         const results = blocks.filter((b) => b.type === 'tool_result')
         for (const b of blocks) {
@@ -298,19 +294,11 @@ export function buildTimeline(events: readonly CodeEvent[]): TimelineItem[] {
       case 'raw':
         into.push({ kind: 'raw', key: key(), seq, trimmed, text: str(e.text) ?? '' })
         break
-      case 'rate_limit_event': {
-        // About the whole plan, not one agent: always at the top.
-        const { status, resetsAt } = rateLimitOf(e)
-        if (status !== 'allowed' && status !== limit) top.push({ kind: 'rate_limit', key: key(), seq, trimmed, status, ...(resetsAt === undefined ? {} : { resetsAt }) })
-        limit = status
-        break
-      }
       default:
-        if (QUIET_TYPES.includes(type)) break
         if (!tooLarge) into.push({ kind: 'other', key: key(), seq, trimmed, type: type || '?', event: e })
     }
     // A stub with nothing left to show still says something was there.
-    if (tooLarge && into.length === before && type !== 'result' && type !== 'rate_limit_event' && !QUIET_TYPES.includes(type)) into.push({ kind: 'too_large', key: key(), seq, trimmed: true, type: type || '?' })
+    if (tooLarge && into.length === before && type !== 'result') into.push({ kind: 'too_large', key: key(), seq, trimmed: true, type: type || '?' })
   }
   return top
 }

@@ -10,7 +10,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { type Editor, EditorContent, useEditor } from '@tiptap/react'
 import { Lingering } from '@/components/ui/Lingering'
-import { isAppLink } from '@/lib/appLinks'
+import { SketchPickerDialog } from '@/features/sketch/SketchPickerDialog'
+import { isAppLink, sketchPreviewUrl } from '@/lib/appLinks'
 import { cn } from '@/lib/cn'
 import { t } from '@/lib/i18n'
 import { uploadAsset } from '../api'
@@ -49,6 +50,8 @@ export function RichEditor({ initial, onChange, onError, variant = 'document', l
   const editorRef = useRef<Editor | null>(null)
   // The link picker: from the toolbar (files too), or from typing `[[` (items only).
   const [pickingLink, setPickingLink] = useState<false | 'toolbar' | 'brackets'>(false)
+  // The sketch picker (documents): a sketch embedded as its image, `![Title](/documents/<id>)` in the file.
+  const [pickingSketch, setPickingSketch] = useState(false)
 
   /** Upload images and insert them at the cursor (or at `pos` for a drop). */
   const insertImages = async (files: File[], pos?: number) => {
@@ -156,7 +159,8 @@ export function RichEditor({ initial, onChange, onError, variant = 'document', l
   }
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <EditorToolbar editor={editor} onPickLink={() => setPickingLink('toolbar')} onPickImage={() => fileInput.current?.click()} />
+      <EditorToolbar editor={editor} onPickLink={() => setPickingLink('toolbar')} onPickImage={() => fileInput.current?.click()}
+        onPickSketch={() => setPickingSketch(true)} />
       <input ref={fileInput} type="file" accept="image/*" multiple hidden
         onChange={(e) => {
           void insertImages(Array.from(e.target.files ?? []))
@@ -168,6 +172,13 @@ export function RichEditor({ initial, onChange, onError, variant = 'document', l
         </div>
       </div>
       {picker}
+      <Lingering value={pickingSketch}>
+        {() => (
+          <SketchPickerDialog title={t('Embed a sketch')} description={t('Its image shows in the text and opens the sketch; it stays up to date as you draw.')}
+            onClose={() => setPickingSketch(false)}
+            onPick={(sketch) => editor.chain().focus().insertContent({ type: 'image', attrs: { src: sketchPreviewUrl(sketch.id), alt: sketch.title } }).run()} />
+        )}
+      </Lingering>
     </div>
   )
 }

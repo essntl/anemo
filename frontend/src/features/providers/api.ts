@@ -156,6 +156,18 @@ export function useSaveModelDefaults() {
   })
 }
 
+export type ImageSettings = Schemas['ImageSettings']
+
+/** Settings → Providers & Models → Image generation (security-sensitive, like the permissions). */
+export function useSaveImageSettings() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: ImageSettings) =>
+      withReauth(async () => unwrap(await api.PUT('/api/settings/images', { body }))),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: settingsKey }),
+  })
+}
+
 export type ClaudeRunnerStatus = Schemas['ClaudeRunnerStatus']
 
 /** The claude-runner (Claude subscription provider) as a worker last saw it. */

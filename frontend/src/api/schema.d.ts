@@ -239,6 +239,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/hooks/{trigger_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Receive Hook */
+        post: operations["receive_hook_api_hooks__trigger_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings": {
         parameters: {
             query?: never;
@@ -283,6 +300,23 @@ export interface paths {
         get?: never;
         /** Put Appearance Settings */
         put: operations["put_appearance_settings_api_settings_appearance_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Profile Settings */
+        put: operations["put_profile_settings_api_settings_profile_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -579,6 +613,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Images Settings */
+        put: operations["put_images_settings_api_settings_images_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/plugins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Plugins Settings */
+        put: operations["put_plugins_settings_api_settings_plugins_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/audit": {
         parameters: {
             query?: never;
@@ -590,6 +658,69 @@ export interface paths {
         get: operations["list_audit_api_audit_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Activity
+         * @description What was changed, newest first. `actor_kind`: who (`trigger`: runs an event
+         *     started); `since` / `until`: a time range (until is exclusive).
+         */
+        get: operations["list_activity_api_activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/activity/{entry_id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo Entry
+         * @description Undo one change. 409 `activity_conflict` (with `details.differs`) when the item
+         *     was changed since; `force=true` undoes it anyway.
+         */
+        post: operations["undo_entry_api_activity__entry_id__undo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/activity/groups/{group_id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo Group
+         * @description Undo a batch, newest change first, each on its own: the results say which were
+         *     undone and why the others weren't.
+         */
+        post: operations["undo_group_api_activity_groups__group_id__undo_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1291,6 +1422,80 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/appearance/assets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Assets */
+        get: operations["list_assets_api_appearance_assets_get"];
+        put?: never;
+        /** Upload Asset */
+        post: operations["upload_asset_api_appearance_assets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/appearance/assets/{asset_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Asset Content */
+        get: operations["asset_content_api_appearance_assets__asset_id__content_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/appearance/assets/{asset_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Asset */
+        delete: operations["delete_asset_api_appearance_assets__asset_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/appearance/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Avatar
+         * @description Replace the avatar with the square (crop_x, crop_y, crop_size: fractions of the
+         *     picture's width, height and shorter side) of the uploaded picture.
+         */
+        put: operations["set_avatar_api_appearance_avatar_put"];
+        post?: never;
+        /** Remove Avatar */
+        delete: operations["remove_avatar_api_appearance_avatar_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}/timeline": {
         parameters: {
             query?: never;
@@ -1574,6 +1779,27 @@ export interface paths {
         get: operations["broken_links_api_links_broken_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/links/targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Link Targets
+         * @description What these references point to now (title, state), in the order given: the approval
+         *     of a batch change names its tasks or events this way.
+         */
+        post: operations["link_targets_api_links_targets_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2428,6 +2654,96 @@ export interface paths {
          * @description Point the chosen instructions and memories at the document's path now.
          */
         post: operations["update_mentions_api_documents__document_id__mentions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/sketch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save Sketch
+         * @description Save the drawing (properties and transcription stay). 409 conflict_base_hash when
+         *     the file changed since `base_hash`; 400 sketch_invalid / too_large write nothing.
+         */
+        put: operations["save_sketch_api_documents__document_id__sketch_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/sketch/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview
+         * @description The sketch's image (the last one uploaded; GET /documents/{id} says whether it is
+         *     current). Served by the app itself, so Markdown can show it where a sketch is embedded.
+         */
+        get: operations["preview_api_documents__document_id__sketch_preview_get"];
+        /**
+         * Upload Preview
+         * @description The editor's rendering of the drawing version `drawing_hash` (PNG or WebP, at most
+         *     4 MB and 4096 px a side). 409 preview_outdated when the drawing changed since.
+         */
+        put: operations["upload_preview_api_documents__document_id__sketch_preview_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/sketch/attachment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sketch Attachment
+         * @description The sketch's image as a chat attachment (send its id with a message, as with an
+         *     upload). 409 preview_outdated when the image isn't current: upload it first.
+         */
+        post: operations["sketch_attachment_api_documents__document_id__sketch_attachment_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/sketch/transcribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Transcribe
+         * @description Ask a model that can view images to transcribe the drawing (in the background;
+         *     `sketch.transcription_status` says how it goes). 409 preview_outdated or
+         *     no_model_available.
+         */
+        post: operations["transcribe_api_documents__document_id__sketch_transcribe_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3513,6 +3829,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Code Usage
+         * @description The latest known usage of the Claude subscription of each computer (from its jobs'
+         *     `rate_limit_event`s), with when it was seen; kept while no job runs.
+         */
+        get: operations["code_usage_api_code_usage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/jobs/{job_id}": {
         parameters: {
             query?: never;
@@ -3635,6 +3972,93 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/jobs/{job_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Message
+         * @description A message for the thread: handed to its running job, which takes it in at its next
+         *     step (`now`: after interrupting the current one), or sent as the next follow-up when
+         *     the job can't take it or has ended.
+         */
+        post: operations["send_message_api_code_jobs__job_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/messages/{message_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Message
+         * @description Remove a message that wasn't delivered yet (withdrawn from the job when it holds it);
+         *     409 `message_delivered` when Claude Code took it in already.
+         */
+        delete: operations["remove_message_api_code_messages__message_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/messages/{message_id}/now": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Message Now
+         * @description Send a waiting (or held) message now: interrupting the job's current step, or as a
+         *     follow-up at once when the job has ended.
+         */
+        post: operations["send_message_now_api_code_messages__message_id__now_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/jobs/{job_id}/auto-continue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Auto Continue
+         * @description Auto continue for a job that stopped at the usage limit: on, its session is resumed
+         *     shortly after the limit resets (as soon as its computer is back); off, that is
+         *     cancelled. 409 `not_limited` for a job that isn't the last of its thread or didn't stop
+         *     at the limit.
+         */
+        put: operations["auto_continue_api_code_jobs__job_id__auto_continue_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/jobs/{job_id}/cancel": {
         parameters: {
             query?: never;
@@ -3649,6 +4073,67 @@ export interface paths {
          * @description Cancel a running job; one that has ended is returned as it is.
          */
         post: operations["cancel_job_api_code_jobs__job_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/devices/{device_id}/git/graph": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Git Graph
+         * @description A repository's graph, in the same shape as the plugin method `code.gitGraph`. A
+         *     POST: a fetch changes what the computer has (its remote branches, its cache).
+         */
+        post: operations["git_graph_api_code_devices__device_id__git_graph_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/devices/{device_id}/git/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Git Commit
+         * @description One commit's metadata and the files it changed (no diff), as `code.gitCommit`.
+         */
+        post: operations["git_commit_api_code_devices__device_id__git_commit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/devices/{device_id}/git/cache/clear": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Git Cache Clear
+         * @description Remove the computer's cached clones of repositories that aren't cloned there.
+         */
+        post: operations["git_cache_clear_api_code_devices__device_id__git_cache_clear_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3901,6 +4386,192 @@ export interface paths {
         put?: never;
         /** Run Automation Now */
         post: operations["run_automation_now_api_automations__automation_id__run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/automations/scripts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Script
+         * @description A new script, written in the app: approved at once, off until switched on.
+         */
+        post: operations["create_script_api_automations_scripts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/automations/{automation_id}/script": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Script
+         * @description The approved version and the one waiting for review (for the diff), who wrote it
+         *     and which of its secrets are set.
+         */
+        get: operations["get_script_api_automations__automation_id__script_get"];
+        /**
+         * Save Script
+         * @description Save a new version from the app (approved at once: the user wrote it).
+         */
+        put: operations["save_script_api_automations__automation_id__script_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/automations/{automation_id}/script/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Script
+         * @description Approve the version waiting for review: the one with the hash the user looked at.
+         */
+        post: operations["approve_script_api_automations__automation_id__script_approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/automations/{automation_id}/script/pending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Discard Change
+         * @description Throw the change waiting for review away; the approved version stays.
+         */
+        delete: operations["discard_change_api_automations__automation_id__script_pending_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/automations/{automation_id}/script/secrets/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Secret
+         * @description Set the value of one of the script's secrets (write-only: it is never shown).
+         */
+        put: operations["set_secret_api_automations__automation_id__script_secrets__name__put"];
+        post?: never;
+        /** Clear Secret */
+        delete: operations["clear_secret_api_automations__automation_id__script_secrets__name__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/triggers/catalogue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Catalogue
+         * @description The event types a trigger can wait for, with the fields a filter may name.
+         */
+        get: operations["catalogue_api_triggers_catalogue_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/triggers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Triggers */
+        get: operations["list_triggers_api_triggers_get"];
+        put?: never;
+        /**
+         * Create Trigger
+         * @description A trigger for an automation. A webhook's secret is in the answer, this once.
+         */
+        post: operations["create_trigger_api_triggers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/triggers/{trigger_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Trigger */
+        delete: operations["delete_trigger_api_triggers__trigger_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Trigger */
+        patch: operations["update_trigger_api_triggers__trigger_id__patch"];
+        trace?: never;
+    };
+    "/api/triggers/{trigger_id}/secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotate Secret
+         * @description A new signing secret for a webhook trigger, shown this once; the old one stops
+         *     working at once. Needs the password entered recently.
+         */
+        post: operations["rotate_secret_api_triggers__trigger_id__secret_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4623,10 +5294,33 @@ export interface paths {
         put?: never;
         /**
          * Voice Turn
-         * @description A spoken request: transcribed, made a clear request, and started as an agent run
-         *     in the Voice chat (or continuing `conversation_id` within the follow-up window).
+         * @description A spoken request: transcribed (or `text`, the transcript from `/voice/transcripts`),
+         *     made a clear request, and started as an agent run in the Voice chat (or continuing
+         *     `conversation_id` within the follow-up window; with `keep_chat`, whatever the window
+         *     says). `voice_mode`: the phone listens again after the answer.
          */
         post: operations["voice_turn_api_voice_turns_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/voice/transcripts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Voice Transcript
+         * @description Only transcribes: the phone matches its voice-mode commands on what was heard
+         *     before anything starts (docs/specs/07-voice-mode-android.md). Stores nothing.
+         */
+        post: operations["voice_transcript_api_voice_transcripts_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4653,10 +5347,351 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/plugins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Plugins */
+        get: operations["list_plugins_api_plugins_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/contributions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Contributions
+         * @description What the slots render: enabled plugins' approved versions only.
+         */
+        get: operations["contributions_api_plugins_contributions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/bundled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Bundled */
+        get: operations["list_bundled_api_plugins_bundled_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/install/zip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Install Zip */
+        post: operations["install_zip_api_plugins_install_zip_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/install/git": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Install Git */
+        post: operations["install_git_api_plugins_install_git_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/install/bundled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Install Bundled */
+        post: operations["install_bundled_api_plugins_install_bundled_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/{plugin}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Plugin */
+        get: operations["get_plugin_api_plugins__plugin__get"];
+        put?: never;
+        post?: never;
+        /** Uninstall */
+        delete: operations["uninstall_api_plugins__plugin__delete"];
+        options?: never;
+        head?: never;
+        /** Switch Plugin */
+        patch: operations["switch_plugin_api_plugins__plugin__patch"];
+        trace?: never;
+    };
+    "/api/plugins/{plugin}/versions/{version}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Version */
+        post: operations["approve_version_api_plugins__plugin__versions__version__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/{plugin}/versions/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Reject Version */
+        delete: operations["reject_version_api_plugins__plugin__versions__version__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/{plugin}/versions/{version}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Version Diff */
+        get: operations["version_diff_api_plugins__plugin__versions__version__diff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/{plugin}/versions/{version}/files/{path}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Version File
+         * @description One file of a version, for the host and the code view. Never rendered: text is
+         *     text/plain, and nothing in it may run (CSP default-src 'none').
+         */
+        get: operations["version_file_api_plugins__plugin__versions__version__files__path__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/{plugin}/versions/{version}/ui/{ui}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Frame Bundle */
+        get: operations["frame_bundle_api_plugins__plugin__versions__version__ui__ui__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/{plugin}/data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Plugin Data */
+        get: operations["plugin_data_api_plugins__plugin__data_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/{plugin}/call": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Plugin Call
+         * @description A call from one of the plugin's frames, checked again here (§6.4). An error has
+         *     the contract's code; `confirm_required` carries {token, summary, risk}.
+         */
+        post: operations["plugin_call_api_plugins__plugin__call_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/{plugin}/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Chat
+         * @description A new chat in Agent mode, linked to the plugin, whose first message asks the
+         *     assistant to read the plugin. The answer is already queued.
+         */
+        post: operations["start_chat_api_plugins__plugin__chat_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ActivityOut */
+        ActivityOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** @description Who did it (None: an actor that can't be read) */
+            actor: components["schemas"]["ActorOut"] | null;
+            /**
+             * Action
+             * @description created | changed | completed | deleted | restored | reverted | moved | undone
+             */
+            action: string;
+            /** Object Type */
+            object_type: string;
+            /**
+             * Object Id
+             * @description A UUID, or a workspace path for a file
+             */
+            object_id: string | null;
+            /**
+             * Object Label
+             * @description The object's name now (None when it is gone: the summary names it)
+             */
+            object_label: string | null;
+            /**
+             * Object Url
+             * @description Where the object is in the app
+             */
+            object_url: string | null;
+            /** Summary */
+            summary: string;
+            /**
+             * Fields
+             * @description What a change changed, e.g. title, properties.client
+             */
+            fields: string[];
+            /** Group Id */
+            group_id: string | null;
+            /** Group Label */
+            group_label: string | null;
+            /** Run Id */
+            run_id: string | null;
+            /** Undone At */
+            undone_at: string | null;
+            /** Undone By */
+            undone_by: string | null;
+            /**
+             * Undo Blocked
+             * @description Why it can't be undone (undone | is_undo | not_undoable | too_large), None when it can be tried
+             */
+            undo_blocked: string | null;
+        };
+        /** ActivityPage */
+        ActivityPage: {
+            /** Items */
+            items: components["schemas"]["ActivityOut"][];
+            /**
+             * Next Cursor
+             * @description Pass as `cursor` for the next page
+             */
+            next_cursor: string | null;
+        };
         /**
          * ActorOut
          * @description Who made or changed something, ready to show: "the assistant in <chat title>".
@@ -4671,17 +5706,22 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "user" | "external" | "chat" | "automation";
+            kind: "user" | "external" | "chat" | "automation" | "plugin";
             /**
              * Label
-             * @description The chat's title or the automation's name (looked up when read); 'deleted chat' / 'deleted automation' when it is gone
+             * @description The chat's title or the automation's name (looked up when read); 'deleted chat' / 'deleted automation' when it is gone. A plugin: 'the plugin <name>' ('a removed plugin' when it is gone)
              */
             label: string;
             /**
              * Url
-             * @description Where it leads: the chat, or the automation's run
+             * @description Where it leads: the chat, the automation's run, or the plugin's page
              */
             url: string | null;
+            /**
+             * Automation Kind
+             * @description For an automation: a prompt (agent) or a script; None otherwise
+             */
+            automation_kind?: ("agent" | "script") | null;
         };
         /** AgentStats */
         AgentStats: {
@@ -4698,6 +5738,7 @@ export interface components {
         AllSettings: {
             general: components["schemas"]["GeneralSettings"];
             appearance: components["schemas"]["AppearanceSettings"];
+            profile: components["schemas"]["ProfileSettings"];
             models: components["schemas"]["ModelDefaults"];
             permissions: components["schemas"]["PermissionSettings"];
             workspace: components["schemas"]["WorkspaceSettings"];
@@ -4715,8 +5756,88 @@ export interface components {
             dictation: components["schemas"]["DictationSettings"];
             voice: components["schemas"]["VoiceSettings"];
             code: components["schemas"]["CodeSettings"];
+            images: components["schemas"]["ImageSettings"];
+            plugins: components["schemas"]["PluginSettings"];
         };
-        /** AppearanceSettings */
+        /** AppearanceAssetOut */
+        AppearanceAssetOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "background" | "font" | "avatar";
+            /**
+             * Media
+             * @enum {string}
+             */
+            media: "image" | "animated" | "video" | "font";
+            /** Mime */
+            mime: string;
+            /** Size */
+            size: number;
+            /** Filename */
+            filename: string;
+            /** Url */
+            url: string;
+            /** Poster Url */
+            poster_url: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * AppearanceBackground
+         * @description What is behind the app: nothing, a built-in animated gradient, or an upload.
+         */
+        AppearanceBackground: {
+            /**
+             * Kind
+             * @default none
+             * @enum {string}
+             */
+            kind: "none" | "gradient" | "upload";
+            /**
+             * Gradient
+             * @default aurora
+             * @enum {string}
+             */
+            gradient: "aurora" | "dusk" | "lagoon" | "custom";
+            custom_gradient?: components["schemas"]["CustomGradient"];
+            /** Asset Id */
+            asset_id?: string | null;
+            /**
+             * Blur
+             * @default 0
+             */
+            blur: number;
+            /**
+             * Dim
+             * @default 35
+             */
+            dim: number;
+            /**
+             * Fit
+             * @default cover
+             * @enum {string}
+             */
+            fit: "cover" | "contain" | "tile";
+            /**
+             * Animate On Phones
+             * @default false
+             */
+            animate_on_phones: boolean;
+        };
+        /**
+         * AppearanceSettings
+         * @description Settings > Appearance; applied in the browser (frontend/src/features/appearance).
+         */
         AppearanceSettings: {
             /**
              * Mode
@@ -4735,6 +5856,34 @@ export interface components {
              * @enum {string}
              */
             density: "comfortable" | "compact";
+            /** Tint */
+            tint?: string | null;
+            /**
+             * Tint Strength
+             * @default 40
+             */
+            tint_strength: number;
+            /**
+             * Ui Font
+             * @default default
+             */
+            ui_font: string;
+            /**
+             * Code Font
+             * @default default
+             */
+            code_font: string;
+            background?: components["schemas"]["AppearanceBackground"];
+            /**
+             * Glass
+             * @default false
+             */
+            glass: boolean;
+            /**
+             * Glass Strength
+             * @default 50
+             */
+            glass_strength: number;
         };
         /** AppendTo */
         AppendTo: {
@@ -4836,6 +5985,8 @@ export interface components {
             mime: string;
             /** Size */
             size: number;
+            /** Path */
+            path?: string | null;
         };
         /** AuditOut */
         AuditOut: {
@@ -4933,6 +6084,12 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Kind
+             * @default agent
+             * @enum {string}
+             */
+            kind: "agent" | "script";
             /** Name */
             name: string;
             /** Prompt */
@@ -5010,6 +6167,16 @@ export interface components {
             last_run_id: string | null;
             /** Active Run Id */
             active_run_id?: string | null;
+            /**
+             * Script Approved
+             * @default false
+             */
+            script_approved: boolean;
+            /**
+             * Script Pending
+             * @default false
+             */
+            script_pending: boolean;
             /**
              * Created At
              * Format: date-time
@@ -5093,6 +6260,7 @@ export interface components {
             /** Error */
             error: string | null;
             timing: components["schemas"]["RunTiming"];
+            event?: components["schemas"]["RunEvent"] | null;
         };
         /**
          * AutomationSettings
@@ -5109,6 +6277,11 @@ export interface components {
              * @default 30
              */
             max_run_minutes: number;
+            /**
+             * Max Trigger Firings Per Hour
+             * @default 60
+             */
+            max_trigger_firings_per_hour: number;
         };
         /**
          * AutomationToolOut
@@ -5144,10 +6317,35 @@ export interface components {
              */
             target: "chat" | "text";
         };
+        /** Body_install_zip_api_plugins_install_zip_post */
+        Body_install_zip_api_plugins_install_zip_post: {
+            /** File */
+            file: string;
+        };
         /** Body_pdf_text_api_extension_pdf_text_post */
         Body_pdf_text_api_extension_pdf_text_post: {
             /** File */
             file: string;
+        };
+        /** Body_set_avatar_api_appearance_avatar_put */
+        Body_set_avatar_api_appearance_avatar_put: {
+            /** File */
+            file: string;
+            /**
+             * Crop X
+             * @default 0
+             */
+            crop_x: number;
+            /**
+             * Crop Y
+             * @default 0
+             */
+            crop_y: number;
+            /**
+             * Crop Size
+             * @default 1
+             */
+            crop_size: number;
         };
         /** Body_upload_api_attachments_post */
         Body_upload_api_attachments_post: {
@@ -5169,10 +6367,27 @@ export interface components {
              */
             paths?: string[] | null;
         };
+        /** Body_upload_asset_api_appearance_assets_post */
+        Body_upload_asset_api_appearance_assets_post: {
+            /** File */
+            file: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "background" | "font";
+        };
         /** Body_upload_asset_api_documents_assets_post */
         Body_upload_asset_api_documents_assets_post: {
             /** File */
             file: string;
+        };
+        /** Body_upload_preview_api_documents__document_id__sketch_preview_put */
+        Body_upload_preview_api_documents__document_id__sketch_preview_put: {
+            /** File */
+            file: string;
+            /** Drawing Hash */
+            drawing_hash: string;
         };
         /** Body_upload_task_files_api_tasks__task_id__files_upload_post */
         Body_upload_task_files_api_tasks__task_id__files_upload_post: {
@@ -5189,6 +6404,11 @@ export interface components {
              */
             approval_id: string;
         };
+        /** Body_voice_transcript_api_voice_transcripts_post */
+        Body_voice_transcript_api_voice_transcripts_post: {
+            /** Audio */
+            audio: string;
+        };
         /** Body_voice_turn_api_voice_turns_post */
         Body_voice_turn_api_voice_turns_post: {
             /** Audio */
@@ -5200,6 +6420,18 @@ export interface components {
              * @default false
              */
             status: boolean;
+            /** Text */
+            text?: string | null;
+            /**
+             * Voice Mode
+             * @default false
+             */
+            voice_mode: boolean;
+            /**
+             * Keep Chat
+             * @default false
+             */
+            keep_chat: boolean;
         };
         /** BranchIn */
         BranchIn: {
@@ -5298,6 +6530,31 @@ export interface components {
         BulkOut: {
             /** Changed */
             changed: number;
+        };
+        /** BundledInstallIn */
+        BundledInstallIn: {
+            /** Id */
+            id: string;
+        };
+        /** BundledListOut */
+        BundledListOut: {
+            /** Plugins */
+            plugins: components["schemas"]["BundledPluginOut"][];
+        };
+        /** BundledPluginOut */
+        BundledPluginOut: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /** Version */
+            version: string;
+            /** Installed */
+            installed: boolean;
+            /** Permissions */
+            permissions: components["schemas"]["PermissionOut"][];
         };
         /** CaptureIn */
         CaptureIn: {
@@ -5506,6 +6763,11 @@ export interface components {
             /** Start Command */
             start_command: string;
         };
+        /** CodeAutoContinueIn */
+        CodeAutoContinueIn: {
+            /** Enabled */
+            enabled: boolean;
+        };
         /** CodeDeviceOut */
         CodeDeviceOut: {
             /**
@@ -5575,12 +6837,77 @@ export interface components {
             model?: string | null;
             /** Max Turns */
             max_turns?: number | null;
+            /**
+             * Image Ids
+             * @description Uploaded images (POST /api/attachments) to send with the prompt
+             */
+            image_ids?: string[];
+        };
+        /** CodeGitCommitIn */
+        CodeGitCommitIn: {
+            /**
+             * Project
+             * @description A folder in the computer's projects folder (a local checkout)
+             */
+            project?: string | null;
+            /**
+             * Repo
+             * @description owner/name of one of the owner's GitHub repositories that isn't cloned there (read from a cache on the computer)
+             */
+            repo?: string | null;
+            /** Hash */
+            hash: string;
+        };
+        /** CodeGitGraphIn */
+        CodeGitGraphIn: {
+            /**
+             * Project
+             * @description A folder in the computer's projects folder (a local checkout)
+             */
+            project?: string | null;
+            /**
+             * Repo
+             * @description owner/name of one of the owner's GitHub repositories that isn't cloned there (read from a cache on the computer)
+             */
+            repo?: string | null;
+            /**
+             * Limit
+             * @default 300
+             */
+            limit: number;
+            /**
+             * All
+             * @description Every branch; false: what HEAD can reach
+             * @default true
+             */
+            all: boolean;
+            /**
+             * Fetch
+             * @description git fetch --prune first (slower)
+             * @default false
+             */
+            fetch: boolean;
+        };
+        /** CodeImageOut */
+        CodeImageOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
         };
         /** CodeJobDetailOut */
         CodeJobDetailOut: {
             job: components["schemas"]["CodeJobOut"];
             /** Thread */
             thread: components["schemas"]["CodeJobOut"][];
+            /**
+             * Messages
+             * @default []
+             */
+            messages: components["schemas"]["CodeMessageOut"][];
         };
         /** CodeJobIn */
         CodeJobIn: {
@@ -5606,6 +6933,11 @@ export interface components {
             model?: string | null;
             /** Max Turns */
             max_turns?: number | null;
+            /**
+             * Image Ids
+             * @description Uploaded images (POST /api/attachments) to send with the prompt
+             */
+            image_ids?: string[];
         };
         /** CodeJobListOut */
         CodeJobListOut: {
@@ -5693,6 +7025,107 @@ export interface components {
             run_id?: string | null;
             /** Conversation Title */
             conversation_title?: string | null;
+            /**
+             * Images
+             * @default []
+             */
+            images: components["schemas"]["CodeImageOut"][];
+            tokens?: components["schemas"]["CodeTokensOut"] | null;
+            /**
+             * Input Open
+             * @default false
+             */
+            input_open: boolean;
+            /**
+             * Limit Hit
+             * @default false
+             */
+            limit_hit: boolean;
+            /** Limit Resets At */
+            limit_resets_at?: string | null;
+            /** Resume State */
+            resume_state?: string | null;
+            /** Resume At */
+            resume_at?: string | null;
+            /** Resume Note */
+            resume_note?: string | null;
+            /**
+             * Resume Attempt
+             * @default 0
+             */
+            resume_attempt: number;
+            /** Resumed Job Id */
+            resumed_job_id?: string | null;
+            /** Resumed From */
+            resumed_from?: string | null;
+        };
+        /** CodeMessageIn */
+        CodeMessageIn: {
+            /** Prompt */
+            prompt: string;
+            /**
+             * Image Ids
+             * @description Uploaded images (POST /api/attachments) to send with the message
+             */
+            image_ids?: string[];
+            /**
+             * Now
+             * @description Interrupt the job's current step and send it at once (default: queue)
+             */
+            now?: boolean | null;
+        };
+        /**
+         * CodeMessageOut
+         * @description A message written for a thread while its job ran (§15).
+         */
+        CodeMessageOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Thread Id
+             * Format: uuid
+             */
+            thread_id: string;
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /** Prompt */
+            prompt: string;
+            /**
+             * Images
+             * @default []
+             */
+            images: components["schemas"]["CodeImageOut"][];
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "queue" | "now";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "queued" | "sending" | "sent" | "delivered" | "followed_up" | "held";
+            /** Note */
+            note: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Sent At */
+            sent_at: string | null;
+            /** Delivered At */
+            delivered_at: string | null;
+            /** Delivered Seq */
+            delivered_seq: number | null;
+            /** Follow Up Job Id */
+            follow_up_job_id: string | null;
         };
         /** CodeProjectOut */
         CodeProjectOut: {
@@ -5702,6 +7135,8 @@ export interface components {
             dir: string;
             /** Remote */
             remote: string | null;
+            /** Repo */
+            repo?: string | null;
         };
         /** CodeProjectsOut */
         CodeProjectsOut: {
@@ -5718,6 +7153,8 @@ export interface components {
             name: string;
             /** Url */
             url: string;
+            /** Repo */
+            repo?: string | null;
         };
         /**
          * CodeSettings
@@ -5729,6 +7166,11 @@ export interface components {
              * @default 30
              */
             keep_days: number;
+            /**
+             * Auto Continue
+             * @default false
+             */
+            auto_continue: boolean;
         };
         /** CodeTodoOut */
         CodeTodoOut: {
@@ -5738,6 +7180,74 @@ export interface components {
             status: string;
             /** Activeform */
             activeForm?: string | null;
+        };
+        /** CodeTokensOut */
+        CodeTokensOut: {
+            /**
+             * Input
+             * @default 0
+             */
+            input: number;
+            /**
+             * Output
+             * @default 0
+             */
+            output: number;
+            /**
+             * Cache Read
+             * @default 0
+             */
+            cache_read: number;
+            /**
+             * Cache Creation
+             * @default 0
+             */
+            cache_creation: number;
+        };
+        /** CodeUsageListOut */
+        CodeUsageListOut: {
+            /** Usage */
+            usage: components["schemas"]["CodeUsageOut"][];
+        };
+        /**
+         * CodeUsageOut
+         * @description The usage of the Claude subscription a computer's jobs run on, as its newest
+         *     `rate_limit_event` said (§14).
+         */
+        CodeUsageOut: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Device Name */
+            device_name: string;
+            /** Status */
+            status: string | null;
+            /** Limit Type */
+            limit_type: string | null;
+            /** Resets At */
+            resets_at: string | null;
+            /** Windows */
+            windows: components["schemas"]["CodeUsageWindowOut"][];
+            /**
+             * Observed At
+             * Format: date-time
+             */
+            observed_at: string;
+            /** Job Id */
+            job_id: string | null;
+        };
+        /** CodeUsageWindowOut */
+        CodeUsageWindowOut: {
+            /** Name */
+            name: string;
+            /** Utilization */
+            utilization: number | null;
+            /** Resets At */
+            resets_at: string | null;
+            /** Status */
+            status: string | null;
         };
         /** ContentOut */
         ContentOut: {
@@ -5749,6 +7259,105 @@ export interface components {
             hash: string;
             /** Size */
             size: number;
+        };
+        /** ContributedCommandOut */
+        ContributedCommandOut: {
+            /** Plugin */
+            plugin: string;
+            /** Plugin Name */
+            plugin_name: string;
+            /** Version */
+            version: string;
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Icon */
+            icon: string | null;
+            /** Keywords */
+            keywords: string[];
+            /** Action */
+            action: {
+                [key: string]: unknown;
+            };
+        };
+        /** ContributedFenceOut */
+        ContributedFenceOut: {
+            /** Plugin */
+            plugin: string;
+            /** Fence */
+            fence: string;
+            /** Ui */
+            ui: string;
+        };
+        /** ContributedTemplateOut */
+        ContributedTemplateOut: {
+            /** Plugin */
+            plugin: string;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Title */
+            title: string;
+        };
+        /** ContributedThemeOut */
+        ContributedThemeOut: {
+            /** Plugin */
+            plugin: string;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Appearance */
+            appearance: {
+                [key: string]: unknown;
+            };
+        };
+        /** ContributedUiOut */
+        ContributedUiOut: {
+            /** Plugin */
+            plugin: string;
+            /** Plugin Name */
+            plugin_name: string;
+            /** Version */
+            version: string;
+            /** Icon Url */
+            icon_url: string | null;
+            /** Id */
+            id: string;
+            /** Slot */
+            slot: string;
+            /** Objects */
+            objects: string[] | null;
+            /** Title */
+            title: string | null;
+            /** Icon */
+            icon: string | null;
+            /** Entry */
+            entry: string;
+            /** Height */
+            height: number | null;
+            /** Fence */
+            fence: string | null;
+            /** Permissions */
+            permissions: string[];
+        };
+        /** ContributionOut */
+        ContributionOut: {
+            /** Kind */
+            kind: string;
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /**
+             * Risk
+             * @enum {string}
+             */
+            risk: "low" | "medium" | "high" | "critical";
+            /** Detail */
+            detail: string;
         };
         /** ConversationIn */
         ConversationIn: {
@@ -5861,6 +7470,35 @@ export interface components {
             properties?: {
                 [key: string]: unknown;
             } | null;
+            /** Kind */
+            kind?: ("markdown" | "sketch") | null;
+            /** Layout */
+            layout?: ("infinite" | "pages") | null;
+        };
+        /**
+         * CustomGradient
+         * @description The user's own animated gradient (Background > Animated gradient > Custom).
+         */
+        CustomGradient: {
+            /** Colors */
+            colors?: string[];
+            /**
+             * Style
+             * @default drift
+             * @enum {string}
+             */
+            style: "drift" | "linear";
+            /**
+             * Angle
+             * @default 135
+             */
+            angle: number;
+            /**
+             * Speed
+             * @default normal
+             * @enum {string}
+             */
+            speed: "slow" | "normal" | "fast";
         };
         /** DailyNoteIn */
         DailyNoteIn: {
@@ -6149,6 +7787,22 @@ export interface components {
             /** Vocabulary */
             vocabulary?: string[];
         };
+        /** DiffFileOut */
+        DiffFileOut: {
+            /** Path */
+            path: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "added" | "removed" | "changed" | "same";
+            /** Before */
+            before?: string | null;
+            /** After */
+            after?: string | null;
+            /** Sha256 */
+            sha256?: string | null;
+        };
         /** DiscoveredModelOut */
         DiscoveredModelOut: {
             /** Model Key */
@@ -6177,6 +7831,13 @@ export interface components {
             folder: string;
             /** Title */
             title: string;
+            /**
+             * Kind
+             * @description sketch: a drawing sheet (a .sketch.md file)
+             * @default markdown
+             * @enum {string}
+             */
+            kind: "markdown" | "sketch";
             /** Word Count */
             word_count: number;
             /** Last Editor */
@@ -6203,6 +7864,8 @@ export interface components {
             content: string;
             /** Hash */
             hash: string;
+            /** @description A sketch's drawing and its state */
+            sketch?: components["schemas"]["SketchOut"] | null;
         };
         /** DocumentList */
         DocumentList: {
@@ -6224,6 +7887,13 @@ export interface components {
             folder: string;
             /** Title */
             title: string;
+            /**
+             * Kind
+             * @description sketch: a drawing sheet (a .sketch.md file)
+             * @default markdown
+             * @enum {string}
+             */
+            kind: "markdown" | "sketch";
             /** Word Count */
             word_count: number;
             /** Last Editor */
@@ -6276,6 +7946,25 @@ export interface components {
             modified: string;
             /** Mime */
             mime: string | null;
+        };
+        /** EventFieldOut */
+        EventFieldOut: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** Kind */
+            kind: string;
+            /**
+             * Choices
+             * @default []
+             */
+            choices: string[];
+            /**
+             * Required
+             * @default false
+             */
+            required: boolean;
         };
         /**
          * EventIn
@@ -6411,6 +8100,40 @@ export interface components {
              */
             dropped_properties?: string[];
         };
+        /**
+         * EventSummary
+         * @description The event a "wake me" trigger brought into the chat (features/triggers): the
+         *     message is the system's, not the user's, and is shown as an event card.
+         */
+        EventSummary: {
+            /** Event Type */
+            event_type: string;
+            /** Summary */
+            summary: string;
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /**
+             * Coalesced
+             * @default 1
+             */
+            coalesced: number;
+            /** Trigger Id */
+            trigger_id?: string | null;
+        };
+        /** EventTypeOut */
+        EventTypeOut: {
+            /** Type */
+            type: string;
+            /** Label */
+            label: string;
+            /** Description */
+            description: string;
+            /** Fields */
+            fields: components["schemas"]["EventFieldOut"][];
+        };
         /** ExplainIn */
         ExplainIn: {
             /** Text */
@@ -6474,6 +8197,11 @@ export interface components {
              * @default false
              */
             show_documents_folder: boolean;
+            /**
+             * Device File Max Mb
+             * @default 50
+             */
+            device_file_max_mb: number;
         };
         /**
          * FilterChip
@@ -6730,6 +8458,23 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** FrameFileOut */
+        FrameFileOut: {
+            /** Path */
+            path: string;
+            /** Text */
+            text: string;
+        };
+        /**
+         * FramePictureOut
+         * @description A picture of the package, for `<img src>`, CSS `url()` and `anemo.files.url()`.
+         */
+        FramePictureOut: {
+            /** Path */
+            path: string;
+            /** Data Url */
+            data_url: string;
+        };
         /** GeneralSettings */
         GeneralSettings: {
             /**
@@ -6766,6 +8511,199 @@ export interface components {
              */
             language: "system" | "en" | "uk" | "ru";
         };
+        /** GitBranch */
+        GitBranch: {
+            /** Name */
+            name: string;
+            /** Commit */
+            commit: string;
+            /** Remote */
+            remote: boolean;
+            /** Upstream */
+            upstream: string | null;
+            /** Ahead */
+            ahead: number;
+            /** Behind */
+            behind: number;
+            /** Current */
+            current: boolean;
+            pullRequest?: components["schemas"]["GitPullRequest"] | null;
+        };
+        /** GitCacheCleared */
+        GitCacheCleared: {
+            /** Removed */
+            removed: number;
+            /** Bytes */
+            bytes: number;
+        };
+        /** GitCommitDetail */
+        GitCommitDetail: {
+            /** Hash */
+            hash: string;
+            /** Parents */
+            parents: string[];
+            /** Authorname */
+            authorName: string;
+            /** Authoremail */
+            authorEmail: string;
+            /** Date */
+            date: string;
+            /** Subject */
+            subject: string;
+            /** Committerdate */
+            committerDate: string;
+            /**
+             * Committername
+             * @default
+             */
+            committerName: string;
+            /** Body */
+            body: string;
+            /** Files */
+            files: components["schemas"]["GitFile"][];
+            stats: components["schemas"]["GitStats"];
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+        };
+        /** GitFile */
+        GitFile: {
+            /** Path */
+            path: string;
+            /** Status */
+            status: string;
+            /** Additions */
+            additions: number | null;
+            /** Deletions */
+            deletions: number | null;
+        };
+        /** GitGraph */
+        GitGraph: {
+            head: components["schemas"]["GitHead"];
+            /** Branches */
+            branches: components["schemas"]["GitBranch"][];
+            /** Tags */
+            tags: components["schemas"]["GitTag"][];
+            /** Commits */
+            commits: components["schemas"]["GitGraphCommit"][];
+            status: components["schemas"]["GitStatus"] | null;
+            /** Remotes */
+            remotes: components["schemas"]["GitRemote"][];
+            /** Truncated */
+            truncated: boolean;
+            /**
+             * Source
+             * @default local
+             * @enum {string}
+             */
+            source: "local" | "remote";
+            /** Repo */
+            repo?: string | null;
+            /** Fetchedat */
+            fetchedAt?: string | null;
+            /** Fetcherror */
+            fetchError?: string | null;
+            /** Pullrequests */
+            pullRequests?: components["schemas"]["GitPullRequest"][] | null;
+        };
+        /** GitGraphCommit */
+        GitGraphCommit: {
+            /** Hash */
+            hash: string;
+            /** Parents */
+            parents: string[];
+            /** Authorname */
+            authorName: string;
+            /** Authoremail */
+            authorEmail: string;
+            /** Date */
+            date: string;
+            /** Subject */
+            subject: string;
+            /**
+             * Refs
+             * @default []
+             */
+            refs: string[];
+        };
+        /** GitHead */
+        GitHead: {
+            /** Branch */
+            branch: string | null;
+            /** Commit */
+            commit: string | null;
+            /** Detached */
+            detached: boolean;
+        };
+        /** GitInstallIn */
+        GitInstallIn: {
+            /** Url */
+            url: string;
+            /** Ref */
+            ref?: string | null;
+        };
+        /** GitPullRequest */
+        GitPullRequest: {
+            /** Number */
+            number: number;
+            /** Title */
+            title: string;
+            /** Headref */
+            headRef: string;
+            /** Url */
+            url: string;
+            /**
+             * Draft
+             * @default false
+             */
+            draft: boolean;
+        };
+        /** GitRemote */
+        GitRemote: {
+            /** Name */
+            name: string;
+            /** Url */
+            url: string;
+        };
+        /** GitStats */
+        GitStats: {
+            /** Files */
+            files: number;
+            /** Additions */
+            additions: number;
+            /** Deletions */
+            deletions: number;
+        };
+        /** GitStatus */
+        GitStatus: {
+            /** Dirty */
+            dirty: boolean;
+            /** Staged */
+            staged: number;
+            /** Unstaged */
+            unstaged: number;
+            /** Untracked */
+            untracked: number;
+            /** Conflicted */
+            conflicted: number;
+        };
+        /** GitTag */
+        GitTag: {
+            /** Name */
+            name: string;
+            /** Commit */
+            commit: string;
+        };
+        /** GroupUndoOut */
+        GroupUndoOut: {
+            /**
+             * Results
+             * @description One per entry tried or skipped, newest first (undone ones are left out)
+             */
+            results: components["schemas"]["UndoItemOut"][];
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -6781,6 +8719,17 @@ export interface components {
             /** Mobile Layout */
             mobile_layout?: components["schemas"]["WidgetLayout"][];
         };
+        /**
+         * HookAccepted
+         * @description Nothing about the trigger or its automation: only that the request was taken.
+         */
+        HookAccepted: {
+            /**
+             * Accepted
+             * @default true
+             */
+            accepted: boolean;
+        };
         /** HubSection */
         HubSection: {
             /** Key */
@@ -6795,6 +8744,29 @@ export interface components {
             rows: components["schemas"]["ViewRow"][];
             /** Truncated */
             truncated: boolean;
+        };
+        /**
+         * ImageSettings
+         * @description The generate_image tool (features/image_generation). Security-sensitive like the
+         *     permissions: it decides how much an agent may spend without asking.
+         */
+        ImageSettings: {
+            /**
+             * Max Count
+             * @default 4
+             */
+            max_count: number;
+            /**
+             * Max Resolution
+             * @default 2K
+             * @enum {string}
+             */
+            max_resolution: "1K" | "2K" | "4K";
+            /**
+             * Ask In Automations
+             * @default true
+             */
+            ask_in_automations: boolean;
         };
         /** ImportIn */
         ImportIn: {
@@ -7022,6 +8994,17 @@ export interface components {
             username: string;
             /** Password */
             password: string;
+        };
+        /** ManifestDiffOut */
+        ManifestDiffOut: {
+            /** Before */
+            before: {
+                [key: string]: unknown;
+            } | null;
+            /** After */
+            after: {
+                [key: string]: unknown;
+            };
         };
         /**
          * MarkReadIn
@@ -7401,6 +9384,7 @@ export interface components {
              */
             references: components["schemas"]["ReferenceSummary"][];
             page?: components["schemas"]["PageSummary"] | null;
+            event?: components["schemas"]["EventSummary"] | null;
             skill?: components["schemas"]["SkillSummary"] | null;
             /** Mode */
             mode?: string | null;
@@ -7455,7 +9439,7 @@ export interface components {
         /**
          * ModelDefaults
          * @description Which model handles each kind of work. Unset tasks fall back to the chat model
-         *     (except embeddings and transcription, which need a model of their own kind).
+         *     (except embeddings, transcription and image, which need a model of their own kind).
          */
         ModelDefaults: {
             /** Chat */
@@ -7480,6 +9464,8 @@ export interface components {
             transcription?: string | null;
             /** Dictation */
             dictation?: string | null;
+            /** Image */
+            image?: string | null;
             /** Fallbacks */
             fallbacks?: {
                 [key: string]: string[];
@@ -7625,7 +9611,7 @@ export interface components {
              *       "files"
              *     ]
              */
-            pinned: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "code" | "automations" | "agents" | "memory")[];
+            pinned: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "code" | "automations" | "agents" | "memory" | "activity")[];
             /**
              * More
              * @default [
@@ -7636,12 +9622,13 @@ export interface components {
              *       "code",
              *       "automations",
              *       "agents",
-             *       "memory"
+             *       "memory",
+             *       "activity"
              *     ]
              */
-            more: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "code" | "automations" | "agents" | "memory")[];
+            more: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "code" | "automations" | "agents" | "memory" | "activity")[];
             /** Off */
-            off?: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "code" | "automations" | "agents" | "memory")[];
+            off?: ("home" | "notifications" | "tasks" | "calendar" | "documents" | "files" | "projects" | "focus" | "music" | "runs" | "code" | "automations" | "agents" | "memory" | "activity")[];
         };
         /** NewDeviceOut */
         NewDeviceOut: {
@@ -8080,6 +10067,33 @@ export interface components {
             /** Tool Name */
             tool_name: string;
         };
+        /** PermissionDiffOut */
+        PermissionDiffOut: {
+            /** Added */
+            added: components["schemas"]["PermissionOut"][];
+            /** Removed */
+            removed: components["schemas"]["PermissionOut"][];
+            /** Kept */
+            kept: components["schemas"]["PermissionOut"][];
+        };
+        /** PermissionOut */
+        PermissionOut: {
+            /** Name */
+            name: string;
+            /** Kind */
+            kind: string;
+            /** Target */
+            target: string | null;
+            /**
+             * Risk
+             * @enum {string}
+             */
+            risk: "low" | "medium" | "high" | "critical";
+            /** Label */
+            label: string;
+            /** Explanation */
+            explanation: string;
+        };
         /**
          * PermissionSettings
          * @description Stored in app_settings["permissions"] (security-sensitive section).
@@ -8261,10 +10275,342 @@ export interface components {
             /** Track Ids */
             track_ids: string[];
         };
+        /** PluginApproveIn */
+        PluginApproveIn: {
+            /** Hash */
+            hash: string;
+            /**
+             * Enable
+             * @default false
+             */
+            enable: boolean;
+        };
+        /** PluginAuthorOut */
+        PluginAuthorOut: {
+            /** Name */
+            name: string;
+            /** Url */
+            url?: string | null;
+        };
+        /**
+         * PluginBuildChatOut
+         * @description The chat "Continue building with the assistant" started (POST /{plugin}/chat).
+         */
+        PluginBuildChatOut: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+        };
+        /** PluginCallIn */
+        PluginCallIn: {
+            /** Ui */
+            ui?: string | null;
+            /** Method */
+            method: string;
+            /** Params */
+            params?: {
+                [key: string]: unknown;
+            };
+            /** Confirm Token */
+            confirm_token?: string | null;
+            /** Preview Version */
+            preview_version?: string | null;
+        };
+        /** PluginCallOut */
+        PluginCallOut: {
+            /** Result */
+            result: unknown;
+        };
+        /** PluginChatIn */
+        PluginChatIn: {
+            /**
+             * Message
+             * @description What the user wants changed. Left out: the assistant reads the plugin and asks.
+             * @default
+             */
+            message: string;
+        };
+        /** PluginChatOut */
+        PluginChatOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+        };
+        /** PluginContributionsOut */
+        PluginContributionsOut: {
+            /** Ui */
+            ui: components["schemas"]["ContributedUiOut"][];
+            /** Commands */
+            commands: components["schemas"]["ContributedCommandOut"][];
+            /** Fences */
+            fences: components["schemas"]["ContributedFenceOut"][];
+            /** Themes */
+            themes: components["schemas"]["ContributedThemeOut"][];
+            /** Templates */
+            templates: components["schemas"]["ContributedTemplateOut"][];
+            /** Disabled All */
+            disabled_all: boolean;
+        };
+        /** PluginDataOut */
+        PluginDataOut: {
+            /** Resources */
+            resources: components["schemas"]["PluginResourceOut"][];
+            /** Storage Keys */
+            storage_keys: number;
+            /** Storage Bytes */
+            storage_bytes: number;
+            /**
+             * Asset Count
+             * @default 0
+             */
+            asset_count: number;
+            /**
+             * Asset Bytes
+             * @default 0
+             */
+            asset_bytes: number;
+            /** Tasks */
+            tasks: number;
+            /** Documents */
+            documents: number;
+            /** Events */
+            events: number;
+        };
+        /** PluginDetailOut */
+        PluginDetailOut: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /** Version */
+            version: string;
+            /** Icon Url */
+            icon_url: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "needs_review" | "enabled" | "disabled" | "error";
+            /** Update Pending */
+            update_pending: boolean;
+            /** Made By Assistant */
+            made_by_assistant: boolean;
+            /** Error */
+            error: string | null;
+            source: components["schemas"]["PluginSource"];
+            /** Ui Count */
+            ui_count: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Readme */
+            readme: string | null;
+            author: components["schemas"]["PluginAuthorOut"];
+            /** License */
+            license: string | null;
+            /** Approved Version */
+            approved_version: string | null;
+            /** Pending Version */
+            pending_version: string | null;
+            /** Versions */
+            versions: components["schemas"]["PluginVersionOut"][];
+            /** Chats */
+            chats: components["schemas"]["PluginChatOut"][];
+        };
+        /** PluginDiffOut */
+        PluginDiffOut: {
+            /** From */
+            from: string | null;
+            /** To */
+            to: string;
+            manifest: components["schemas"]["ManifestDiffOut"];
+            permissions: components["schemas"]["PermissionDiffOut"];
+            /** Files */
+            files: components["schemas"]["DiffFileOut"][];
+        };
+        /** PluginFileOut */
+        PluginFileOut: {
+            /** Path */
+            path: string;
+            /** Size */
+            size: number;
+            /** Sha256 */
+            sha256: string;
+        };
+        /** PluginFrameBundleOut */
+        PluginFrameBundleOut: {
+            /** Entry */
+            entry: string;
+            /** Html */
+            html: string;
+            /** Scripts */
+            scripts: components["schemas"]["FrameFileOut"][];
+            /** Styles */
+            styles: components["schemas"]["FrameFileOut"][];
+            /** Hash */
+            hash: string;
+            /** Pictures */
+            pictures?: components["schemas"]["FramePictureOut"][];
+        };
+        /** PluginListOut */
+        PluginListOut: {
+            /** Plugins */
+            plugins: components["schemas"]["PluginOut"][];
+            /** Disabled All */
+            disabled_all: boolean;
+        };
+        /** PluginOut */
+        PluginOut: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /** Version */
+            version: string;
+            /** Icon Url */
+            icon_url: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "needs_review" | "enabled" | "disabled" | "error";
+            /** Update Pending */
+            update_pending: boolean;
+            /** Made By Assistant */
+            made_by_assistant: boolean;
+            /** Error */
+            error: string | null;
+            source: components["schemas"]["PluginSource"];
+            /** Ui Count */
+            ui_count: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** PluginPatchIn */
+        PluginPatchIn: {
+            /** Enabled */
+            enabled: boolean;
+        };
+        /** PluginResourceOut */
+        PluginResourceOut: {
+            /** Kind */
+            kind: string;
+            /** Id */
+            id: string;
+            /** Object Type */
+            object_type: string;
+            /**
+             * Object Id
+             * Format: uuid
+             */
+            object_id: string;
+            /** Label */
+            label: string;
+            /** Owned */
+            owned: boolean;
+        };
+        /**
+         * PluginSettings
+         * @description Settings > Plugins (docs/specs/CONTRACTS-plugins.md §5). Not sensitive: switching
+         *     every plugin off must be quick.
+         */
+        PluginSettings: {
+            /**
+             * Disabled All
+             * @default false
+             */
+            disabled_all: boolean;
+        };
+        /**
+         * PluginSource
+         * @description Where a plugin came from: an uploaded zip (its file name), a Git repository (URL,
+         *     ref, the commit it was fetched at), an assistant (the chats) or Anemo itself.
+         */
+        PluginSource: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "zip" | "git" | "assistant" | "bundled";
+            /** Label */
+            label: string;
+            /** Url */
+            url?: string | null;
+            /** Ref */
+            ref?: string | null;
+            /** Commit */
+            commit?: string | null;
+            /**
+             * Conversation Ids
+             * @default []
+             */
+            conversation_ids: string[];
+        };
+        /** PluginVersionOut */
+        PluginVersionOut: {
+            /** Version */
+            version: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "approved" | "superseded" | "rejected";
+            /** Hash */
+            hash: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            created_by: components["schemas"]["ActorOut"] | null;
+            /** Approved At */
+            approved_at: string | null;
+            /** Manifest */
+            manifest: {
+                [key: string]: unknown;
+            };
+            /** Permissions */
+            permissions: components["schemas"]["PermissionOut"][];
+            /** Contributions */
+            contributions: components["schemas"]["ContributionOut"][];
+            /** Files */
+            files: components["schemas"]["PluginFileOut"][];
+        };
         /** PresenceIn */
         PresenceIn: {
             /** Tab */
             tab: string;
+        };
+        /** PreviewOut */
+        PreviewOut: {
+            /**
+             * Drawing Hash
+             * @description The drawing version the image shows
+             */
+            drawing_hash: string;
+            /** Width */
+            width: number;
+            /** Height */
+            height: number;
         };
         /** ProfileIn */
         ProfileIn: {
@@ -8344,6 +10690,20 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /**
+         * ProfileSettings
+         * @description Settings > Profile: how you appear in the app. The avatar is set through
+         *     PUT /appearance/avatar, which also stores its id here.
+         */
+        ProfileSettings: {
+            /**
+             * Display Name
+             * @default
+             */
+            display_name: string;
+            /** Avatar Id */
+            avatar_id?: string | null;
         };
         /** ProjectIn */
         ProjectIn: {
@@ -8454,7 +10814,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "openai" | "anthropic" | "openrouter" | "openai_compatible" | "claude_code" | "fake";
+            type: "openai" | "anthropic" | "openrouter" | "google" | "openai_compatible" | "claude_code" | "fake";
             /** Base Url */
             base_url?: string | null;
             /**
@@ -8488,7 +10848,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "openai" | "anthropic" | "openrouter" | "openai_compatible" | "claude_code" | "fake";
+            type: "openai" | "anthropic" | "openrouter" | "google" | "openai_compatible" | "claude_code" | "fake";
             /** Base Url */
             base_url: string | null;
             /** Effective Base Url */
@@ -8528,7 +10888,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "openai" | "anthropic" | "openrouter" | "openai_compatible" | "claude_code" | "fake";
+            type: "openai" | "anthropic" | "openrouter" | "google" | "openai_compatible" | "claude_code" | "fake";
             /** Label */
             label: string;
             /** Default Base Url */
@@ -8589,6 +10949,11 @@ export interface components {
             /** Answer */
             answer: string | null;
         };
+        /** QueuedOut */
+        QueuedOut: {
+            /** Queued */
+            queued: boolean;
+        };
         /** RecentDocument */
         RecentDocument: {
             /**
@@ -8602,6 +10967,13 @@ export interface components {
             folder: string;
             /** Title */
             title: string;
+            /**
+             * Kind
+             * @description sketch: a drawing sheet (a .sketch.md file)
+             * @default markdown
+             * @enum {string}
+             */
+            kind: "markdown" | "sketch";
             /** Word Count */
             word_count: number;
             /** Last Editor */
@@ -9060,6 +11432,26 @@ export interface components {
              */
             memories_used: components["schemas"]["MemoryUsed"][];
         };
+        /**
+         * RunEvent
+         * @description The event that started a run (an event trigger, features/triggers).
+         */
+        RunEvent: {
+            /** Type */
+            type: string;
+            /** Summary */
+            summary: string;
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /**
+             * Coalesced
+             * @default 1
+             */
+            coalesced: number;
+        };
         /** RunListItem */
         RunListItem: {
             /**
@@ -9294,7 +11686,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "cron" | "interval" | "once" | "rrule";
+            kind: "cron" | "interval" | "once" | "rrule" | "manual";
             /** Cron */
             cron?: string | null;
             /** Every Minutes */
@@ -9332,6 +11724,143 @@ export interface components {
         Scope: {
             /** Roots */
             roots?: string[];
+        };
+        /** ScriptApproveIn */
+        ScriptApproveIn: {
+            /** Hash */
+            hash: string;
+            /**
+             * Enable
+             * @default false
+             */
+            enable: boolean;
+        };
+        /**
+         * ScriptCode
+         * @description What a version of a script is: its code and what the code may use. All of it is
+         *     reviewed together: changing any part is a new version.
+         */
+        ScriptCode: {
+            /** Code */
+            code: string;
+            /** Tools */
+            tools?: string[];
+            /** Hosts */
+            hosts?: string[];
+            /** Secrets */
+            secrets?: string[];
+            /** Think Tools */
+            think_tools?: string[];
+        };
+        /**
+         * ScriptCreateIn
+         * @description A new script from the app: approved at once (the user wrote or saw it), off
+         *     until it is switched on.
+         */
+        ScriptCreateIn: {
+            /** Code */
+            code: string;
+            /** Tools */
+            tools?: string[];
+            /** Hosts */
+            hosts?: string[];
+            /** Secrets */
+            secrets?: string[];
+            /** Think Tools */
+            think_tools?: string[];
+            /** Name */
+            name: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            schedule?: components["schemas"]["Schedule"];
+            /** Profile Id */
+            profile_id?: string | null;
+            /** Model Id */
+            model_id?: string | null;
+            /** Project Id */
+            project_id?: string | null;
+            /**
+             * On Ask
+             * @default pause
+             * @enum {string}
+             */
+            on_ask: "pause" | "deny" | "fail";
+            /**
+             * Notify
+             * @default agent_decides
+             * @enum {string}
+             */
+            notify: "agent_decides" | "always" | "on_failure" | "never";
+            /**
+             * Max Retries
+             * @default 0
+             */
+            max_retries: number;
+            /**
+             * Max Tool Calls
+             * @default 30
+             */
+            max_tool_calls: number;
+            /**
+             * Max Runtime S
+             * @default 300
+             */
+            max_runtime_s: number;
+            /** Chat Retention Days */
+            chat_retention_days?: number | null;
+        };
+        /** ScriptOut */
+        ScriptOut: {
+            /**
+             * Automation Id
+             * Format: uuid
+             */
+            automation_id: string;
+            approved: components["schemas"]["ScriptVersionOut"] | null;
+            pending: components["schemas"]["ScriptVersionOut"] | null;
+            owner: components["schemas"]["ActorOut"] | null;
+            /** Secrets */
+            secrets: components["schemas"]["ScriptSecretOut"][];
+        };
+        /** ScriptSecretIn */
+        ScriptSecretIn: {
+            /** Value */
+            value: string;
+        };
+        /** ScriptSecretOut */
+        ScriptSecretOut: {
+            /** Name */
+            name: string;
+            /** Value Hint */
+            value_hint: string | null;
+        };
+        /** ScriptVersionOut */
+        ScriptVersionOut: {
+            /** Number */
+            number: number;
+            /** Hash */
+            hash: string;
+            /** Code */
+            code: string;
+            /** Tools */
+            tools: string[];
+            /** Hosts */
+            hosts: string[];
+            /** Secrets */
+            secrets: string[];
+            /** Think Tools */
+            think_tools: string[];
+            created_by: components["schemas"]["ActorOut"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Approved At */
+            approved_at: string | null;
         };
         /** SearchGroup */
         SearchGroup: {
@@ -9410,6 +11939,13 @@ export interface components {
             /** Url */
             url: string;
         };
+        /** SecretOut */
+        SecretOut: {
+            /** Secret */
+            secret: string;
+            /** Webhook Url */
+            webhook_url: string;
+        };
         /** SessionOut */
         SessionOut: {
             /**
@@ -9458,6 +11994,31 @@ export interface components {
             has_chat_default: boolean;
             /** Offer Setup */
             offer_setup: boolean;
+        };
+        /**
+         * Shape
+         * @description A line or arrow from (x1, y1) to (x2, y2), or a rectangle or ellipse in that box.
+         */
+        Shape: {
+            /** Id */
+            id: string;
+            /** Color */
+            color: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "arrow" | "ellipse" | "line" | "rect";
+            /** Width */
+            width: number;
+            /** X1 */
+            x1: number;
+            /** Y1 */
+            y1: number;
+            /** X2 */
+            x2: number;
+            /** Y2 */
+            y2: number;
         };
         /** ShareIn */
         ShareIn: {
@@ -9749,6 +12310,86 @@ export interface components {
              */
             app: string;
         };
+        /**
+         * SketchData
+         * @description The drawing (version 1). Coordinates are in sheet units (CSS pixels at 100 %).
+         */
+        SketchData: {
+            /**
+             * V
+             * @default 1
+             * @constant
+             */
+            v: 1;
+            /**
+             * Layout
+             * @default infinite
+             * @enum {string}
+             */
+            layout: "infinite" | "pages";
+            /**
+             * Background
+             * @default plain
+             * @enum {string}
+             */
+            background: "plain" | "grid" | "dots" | "lines";
+            /**
+             * Pages
+             * @default 1
+             */
+            pages: number;
+            /** Items */
+            items?: (components["schemas"]["Stroke"] | components["schemas"]["Shape"] | components["schemas"]["TextBox"])[];
+        };
+        /** SketchOut */
+        SketchOut: {
+            /** @description The drawing; None when it can't be read */
+            data: components["schemas"]["SketchData"] | null;
+            /**
+             * Error
+             * @description Why the drawing can't be read
+             */
+            error?: string | null;
+            /**
+             * Drawing Hash
+             * @description This version of the drawing
+             */
+            drawing_hash?: string | null;
+            /**
+             * Transcription
+             * @description Text a model read from the drawing
+             */
+            transcription?: string | null;
+            /**
+             * Transcription Current
+             * @description The transcription was made from the drawing as it is now
+             * @default false
+             */
+            transcription_current: boolean;
+            /**
+             * Transcription Status
+             * @description queued | failed | None
+             */
+            transcription_status?: string | null;
+            preview?: components["schemas"]["PreviewOut"] | null;
+            /**
+             * Preview Current
+             * @description The image shows the drawing as it is now
+             * @default false
+             */
+            preview_current: boolean;
+        };
+        /** SketchSaveIn */
+        SketchSaveIn: {
+            data: components["schemas"]["SketchData"];
+            /** Title */
+            title?: string | null;
+            /**
+             * Base Hash
+             * @description Hash of the version being edited
+             */
+            base_hash?: string | null;
+        };
         /** SkillIn */
         SkillIn: {
             /** Slug */
@@ -9918,6 +12559,30 @@ export interface components {
             projects: components["schemas"]["ProjectStats"][];
             agents: components["schemas"]["AgentStats"];
         };
+        /**
+         * Stroke
+         * @description A freehand line: `points` is flat, three numbers a point (x, y, pressure 0-1).
+         */
+        Stroke: {
+            /** Id */
+            id: string;
+            /** Color */
+            color: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "stroke";
+            /**
+             * Tool
+             * @enum {string}
+             */
+            tool: "pen" | "highlighter";
+            /** Width */
+            width: number;
+            /** Points */
+            points: number[];
+        };
         /** SuggestionIds */
         SuggestionIds: {
             /** Ids */
@@ -10042,6 +12707,14 @@ export interface components {
             events: number;
             /** Titles */
             titles: string[];
+        };
+        /** TargetsIn */
+        TargetsIn: {
+            /**
+             * Refs
+             * @description References: /documents/<id>, /tasks?task=<id>, /calendar?event=<id>, /c/<id>
+             */
+            refs: string[];
         };
         /** TaskFileOut */
         TaskFileOut: {
@@ -10290,6 +12963,31 @@ export interface components {
             /** Detail */
             detail?: string | null;
         };
+        /**
+         * TextBox
+         * @description Text at (x, y) (its top left), `size` the font size; `width` wraps it.
+         */
+        TextBox: {
+            /** Id */
+            id: string;
+            /** Color */
+            color: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "text";
+            /** X */
+            x: number;
+            /** Y */
+            y: number;
+            /** Size */
+            size: number;
+            /** Text */
+            text: string;
+            /** Width */
+            width?: number | null;
+        };
         /** TimelineOut */
         TimelineOut: {
             /**
@@ -10536,6 +13234,141 @@ export interface components {
              */
             deleted_at: string;
         };
+        /** TriggerCreated */
+        TriggerCreated: {
+            trigger: components["schemas"]["TriggerOut"];
+            /** Secret */
+            secret?: string | null;
+        };
+        /**
+         * TriggerIn
+         * @description A trigger for an automation (the Automations page). Wake-me triggers are only made
+         *     by an agent in its chat (the create_trigger tool).
+         */
+        TriggerIn: {
+            /**
+             * Automation Id
+             * Format: uuid
+             */
+            automation_id: string;
+            /** Event Type */
+            event_type: string;
+            /** Filter */
+            filter?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Once
+             * @default false
+             */
+            once: boolean;
+            /** Expires At */
+            expires_at?: string | null;
+            /**
+             * Debounce S
+             * @default 0
+             */
+            debounce_s: number;
+            /**
+             * Max Per Hour
+             * @default 12
+             */
+            max_per_hour: number;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /** TriggerOut */
+        TriggerOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Automation Id */
+            automation_id: string | null;
+            /** Conversation Id */
+            conversation_id: string | null;
+            /** Conversation Title */
+            conversation_title?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "automation" | "wake";
+            /** Event Type */
+            event_type: string;
+            /** Event Label */
+            event_label: string;
+            /** Filter */
+            filter: {
+                [key: string]: unknown;
+            };
+            /** Once */
+            once: boolean;
+            /** Expires At */
+            expires_at: string | null;
+            /** Debounce S */
+            debounce_s: number;
+            /** Max Per Hour */
+            max_per_hour: number;
+            /** Enabled */
+            enabled: boolean;
+            /** Note */
+            note: string;
+            /** Created By */
+            created_by: string;
+            /** Fire Count */
+            fire_count: number;
+            /** Last Fired At */
+            last_fired_at: string | null;
+            /** Dropped Count */
+            dropped_count: number;
+            /** Last Drop Reason */
+            last_drop_reason: string | null;
+            /** Waiting */
+            waiting: boolean;
+            /** Webhook Url */
+            webhook_url?: string | null;
+            /**
+             * Has Secret
+             * @default false
+             */
+            has_secret: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** TriggerPatch */
+        TriggerPatch: {
+            /** Event Type */
+            event_type?: string | null;
+            /** Filter */
+            filter?: {
+                [key: string]: unknown;
+            } | null;
+            /** Once */
+            once?: boolean | null;
+            /** Expires At */
+            expires_at?: string | null;
+            /** Debounce S */
+            debounce_s?: number | null;
+            /** Max Per Hour */
+            max_per_hour?: number | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Note */
+            note?: string | null;
+        };
         /** TurnIn */
         TurnIn: {
             /**
@@ -10587,6 +13420,36 @@ export interface components {
             document_id: string;
             /** Revision Id */
             revision_id?: string | null;
+        };
+        /** UndoItemOut */
+        UndoItemOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Ok */
+            ok: boolean;
+            /** Message */
+            message: string;
+            /**
+             * Code
+             * @description The error code when it wasn't undone
+             */
+            code: string | null;
+            /** Details */
+            details?: unknown;
+            /**
+             * Skipped
+             * @description Not tried: the entry can't be undone (`code` says why); not a failure
+             */
+            skipped: boolean;
+        };
+        /** UndoOut */
+        UndoOut: {
+            /** Message */
+            message: string;
+            entry: components["schemas"]["ActivityOut"];
         };
         /** UpdateMentionsIn */
         UpdateMentionsIn: {
@@ -10944,6 +13807,13 @@ export interface components {
              * @enum {string}
              */
             chat: "daily" | "single";
+        };
+        /** VoiceTranscriptOut */
+        VoiceTranscriptOut: {
+            /** Heard */
+            heard: string;
+            /** Say */
+            say?: string | null;
         };
         /**
          * VoiceTurnOut
@@ -11564,6 +14434,37 @@ export interface operations {
             };
         };
     };
+    receive_hook_api_hooks__trigger_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trigger_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HookAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_settings_all_api_settings_get: {
         parameters: {
             query?: never;
@@ -11652,6 +14553,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AppearanceSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_profile_settings_api_settings_profile_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileSettings"];
                 };
             };
             /** @description Validation Error */
@@ -12260,6 +15196,76 @@ export interface operations {
             };
         };
     };
+    put_images_settings_api_settings_images_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImageSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_plugins_settings_api_settings_plugins_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_audit_api_audit_get: {
         parameters: {
             query?: {
@@ -12280,6 +15286,117 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_activity_api_activity_get: {
+        parameters: {
+            query?: {
+                actor_kind?: ("user" | "assistant" | "automation" | "script" | "plugin" | "trigger" | "external") | null;
+                actor_ref?: string | null;
+                object_type?: ("task" | "event" | "document" | "file" | "project") | null;
+                object_id?: string | null;
+                since?: string | null;
+                until?: string | null;
+                group_id?: string | null;
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    undo_entry_api_activity__entry_id__undo_post: {
+        parameters: {
+            query?: {
+                force?: boolean;
+            };
+            header?: never;
+            path: {
+                entry_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UndoOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    undo_group_api_activity_groups__group_id__undo_post: {
+        parameters: {
+            query?: {
+                force?: boolean;
+            };
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupUndoOut"];
                 };
             };
             /** @description Validation Error */
@@ -13801,6 +16918,206 @@ export interface operations {
             };
         };
     };
+    list_assets_api_appearance_assets_get: {
+        parameters: {
+            query?: {
+                kind?: ("background" | "font" | "avatar") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppearanceAssetOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_asset_api_appearance_assets_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_asset_api_appearance_assets_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppearanceAssetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    asset_content_api_appearance_assets__asset_id__content_get: {
+        parameters: {
+            query?: {
+                variant?: "poster" | null;
+                /** @description An avatar's size in px: 64, 128 or 256 */
+                size?: number | null;
+            };
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_asset_api_appearance_assets__asset_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_avatar_api_appearance_avatar_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_set_avatar_api_appearance_avatar_put"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_avatar_api_appearance_avatar_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     timeline_api_runs__run_id__timeline_get: {
         parameters: {
             query?: never;
@@ -14360,6 +17677,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BrokenLinkOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    link_targets_api_links_targets_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TargetsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkItem"][];
                 };
             };
             /** @description Validation Error */
@@ -16388,6 +19740,177 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UpdatedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_sketch_api_documents__document_id__sketch_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SketchSaveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentContent"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_api_documents__document_id__sketch_preview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_preview_api_documents__document_id__sketch_preview_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_preview_api_documents__document_id__sketch_preview_put"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sketch_attachment_api_documents__document_id__sketch_attachment_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    transcribe_api_documents__document_id__sketch_transcribe_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueuedOut"];
                 };
             };
             /** @description Validation Error */
@@ -19114,6 +22637,37 @@ export interface operations {
             };
         };
     };
+    code_usage_api_code_usage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeUsageListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_job_api_code_jobs__job_id__get: {
         parameters: {
             query?: never;
@@ -19317,6 +22871,144 @@ export interface operations {
             };
         };
     };
+    send_message_api_code_jobs__job_id__messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeMessageIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeMessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_message_api_code_messages__message_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_message_now_api_code_messages__message_id__now_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeMessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    auto_continue_api_code_jobs__job_id__auto_continue_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeAutoContinueIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     cancel_job_api_code_jobs__job_id__cancel_post: {
         parameters: {
             query?: never;
@@ -19337,6 +23029,113 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CodeJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    git_graph_api_code_devices__device_id__git_graph_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeGitGraphIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GitGraph"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    git_commit_api_code_devices__device_id__git_commit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeGitCommitIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GitCommitDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    git_cache_clear_api_code_devices__device_id__git_cache_clear_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GitCacheCleared"];
                 };
             };
             /** @description Validation Error */
@@ -20021,6 +23820,455 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunStarted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_script_api_automations_scripts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScriptCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_script_api_automations__automation_id__script_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_script_api_automations__automation_id__script_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScriptCode"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_script_api_automations__automation_id__script_approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScriptApproveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    discard_change_api_automations__automation_id__script_pending_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_secret_api_automations__automation_id__script_secrets__name__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+                name: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScriptSecretIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clear_secret_api_automations__automation_id__script_secrets__name__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+                name: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    catalogue_api_triggers_catalogue_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventTypeOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_triggers_api_triggers_get: {
+        parameters: {
+            query?: {
+                automation_id?: string | null;
+                conversation_id?: string | null;
+                kind?: ("automation" | "wake") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_trigger_api_triggers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TriggerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_trigger_api_triggers__trigger_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trigger_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_trigger_api_triggers__trigger_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trigger_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TriggerPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rotate_secret_api_triggers__trigger_id__secret_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trigger_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecretOut"];
                 };
             };
             /** @description Validation Error */
@@ -21609,6 +25857,41 @@ export interface operations {
             };
         };
     };
+    voice_transcript_api_voice_transcripts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_voice_transcript_api_voice_transcripts_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceTranscriptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     voice_reply_api_voice_replies_post: {
         parameters: {
             query?: never;
@@ -21631,6 +25914,595 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VoiceReplyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_plugins_api_plugins_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    contributions_api_plugins_contributions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginContributionsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_bundled_api_plugins_bundled_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BundledListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    install_zip_api_plugins_install_zip_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_install_zip_api_plugins_install_zip_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    install_git_api_plugins_install_git_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GitInstallIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    install_bundled_api_plugins_install_bundled_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BundledInstallIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_plugin_api_plugins__plugin__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    uninstall_api_plugins__plugin__delete: {
+        parameters: {
+            query?: {
+                data?: "keep" | "remove";
+            };
+            header?: never;
+            path: {
+                plugin: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    switch_plugin_api_plugins__plugin__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginPatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_version_api_plugins__plugin__versions__version__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin: string;
+                version: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginApproveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_version_api_plugins__plugin__versions__version__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin: string;
+                version: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    version_diff_api_plugins__plugin__versions__version__diff_get: {
+        parameters: {
+            query?: {
+                /** @description Default: the approved one */
+                against?: string | null;
+            };
+            header?: never;
+            path: {
+                plugin: string;
+                version: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginDiffOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    version_file_api_plugins__plugin__versions__version__files__path__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin: string;
+                version: string;
+                path: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": unknown;
+                    "image/png": unknown;
+                    "image/webp": unknown;
+                    "image/gif": unknown;
+                    "image/jpeg": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    frame_bundle_api_plugins__plugin__versions__version__ui__ui__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin: string;
+                version: string;
+                ui: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginFrameBundleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plugin_data_api_plugins__plugin__data_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginDataOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plugin_call_api_plugins__plugin__call_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginCallIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginCallOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_chat_api_plugins__plugin__chat_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PluginChatIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginBuildChatOut"];
                 };
             };
             /** @description Validation Error */

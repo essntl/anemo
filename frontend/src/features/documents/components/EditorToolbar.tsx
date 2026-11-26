@@ -16,6 +16,7 @@ import {
   List,
   ListChecks,
   ListOrdered,
+  PenLine,
   Minus,
   Plus,
   Quote,
@@ -97,11 +98,13 @@ const Divider = () => <span className="mx-1 h-5 w-px shrink-0 bg-border" />
  * Without `onPickImage` (short notes) the buttons for whole-document things are left
  * out: the largest heading, images, tables and divider lines.
  */
-export function EditorToolbar({ editor, onPickLink, onPickImage }: {
+export function EditorToolbar({ editor, onPickLink, onPickImage, onPickSketch }: {
   editor: Editor
   /** Opens the picker for a link to a document or task of the app. */
   onPickLink: () => void
   onPickImage?: () => void
+  /** Opens the picker for a sketch to embed (its image, linked to it). */
+  onPickSketch?: () => void
 }) {
   const desktop = useMediaQuery(DESKTOP)
   // Re-render when the selection's formatting changes (the editor itself does not re-render React).
@@ -158,6 +161,7 @@ export function EditorToolbar({ editor, onPickLink, onPickImage }: {
   ]
   const inserts: Tool[] = onPickImage ? [
     { label: t('Image'), icon: <ImagePlus />, run: onPickImage },
+    ...(onPickSketch ? [{ label: t('Embed a sketch'), icon: <PenLine />, run: onPickSketch }] : []),
     { label: t('Table'), icon: <Table />, active: state.table, run: () => chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() },
     { label: t('Divider line'), icon: <Minus />, run: () => chain().setHorizontalRule().run() },
   ] : []

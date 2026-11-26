@@ -8,6 +8,7 @@ using Anemo.Desktop.Core;
 using Anemo.Desktop.Core.CodeJobs;
 using Anemo.Desktop.Core.Connection;
 using Anemo.Desktop.Core.Storage;
+using Anemo.Desktop.Core.Updates;
 using Anemo.Desktop.Platform;
 using Microsoft.Win32;
 
@@ -44,6 +45,8 @@ internal sealed partial class SettingsWindow : Window
         CloseButton.Click += (_, _) => Close();
         SaveButton.Click += (_, _) => TrySave();
         OpenAnemoButton.Click += (_, _) => context.OpenAnemo();
+        CheckNowButton.Click += (_, _) => context.CheckForUpdate();
+        RestartToUpdateButton.Click += (_, _) => context.RestartToUpdate();
         StatusLink.Click += (_, _) => OnStatusLink();
         WorkFolderBrowse.Click += (_, _) => Browse(WorkFolderBox, "The folder PowerShell starts in");
         JobsFolderBrowse.Click += (_, _) => Browse(JobsFolderBox, "The Claude Code jobs folder");
@@ -55,6 +58,7 @@ internal sealed partial class SettingsWindow : Window
         };
         AddressBox.TextChanged += (_, _) => ClearError(SettingsField.Address);
         OwnerBox.TextChanged += (_, _) => ClearError(SettingsField.GitHubOwner);
+        FileFoldersBox.TextChanged += (_, _) => ClearError(SettingsField.FileFolders);
         StopKey.Changed += () => ClearError(SettingsField.StopKey);
         ShareKey.Changed += () => ClearError(SettingsField.ShareKey);
         ShareJobsSwitch.Click += (_, _) => ShowCodeJobs();
@@ -66,6 +70,8 @@ internal sealed partial class SettingsWindow : Window
     }
 
     /// <param name="Save">Saves the settings and the new token; a sentence when that failed (the window stays open).</param>
+    /// <param name="CheckForUpdate">"Check now": at once, whatever the switch says (the switch is saved with Save).</param>
+    /// <param name="RestartToUpdate">"Restart to update": once nothing is running.</param>
     public sealed record Context(
         DesktopSettings Current,
         bool HasToken,
@@ -73,7 +79,9 @@ internal sealed partial class SettingsWindow : Window
         string Version,
         Func<DesktopSettings, string?, string?> Save,
         Action OpenAnemo,
-        ImageSource? Icon);
+        ImageSource? Icon,
+        Action CheckForUpdate,
+        Action RestartToUpdate);
 
     /// <summary>The saved settings, after Save.</summary>
     public DesktopSettings? Result { get; private set; }
@@ -103,6 +111,14 @@ internal sealed partial class SettingsWindow : Window
         OpenAnemoButton.Visibility = phase == ConnectionPhase.Connected ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    /// <summary>The updater's state on the This computer page; called again when it changes.</summary>
+    public void ShowUpdate(UpdateState state, bool automatic)
+    {
+        UpdateStatus.Text = UpdateText.Status(state, automatic, _context.Version);
+        CheckNowButton.IsEnabled = state.Phase is not (UpdatePhase.Unavailable or UpdatePhase.Checking or UpdatePhase.Downloading or UpdatePhase.WaitingToRestart);
+        RestartToUpdateButton.Visibility = state.Phase == UpdatePhase.Ready ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     private static SolidColorBrush Brush(string hex, byte alpha = 255)
     {
         var brush = new SolidColorBrush(Palette.Media(hex, alpha));
@@ -128,6 +144,10 @@ internal sealed partial class SettingsWindow : Window
         ProjectsBox.Tag = CodeJobLimits.DefaultProjectsFolder;
         OwnerBox.Text = draft.GitHubOwner;
         OwnerBox.Tag = "The account gh is signed in as";
+        FilesSwitch.IsChecked = draft.ShareFiles;
+        FileFoldersBox.Text = draft.FileFolders;
+        FileFoldersBox.Tag = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        UpdateSwitch.IsChecked = draft.AutoUpdate;
         ShowCodeJobs();
     }
 
@@ -145,6 +165,9 @@ internal sealed partial class SettingsWindow : Window
         StartCodeJobs = StartJobsSwitch.IsChecked == true,
         CodeProjectsFolder = ProjectsBox.Text,
         GitHubOwner = OwnerBox.Text,
+        ShareFiles = FilesSwitch.IsChecked == true,
+        FileFolders = FileFoldersBox.Text,
+        AutoUpdate = UpdateSwitch.IsChecked == true,
     };
 
     private void TrySave()
@@ -271,6 +294,14 @@ internal sealed partial class SettingsWindow : Window
                 OwnerHelp.Visibility = Visibility.Collapsed;
                 OwnerBox.Focus();
                 break;
+            case SettingsField.FileFolders:
+                ShowPage(NavComputer);
+                MarkBox(FileFoldersBox, true);
+                FileFoldersErrorText.Text = problem.Message;
+                FileFoldersError.Visibility = Visibility.Visible;
+                FileFoldersHelp.Visibility = Visibility.Collapsed;
+                FileFoldersBox.Focus();
+                break;
         }
     }
 
@@ -297,6 +328,11 @@ internal sealed partial class SettingsWindow : Window
                 MarkBox(OwnerBox, false);
                 OwnerError.Visibility = Visibility.Collapsed;
                 OwnerHelp.Visibility = Visibility.Visible;
+                break;
+            case SettingsField.FileFolders:
+                MarkBox(FileFoldersBox, false);
+                FileFoldersError.Visibility = Visibility.Collapsed;
+                FileFoldersHelp.Visibility = Visibility.Visible;
                 break;
         }
 

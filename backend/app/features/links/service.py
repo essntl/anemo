@@ -442,3 +442,12 @@ async def create_meeting_notes(db: AsyncSession, event_id: uuid.UUID) -> Documen
     await db.refresh(doc)
     await calendar.notify()
     return doc
+
+
+async def describe_refs(db: AsyncSession, refs: list[str]) -> list[LinkItem]:
+    """What these references point to now (title, state), in the order given: for a list
+    of items named by reference, such as the approval of a batch change. One that isn't
+    a reference is refused (AppError, code invalid_ref)."""
+    parsed = [targets.as_ref(r) for r in refs]
+    found = await targets.describe(db, parsed)
+    return [_item(found[r]) for r in parsed]

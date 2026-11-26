@@ -141,11 +141,13 @@ async def test_agent_uses_tools_and_plan(authed):
             "code_start",
             "code_status",
             "code_cancel",
+            "code_git_graph",
             "list_tasks",
             "get_task",
             "create_task",
             "update_task",
             "delete_task",
+            "update_tasks",
             "list_task_files",
             "attach_file_to_task",
             "list_projects",
@@ -156,6 +158,7 @@ async def test_agent_uses_tools_and_plan(authed):
             "create_event",
             "update_event",
             "delete_event",
+            "update_events",
             "get_focus_stats",
             "list_focus_sessions",
             "start_focus",
@@ -164,6 +167,8 @@ async def test_agent_uses_tools_and_plan(authed):
             "get_music_queue",
             "music_control",
             "send_notification",
+            "search_chats",  # earlier chats (chat recall)
+            "read_chat",
             "remember",
             "update_memory",
             "forget_memory",
@@ -172,19 +177,43 @@ async def test_agent_uses_tools_and_plan(authed):
             "create_schedule",
             "update_schedule",
             "delete_schedule",
+            # Event triggers: wake this chat, or start an automation, on an event.
+            "create_trigger",
+            "list_triggers",
+            "update_trigger",
+            "delete_trigger",
+            # Automation scripts (spec 08): reading them, and writing or starting them
+            # (those ask by default).
+            "list_scripts",
+            "read_script",
+            "create_script",
+            "update_script",
+            "run_script",
+            # Plugins (spec 12): reading them and the guide, and saving drafts the user
+            # reviews (allowed by default: nothing in a draft runs before approval).
+            "plugin_guide",
+            "plugin_list",
+            "plugin_read",
+            "plugin_validate",
+            "plugin_create",
+            "plugin_update_files",
+            "plugin_preview",
             "get_current_time",
+            "generate_image",
             "read_tool_output",
         ]
     )
 
 
-async def test_chat_mode_only_offers_memory_tools(authed):
+async def test_chat_mode_only_offers_memory_tools_and_image_generation(authed):
     cid = await setup(authed)
     script("hi", [TextDelta("hello"), Done("end")])
     r = await authed.post(f"/api/conversations/{cid}/turns", json={"text": "hi"})
     await execute_run(uuid.UUID(r.json()["run_id"]))
+    # generate_image is offered too (it says what to set up when no image model is).
     assert [t.name for t in FakeAdapter.requests[-1].tools] == [
         "forget_memory",
+        "generate_image",
         "remember",
         "search_memory",
         "update_memory",

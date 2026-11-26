@@ -1,0 +1,76 @@
+/*
+ * Settings > Plugins: the card → page morph (see transition.ts).
+ *
+ * The browser draws a view transition with pseudo-elements: for each shared name a
+ * ::view-transition-group that moves and resizes from the old box to the new one, holding
+ * the old picture (the card) and the new one (the plugin's sheet). Only those pseudo-
+ * elements animate, never the page's real layout, and the pictures are composited.
+ */
+
+/* The card and the sheet: an ease that starts fast and lands softly, like a spring. */
+::view-transition-group(plugin-hero),
+::view-transition-group(plugin-hero-icon),
+::view-transition-group(plugin-hero-name) {
+  animation-duration: 420ms;
+  animation-timing-function: cubic-bezier(0.2, 0.9, 0.1, 1);
+}
+
+/* The two pictures keep their own size and are cut to the moving box (no stretched text):
+   the card's picture stays at its size and fades; the sheet is revealed from its top-left
+   corner, header first, as the box grows. */
+::view-transition-image-pair(plugin-hero) {
+  overflow: hidden;
+  border-radius: var(--radius-card);
+}
+::view-transition-old(plugin-hero),
+::view-transition-new(plugin-hero) {
+  width: 100%;
+  height: 100%;
+  object-fit: none;
+  object-position: left top;
+}
+::view-transition-old(plugin-hero) {
+  animation: fade-out 110ms var(--ease-in) both;
+}
+::view-transition-new(plugin-hero) {
+  animation: fade-in 200ms var(--ease-out) both;
+}
+
+/* The icon and the name are the same picture at both ends: they just move (no cross-fade). */
+::view-transition-old(plugin-hero-icon),
+::view-transition-old(plugin-hero-name) {
+  animation: none;
+  opacity: 0;
+}
+::view-transition-new(plugin-hero-icon),
+::view-transition-new(plugin-hero-name) {
+  animation: none;
+}
+
+/* While a plugin morph runs, the rest of the page doesn't cross-fade: the new page (the
+   settings around the sheet, or the other cards on the way back) is there at once, and the
+   old one fades out underneath it. A cross-fade would dim the parts that are the same on
+   both (the list of sections), and the usual entrance moves up by a few pixels, which
+   would pull against the morph. The page has no background of its own, so the old cards
+   show through where the new page is empty. */
+html.plugin-vt::view-transition-old(page) {
+  animation: fade-out 180ms var(--ease-in) both;
+  mix-blend-mode: normal;
+}
+html.plugin-vt::view-transition-new(page) {
+  animation: none;
+  /* The browser blends a cross-fade's two pictures additively; here one simply lies on the other. */
+  mix-blend-mode: normal;
+}
+
+/* app.css already turns every view transition off for reduced motion; this is the same
+   rule, kept next to the animations above so they can't outlive it. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(plugin-hero),
+  ::view-transition-group(plugin-hero-icon),
+  ::view-transition-group(plugin-hero-name),
+  ::view-transition-old(plugin-hero),
+  ::view-transition-new(plugin-hero) {
+    animation: none !important;
+  }
+}

@@ -11,7 +11,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, StringConstraints, model_validator
 
 from app.features.memory.schemas import MemorySettings
 from app.policy.presets import PermissionSettings
@@ -57,6 +57,9 @@ class AutomationSettings(BaseModel):
     paused: bool = False
     # A scheduled run is stopped after this long, whatever the agent's own limit says.
     max_run_minutes: int = Field(30, ge=1, le=24 * 60)
+    # Event triggers, all together: firings beyond this many in an hour are dropped
+    # (each trigger also has its own limit).
+    max_trigger_firings_per_hour: int = Field(60, ge=1, le=1000)
 
 
 class FocusSettings(BaseModel):
@@ -133,6 +136,7 @@ PageId = Literal[
     "automations",
     "agents",
     "memory",
+    "activity",
 ]
 # Home is where the app opens and the Inbox is where approvals wait: these stay.
 PAGES_ALWAYS_ON: frozenset[str] = frozenset({"home", "notifications"})
@@ -158,6 +162,7 @@ class NavigationSettings(BaseModel):
             "automations",
             "agents",
             "memory",
+            "activity",
         ],
         max_length=20,
     )
@@ -178,13 +183,77 @@ class FilesSettings(BaseModel):
 
     # documents/ holds the Documents library; Files hides it unless this is on.
     show_documents_folder: bool = False
+    # The largest file the agent copies between a computer and the workspace
+    # (device_file_get / device_file_put, docs/specs/22-device-files.md). The whole file
+    # is held in the worker's memory while it is checked, hence the ceiling.
+    device_file_max_mb: int = Field(50, ge=1, le=200)
+
+
+HEX_COLOUR = r"^#[0-9a-fA-F]{6}$"
+# An uploaded font is "custom:<asset id>" (features/appearance); the rest are built in
+# (frontend/src/features/appearance/fonts.ts).
+_CUSTOM_FONT = r"custom:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+UI_FONT = rf"^(default|system|serif|rounded|inter|plex-sans|nunito|source-serif|{_CUSTOM_FONT})$"
+CODE_FONT = rf"^(default|system|jetbrains-mono|fira-code|plex-mono|{_CUSTOM_FONT})$"
+
+
+class CustomGradient(BaseModel):
+    """The user's own animated gradient (Background > Animated gradient > Custom)."""
+
+    # 2 to 4 colour stops.
+    colors: list[Annotated[str, StringConstraints(pattern=HEX_COLOUR)]] = Field(
+        default_factory=lambda: ["#2a6df4", "#00c2d4", "#c04fe0"], min_length=2, max_length=4
+    )
+    # drift: soft colour spots that move slowly; linear: bands at `angle` that slide.
+    style: Literal["drift", "linear"] = "drift"
+    angle: int = Field(135, ge=0, le=359)  # degrees
+    speed: Literal["slow", "normal", "fast"] = "normal"
+
+
+class AppearanceBackground(BaseModel):
+    """What is behind the app: nothing, a built-in animated gradient, or an upload."""
+
+    kind: Literal["none", "gradient", "upload"] = "none"
+    # "custom": the colours in `custom_gradient`.
+    gradient: Literal["aurora", "dusk", "lagoon", "custom"] = "aurora"
+    custom_gradient: CustomGradient = Field(default_factory=CustomGradient)
+    # An `appearance_assets` row of kind "background" (image, animated image or video).
+    asset_id: uuid.UUID | None = None
+    blur: int = Field(0, ge=0, le=40)  # px
+    # How much of the page colour lies over it (%), so text stays readable.
+    dim: int = Field(35, ge=0, le=90)
+    fit: Literal["cover", "contain", "tile"] = "cover"
+    # Phones show a still frame of an animated background unless this is on.
+    animate_on_phones: bool = False
 
 
 class AppearanceSettings(BaseModel):
+    """Settings > Appearance; applied in the browser (frontend/src/features/appearance)."""
+
     mode: Literal["light", "dark", "system"] = "system"
     # The default has 4.5:1 against white text (the buttons).
-    accent: str = Field("#2a6df4", pattern=r"^#[0-9a-fA-F]{6}$")
+    accent: str = Field("#2a6df4", pattern=HEX_COLOUR)
     density: Literal["comfortable", "compact"] = "comfortable"
+    # A colour mixed into the page, panel and card colours; None: the theme's own.
+    tint: str | None = Field(None, pattern=HEX_COLOUR)
+    tint_strength: int = Field(40, ge=0, le=100)
+    ui_font: str = Field("default", pattern=UI_FONT)
+    code_font: str = Field("default", pattern=CODE_FONT)
+    background: AppearanceBackground = Field(default_factory=AppearanceBackground)
+    # Panels, cards, dialogs and the message box turn translucent over the background.
+    glass: bool = False
+    # How strong the glass is: more blur and more see-through (the panel never drops
+    # under 70 % opaque, 65 % in dark; frontend/src/features/appearance/apply.ts).
+    glass_strength: int = Field(50, ge=0, le=100)
+
+
+class ProfileSettings(BaseModel):
+    """Settings > Profile: how you appear in the app. The avatar is set through
+    PUT /appearance/avatar, which also stores its id here."""
+
+    # Shown instead of the login name; empty: the login name.
+    display_name: Annotated[str, StringConstraints(strip_whitespace=True, max_length=60)] = ""
+    avatar_id: uuid.UUID | None = None
 
 
 TaskType = Literal[
@@ -199,12 +268,13 @@ TaskType = Literal[
     "inline",
     "transcription",
     "dictation",
+    "image",
 ]
 
 
 class ModelDefaults(BaseModel):
     """Which model handles each kind of work. Unset tasks fall back to the chat model
-    (except embeddings and transcription, which need a model of their own kind)."""
+    (except embeddings, transcription and image, which need a model of their own kind)."""
 
     chat: uuid.UUID | None = None
     agent: uuid.UUID | None = None
@@ -221,6 +291,8 @@ class ModelDefaults(BaseModel):
     # said (a fast chat model is ideal).
     transcription: uuid.UUID | None = None
     dictation: uuid.UUID | None = None
+    # The generate_image tool: a model with the image_generation capability.
+    image: uuid.UUID | None = None
     # Ordered backup models per task, tried when the primary fails or lacks a capability.
     fallbacks: dict[TaskType, list[uuid.UUID]] = Field(default_factory=dict)
     # How hard models that can reason think, unless a message asks for another level
@@ -278,11 +350,36 @@ class VoiceSettings(BaseModel):
     chat: Literal["daily", "single"] = "daily"
 
 
+class ImageSettings(BaseModel):
+    """The generate_image tool (features/image_generation). Security-sensitive like the
+    permissions: it decides how much an agent may spend without asking."""
+
+    # Pictures one call may make; a call asking for more gets this many.
+    max_count: int = Field(4, ge=1, le=10)
+    # The largest resolution a call may ask for (where the provider has a choice).
+    max_resolution: Literal["1K", "2K", "4K"] = "2K"
+    # Automation runs (and their sub-agents) ask before each call, whatever the
+    # "Generate images" permission says (it can still say Never).
+    ask_in_automations: bool = True
+
+
 class CodeSettings(BaseModel):
     """The Code page: Claude Code jobs that computers share (features/code_sessions)."""
 
     # Jobs started longer ago than this are deleted, with their events.
     keep_days: int = Field(30, ge=1, le=365)
+    # A job that stops at the Claude subscription's usage limit continues by itself once
+    # the limit resets (docs/specs/code-sessions.md §16); each job's panel can change it.
+    auto_continue: bool = False
+
+
+class PluginSettings(BaseModel):
+    """Settings > Plugins (docs/specs/CONTRACTS-plugins.md §5). Not sensitive: switching
+    every plugin off must be quick."""
+
+    # The kill switch: every plugin stops at once (no frames, calls, commands, scripts or
+    # plugin MCP tools), whatever its own switch says; turning it off restores them.
+    disabled_all: bool = False
 
 
 @dataclass(frozen=True)
@@ -294,6 +391,7 @@ class SectionSpec:
 SECTIONS: dict[str, SectionSpec] = {
     "general": SectionSpec(GeneralSettings),
     "appearance": SectionSpec(AppearanceSettings),
+    "profile": SectionSpec(ProfileSettings),
     "models": SectionSpec(ModelDefaults),
     "permissions": SectionSpec(PermissionSettings, sensitive=True),
     "workspace": SectionSpec(WorkspaceSettings, sensitive=True),
@@ -311,4 +409,6 @@ SECTIONS: dict[str, SectionSpec] = {
     "dictation": SectionSpec(DictationSettings),
     "voice": SectionSpec(VoiceSettings),
     "code": SectionSpec(CodeSettings),
+    "images": SectionSpec(ImageSettings, sensitive=True),
+    "plugins": SectionSpec(PluginSettings),
 }

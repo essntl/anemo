@@ -56,7 +56,7 @@ describe('starting, following up and cancelling', () => {
     const { result } = renderHook(() => useStartJob(), { wrapper })
     await act(async () => void (await result.current.mutateAsync({ device_id: 'dev-1', project: 'anemo', prompt: 'Go', new: false, model: null })))
     expect(posted).toEqual([{ path: '/api/code/jobs', init: { body: { device_id: 'dev-1', project: 'anemo', prompt: 'Go', new: false, model: null } } }])
-    expect(client.getQueryData<CodeJobDetail>(codeJobKey('new'))).toEqual({ job, thread: [job] })
+    expect(client.getQueryData<CodeJobDetail>(codeJobKey('new'))).toEqual({ job, thread: [job], messages: [] })
   })
 
   it('follows up: the new job joins the open thread', async () => {
@@ -64,11 +64,21 @@ describe('starting, following up and cancelling', () => {
     const next = codeJob({ id: 'b', thread_id: 'a', state: 'running', resume_session: 's1' })
     answer(next)
     const { client, wrapper } = setup()
-    client.setQueryData<CodeJobDetail>(codeJobKey('a'), { job: first, thread: [first] })
+    client.setQueryData<CodeJobDetail>(codeJobKey('a'), { job: first, thread: [first], messages: [] })
     const { result } = renderHook(() => useFollowUp('a'), { wrapper })
-    await act(async () => void (await result.current.mutateAsync('More')))
+    await act(async () => void (await result.current.mutateAsync({ prompt: 'More' })))
+    // Without images the request has no image_ids at all.
     expect(posted).toEqual([{ path: '/api/code/jobs/{job_id}/follow-up', init: { params: { path: { job_id: 'a' } }, body: { prompt: 'More' } } }])
     expect(client.getQueryData<CodeJobDetail>(codeJobKey('a'))?.thread.map((j) => j.id)).toEqual(['a', 'b'])
+  })
+
+  it('follows up with images: their ids go with the prompt', async () => {
+    answer(codeJob({ id: 'b', thread_id: 'a' }))
+    const { wrapper } = setup()
+    const { result } = renderHook(() => useFollowUp('a'), { wrapper })
+    const images = [{ id: 'att-1', name: 'shot.png', size: 10 }, { id: 'att-2', name: 'b.jpg', size: 20 }]
+    await act(async () => void (await result.current.mutateAsync({ prompt: 'Like this', images })))
+    expect(posted[0].init).toEqual({ params: { path: { job_id: 'a' } }, body: { prompt: 'Like this', image_ids: ['att-1', 'att-2'] } })
   })
 
   it('refreshes the jobs and computers when a start may have happened, not on a plain refusal', async () => {
@@ -99,7 +109,7 @@ describe('starting, following up and cancelling', () => {
     const running = codeJob({ id: 'r', state: 'running' })
     answer({ ...running, state: 'cancelled' })
     const { client, wrapper } = setup()
-    client.setQueryData<CodeJobDetail>(codeJobKey('r'), { job: running, thread: [running] })
+    client.setQueryData<CodeJobDetail>(codeJobKey('r'), { job: running, thread: [running], messages: [] })
     const { result } = renderHook(() => useCancelJob(), { wrapper })
     await act(async () => void (await result.current.mutateAsync('r')))
     expect(posted[0].path).toBe('/api/code/jobs/{job_id}/cancel')

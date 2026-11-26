@@ -27,11 +27,20 @@ export interface FakeJob {
   ended: string | null
   branch: string | null
   stderr_tail: string | null
+  /** It takes messages while it runs (code-sessions.md §15, Anemo Desktop 1.9.0). */
+  input?: boolean
 }
+
+/** A `device.command` as the server sends it. */
+export type FakeCommand = { id: string; action: string; [key: string]: unknown }
 
 export class FakeComputer {
   private acks = new Map<string, number>()
   private waiters: Array<() => void> = []
+  /** Every command the server sent, in order. */
+  readonly commands: FakeCommand[] = []
+  /** Answers a command (its `state`); throwing answers it as failed. Unset: every command fails. */
+  answer: ((command: FakeCommand) => object) | null = null
 
   private constructor(
     private readonly request: APIRequestContext,
@@ -44,6 +53,17 @@ export class FakeComputer {
       if (msg.type === 'code.ack') {
         this.acks.set(String(msg.job_id), Number(msg.seq))
         for (const wake of this.waiters.splice(0)) wake()
+      }
+      if (msg.type === 'device.command') {
+        const command = msg as unknown as FakeCommand
+        this.commands.push(command)
+        for (const wake of this.waiters.splice(0)) wake()
+        try {
+          if (!this.answer) throw new Error('This fake computer answers no commands.')
+          this.send({ type: 'device.result', id: command.id, ok: true, state: this.answer(command) })
+        } catch (err) {
+          this.send({ type: 'device.result', id: command.id, ok: false, code: 'failed', error: String((err as Error).message) })
+        }
       }
     })
   }
@@ -84,6 +104,29 @@ export class FakeComputer {
 
   send(message: Message) {
     this.ws.send(JSON.stringify(message))
+  }
+
+  /** Sends an offer: what this computer lets Anemo do (sharing jobs is always on here). */
+  offer(fields: { control?: boolean; code_start?: boolean; code_input?: boolean }) {
+    this.send({ type: 'device.offer', control: false, shell: false, code: true, ...fields })
+  }
+
+  /** The first command with this action, once it came; throws after `timeoutMs`. */
+  async command(action: string, timeoutMs = 10_000): Promise<FakeCommand> {
+    const deadline = Date.now() + timeoutMs
+    for (;;) {
+      const found = this.commands.find((c) => c.action === action)
+      if (found) return found
+      const left = deadline - Date.now()
+      if (left <= 0) throw new Error(`no ${action} command came`)
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, left)
+        this.waiters.push(() => {
+          clearTimeout(timer)
+          resolve()
+        })
+      })
+    }
   }
 
   /** Announces a job (or its new state). */

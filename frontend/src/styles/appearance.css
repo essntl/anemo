@@ -1,0 +1,190 @@
+/*
+ * Settings > Appearance: frosted glass and the background behind the app.
+ * The values come from features/appearance (apply.ts sets the variables and data
+ * attributes on <html>; AppBackground.tsx draws the background). Not in a layer, so
+ * these rules win over the Tailwind utilities of the elements they change.
+ */
+
+/* ---- The chat over the background ------------------------------------------------ */
+
+/* With a background, the conversation's panel is see-through, so the chat sits on the
+   picture (its blur and dim keep the text readable). Frosted glass, below, wins over this. */
+html[data-background='on'] .chat-panel {
+  background-color: transparent;
+}
+
+/* ---- Text in the accent colour ------------------------------------------------------ */
+
+/* Links, the chosen item in a list, accent labels: --accent-text is the accent made
+   readable on the page (apply.ts), so a dark accent on a dark page doesn't vanish. */
+.text-accent {
+  color: var(--accent-text, var(--accent));
+}
+
+/* ---- Frosted glass --------------------------------------------------------------- */
+
+/* The panel keeps most of its colour, so text on it stays readable whatever is behind.
+   apply.ts sets --glass-blur and --glass-opacity from Frosted glass > Strength; these
+   are the values for the default strength. */
+:root {
+  --glass-opacity: 72%;
+  --glass-blur: 18px;
+  --glass-blur-used: var(--glass-blur);
+}
+[data-theme='dark'] {
+  --glass-opacity: 66%;
+}
+/* Phones: a lighter blur (a little over half) is much cheaper to draw while scrolling. */
+@media (pointer: coarse), (max-width: 767px) {
+  :root {
+    --glass-blur-used: calc(var(--glass-blur) * 0.55);
+  }
+}
+
+/* `glass` is on the few containers that turn to glass (Card, the sidebar, dialogs, menus,
+   the message box). Without data-glass='on' it does nothing. Where backdrop-filter isn't
+   supported the panels stay solid: a translucent panel without blur would be hard to read. */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  html[data-glass='on'] .glass {
+    background-color: color-mix(in srgb, var(--surface) var(--glass-opacity), transparent);
+    -webkit-backdrop-filter: blur(var(--glass-blur-used)) saturate(1.3);
+    backdrop-filter: blur(var(--glass-blur-used)) saturate(1.3);
+  }
+  /* Glass inside glass (a card in a dialog): blurring twice costs a lot and looks the same. */
+  html[data-glass='on'] .glass .glass {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+/* A sticky header inside a glass panel (the chat list's day headings): any fill of its
+   own would show as a band across the glass, so it has none, only a blur of what scrolls
+   under it. */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  html[data-glass='on'] .glass-sticky {
+    background-color: transparent;
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
+}
+
+/* The system asks for less transparency: solid panels (and the settings' preview pane,
+   whose glass is set inline from the strength being chosen). */
+@media (prefers-reduced-transparency: reduce) {
+  .glass-preview {
+    background-color: var(--surface) !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+  html[data-glass='on'] :is(.glass, .glass-sticky) {
+    background-color: var(--surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* ---- The background ---------------------------------------------------------------- */
+
+/* Behind everything (z-index -1 under the page's own content), never in the way of clicks. */
+.app-background {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+/* The picture, video or gradient. A blurred edge would show the page through, so a
+   blurred layer is made larger than the window by twice the blur. */
+.app-background-media {
+  position: absolute;
+  inset: calc(var(--bg-blur, 0px) * -2);
+  filter: blur(var(--bg-blur, 0px));
+}
+video.app-background-media {
+  width: calc(100% + var(--bg-blur, 0px) * 4);
+  height: calc(100% + var(--bg-blur, 0px) * 4);
+}
+/* The dim layer: the page colour over the background, so light text on dark and dark
+   text on light both stay readable. */
+.app-background-dim {
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+  opacity: var(--bg-dim, 0);
+}
+
+/* Built-in animated gradients: a large layer of soft colour spots that drifts slowly.
+   Only `transform` changes, which the compositor does without repainting. */
+.app-gradient {
+  position: absolute;
+  inset: -40%;
+  background:
+    radial-gradient(40% 40% at 25% 30%, var(--g1), transparent 70%),
+    radial-gradient(35% 35% at 75% 25%, var(--g2), transparent 70%),
+    radial-gradient(45% 45% at 55% 75%, var(--g3), transparent 70%),
+    var(--bg);
+  animation: app-gradient-drift var(--g-duration, 48s) ease-in-out infinite alternate;
+  will-change: transform;
+}
+/* A custom gradient (gradients.ts): four spots, one near each corner (the colours repeat
+   when there are fewer than four)... */
+.app-gradient[data-style='drift'] {
+  background:
+    radial-gradient(38% 38% at var(--p1), var(--g1), transparent 70%),
+    radial-gradient(38% 38% at var(--p2), var(--g2), transparent 70%),
+    radial-gradient(38% 38% at var(--p3), var(--g3), transparent 70%),
+    radial-gradient(38% 38% at var(--p4), var(--g4), transparent 70%),
+    var(--bg);
+}
+/* ...or bands of colour along the angle that slide slowly. */
+.app-gradient[data-style='linear'] {
+  /* A veil of the page colour over the bands, as the spots fade into it: dark mode stays dark. */
+  background:
+    linear-gradient(color-mix(in srgb, var(--bg) 45%, transparent), color-mix(in srgb, var(--bg) 45%, transparent)),
+    linear-gradient(var(--g-angle, 135deg), var(--g-stops));
+}
+@keyframes app-gradient-drift {
+  from { transform: translate3d(-8%, -5%, 0) rotate(0deg) scale(1); }
+  to { transform: translate3d(8%, 5%, 0) rotate(20deg) scale(1.1); }
+}
+/* A still frame: reduced motion, phones (unless asked), or the settings preview. */
+.app-background[data-still] .app-gradient {
+  animation: none;
+}
+/* The tab is hidden: nothing moves (browsers slow hidden tabs down too, but don't stop them). */
+html[data-page-hidden] .app-gradient {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-gradient {
+    animation: none;
+  }
+}
+
+/* ---- Colour pickers (features/appearance/ColorSwatches.tsx) --------------------------- */
+
+/* The browser's colour input drawn as a round swatch like the presets, not a raw box. */
+.color-input {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 9999px;
+  background: none;
+  cursor: pointer;
+  overflow: hidden;
+}
+.color-input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.color-input::-webkit-color-swatch {
+  border: none;
+  border-radius: 9999px;
+}
+.color-input::-moz-color-swatch {
+  border: none;
+  border-radius: 9999px;
+}
+.color-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

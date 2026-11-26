@@ -7,7 +7,33 @@ async def test_settings_have_defaults(authed):
     r = await authed.get("/api/settings")
     assert r.status_code == 200
     body = r.json()
-    assert body["appearance"] == {"mode": "system", "accent": "#2a6df4", "density": "comfortable"}
+    assert body["appearance"] == {
+        "mode": "system",
+        "accent": "#2a6df4",
+        "density": "comfortable",
+        "tint": None,
+        "tint_strength": 40,
+        "ui_font": "default",
+        "code_font": "default",
+        "background": {
+            "kind": "none",
+            "gradient": "aurora",
+            "custom_gradient": {
+                "colors": ["#2a6df4", "#00c2d4", "#c04fe0"],
+                "style": "drift",
+                "angle": 135,
+                "speed": "normal",
+            },
+            "asset_id": None,
+            "blur": 0,
+            "dim": 35,
+            "fit": "cover",
+            "animate_on_phones": False,
+        },
+        "glass": False,
+        "glass_strength": 50,
+    }
+    assert body["profile"] == {"display_name": "", "avatar_id": None}
     assert body["general"]["default_chat_mode"] == "chat"
 
 
@@ -15,7 +41,9 @@ async def test_put_appearance_persists(authed):
     new = {"mode": "dark", "accent": "#e0457b", "density": "compact"}
     r = await authed.put("/api/settings/appearance", json=new)
     assert r.status_code == 200
-    assert (await authed.get("/api/settings")).json()["appearance"] == new
+    saved = (await authed.get("/api/settings")).json()["appearance"]
+    # The fields left out keep their defaults.
+    assert saved == {**r.json(), **new} and saved["glass"] is False
 
 
 async def test_invalid_settings_are_rejected(authed):
@@ -35,7 +63,7 @@ async def test_focus_home_and_files_sections(authed):
     assert body["focus"]["quiet_while_focusing"] is False
     assert body["music"]["play_while_focusing"] is False
     assert body["home"] == {"layout": [], "mobile_layout": []}
-    assert body["files"] == {"show_documents_folder": False}
+    assert body["files"] == {"show_documents_folder": False, "device_file_max_mb": 50}
 
     layout = [
         {"id": "focus", "w": 2, "h": 1, "hidden": False, "pinned": False, "options": {}},
@@ -90,6 +118,7 @@ async def test_navigation_says_where_each_page_goes(authed):
             "automations",
             "agents",
             "memory",
+            "activity",
         ],
         "off": [],
     }

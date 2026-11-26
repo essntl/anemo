@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Annotated
 
 from pydantic import BaseModel, Field
 
@@ -97,3 +98,11 @@ class BrokenLinkOut(BaseModel):
     target: LinkItem
     origin: Origin
     created_at: datetime
+
+
+class TargetsIn(BaseModel):
+    refs: list[Annotated[str, Field(min_length=1, max_length=300)]] = Field(
+        min_length=1,
+        max_length=100,
+        description="References: /documents/<id>, /tasks?task=<id>, /calendar?event=<id>, /c/<id>",
+    )

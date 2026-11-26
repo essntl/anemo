@@ -17,11 +17,14 @@ import {
 import { Button } from '@/components/ui/Button'
 import { Logo } from '@/components/ui/Logo'
 import { useLogout, useMe } from '@/features/auth/api'
+import { Avatar } from '@/features/profile/Avatar'
+import { useProfile } from '@/features/profile/profile'
 import { ConversationList } from '@/features/chat/components/ConversationList'
 import { usePalette } from '@/features/search/paletteStore'
 import { shortcutText } from '@/features/shortcuts/registry'
 import { ShortcutKeys } from '@/features/shortcuts/ShortcutKeys'
 import { ViewLinks } from '@/features/views/ViewLinks'
+import { PluginLinks } from '@/features/plugins/slots'
 import { cn } from '@/lib/cn'
 import { t } from '@/lib/i18n'
 import { InboxBadge } from './badges'
@@ -31,7 +34,7 @@ import { ScopeControl } from './ScopeControl'
 import { useSidebar } from './sidebarStore'
 
 // 32px rows: with six pages, More and the chats the sidebar still fits a 720px-high window without scrolling.
-const ROW = 'flex h-8 min-w-0 items-center gap-2.5 rounded-control px-2.5 text-[13px] font-medium transition-colors pointer-coarse:h-10'
+const ROW = 'flex h-(--nav-row-h) min-w-0 items-center gap-2.5 rounded-control px-2.5 text-[13px] font-medium transition-colors pointer-coarse:h-10'
 const ROW_ON = 'bg-surface-2 font-semibold text-text [&>span>svg]:text-accent'
 const ROW_OFF = 'text-text hover:bg-surface-hover [&>span>svg]:text-muted'
 const ICON_BUTTON = 'flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-muted hover:bg-surface-hover hover:text-text'
@@ -129,7 +132,7 @@ export function SidebarRail({ className }: { className?: string }) {
   const { pinned, more } = usePages()
   const button = 'flex h-9 w-9 shrink-0 items-center justify-center rounded-control text-muted hover:bg-surface-hover hover:text-text'
   return (
-    <nav aria-label={t('Menu')} className={cn('h-full w-14 shrink-0 flex-col items-center gap-1 overflow-y-auto bg-surface py-3', className)}>
+    <nav aria-label={t('Menu')} data-plugin-anchor="sidebar" className={cn('h-full w-14 shrink-0 flex-col items-center gap-1 overflow-y-auto bg-surface py-3', className)}>
       <button type="button" aria-label={t('Show the sidebar')} title={t('Show the sidebar ({keys})', { keys: shortcutText('app.sidebar') })} onClick={() => setCollapsed(false)} className={button}>
         <PanelLeftOpen className="h-4 w-4" />
       </button>
@@ -152,6 +155,7 @@ export function SidebarRail({ className }: { className?: string }) {
 export function Sidebar({ className, onClose }: { className?: string; onClose?: () => void }) {
   const navigate = useNavigate()
   const me = useMe()
+  const profile = useProfile()
   const logout = useLogout()
   const openSearch = usePalette((s) => s.setOpen)
   const setCollapsed = useSidebar((s) => s.setCollapsed)
@@ -162,7 +166,7 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
   return (
     // Normally nothing here scrolls but the chats; in a very low window the sidebar as a
     // whole does, rather than squeezing the chats away.
-    <aside className={cn('h-full shrink-0 flex-col overflow-y-auto bg-surface p-3', onClose ? 'flex' : '', className)}>
+    <aside data-plugin-anchor="sidebar" className={cn('glass h-full shrink-0 flex-col overflow-y-auto bg-surface p-3', onClose ? 'flex' : '', className)}>
       <div className={cn('flex items-center gap-2 px-1.5', onClose ? 'mb-3 gap-1' : 'mb-3')}>
         {/* The logo leads home. */}
         <NavLink to="/home" title={t('Home')} aria-label={t('Anemo, go to Home')}
@@ -213,6 +217,8 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
         </nav>
       )}
       {!onClose && <ViewLinks />}
+      {/* The pages of plugins, in a group of their own (not part of Settings > Pages). */}
+      {!onClose && <PluginLinks />}
 
       {/* The chats take all the free height and are the only thing that scrolls. */}
       {!onClose && <Divider className="-mx-3 mt-2.5" />}
@@ -231,6 +237,7 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
         <>
           <Divider className="-mx-3 my-2" />
           <ViewLinks onNavigate={onClose} />
+          <PluginLinks onNavigate={onClose} />
           {/* The Inbox is an icon in this menu's header, so the card doesn't repeat it. */}
           <PagesFolder pages={[...pinned, ...more].filter((p) => p.to !== '/notifications')} onNavigate={onClose} />
         </>
@@ -239,10 +246,8 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
         <>
           <Divider className="-mx-3 mt-2" />
           <div className="-mb-1 flex shrink-0 items-center gap-1 pt-2">
-            <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-soft text-[12px] font-semibold uppercase text-accent">
-              {me.data?.username.slice(0, 1) ?? ''}
-            </span>
-            <span className="ml-1 min-w-0 flex-1 truncate text-[13px] font-medium">{me.data?.username}</span>
+            <Avatar size={28} />
+            <span className="ml-1 min-w-0 flex-1 truncate text-[13px] font-medium">{profile.name}</span>
             <NavLink to="/settings" aria-label={t('Settings')} title={t('Settings')}
               className={({ isActive }) => cn(ICON_BUTTON, isActive && 'bg-surface-2 text-accent')}>
               <Settings className="h-4 w-4" />

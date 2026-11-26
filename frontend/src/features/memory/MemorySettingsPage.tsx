@@ -27,7 +27,7 @@ function MemoryForm({ initial }: { initial: MemorySettings }) {
   const total = (summary.data?.active ?? 0) + (summary.data?.pending ?? 0)
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-(--card-gap)">
       <Card>
         <CardHeader title={t('Using memory')} />
         <CardBody className="flex flex-col gap-5">
@@ -95,7 +95,7 @@ export function MemorySettingsPage() {
   const settings = useSettings()
   const memory = settings.data?.memory as MemorySettings | undefined
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-(--card-gap)">
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-soft text-accent">
           <Brain className="h-5 w-5" />

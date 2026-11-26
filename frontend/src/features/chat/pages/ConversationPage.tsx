@@ -22,6 +22,7 @@ import { ProfilePicker } from '@/features/profiles/components/ProfilePicker'
 import { useResumeRun } from '@/features/runs/api'
 import { useSettings } from '@/features/settings/api'
 import { useProjects } from '@/features/tasks/api'
+import { useReportAssistantActivity } from '@/lib/assistantActivity'
 import { cn } from '@/lib/cn'
 import { t } from '@/lib/i18n'
 import { useIslandVisible } from '@/features/island/islandStore'
@@ -44,6 +45,7 @@ import {
 import { useChatActions } from '../chatActions'
 import { TemporaryLabel } from '../temporary'
 import { LiveTiming } from '../components/AnswerTiming'
+import { EventCard } from '../components/EventCard'
 import { AssistantMessage, UserBubble } from '../components/MessageBubble'
 import { Composer } from '../components/Composer'
 import { useChatModel } from '../chatModel'
@@ -169,7 +171,9 @@ function Conversation() {
   // make sure the finished message is reloaded once the run is no longer active.
   const previousRun = useRef(activeRunId)
   useEffect(() => {
-    if (previousRun.current && !activeRunId) {
+    // Also when a run starts that this page didn't start (an event woke the chat): its
+    // turn is not in the list yet.
+    if ((previousRun.current && !activeRunId) || (activeRunId && activeRunId !== previousRun.current)) {
       void qc.invalidateQueries({ queryKey: messagesKey(conversationId) })
     }
     previousRun.current = activeRunId
@@ -186,11 +190,13 @@ function Conversation() {
   const lastAssistant = [...list].reverse().find((m) => m.role === 'assistant')
   const lastUser = [...list].reverse().find((m) => m.role === 'user')
   // The last message can be edited when it is the one the last answer replied to.
-  const canEditLast = !activeRunId && lastUser && lastAssistant && lastAssistant.seq === lastUser.seq + 1
+  const canEditLast = !activeRunId && lastUser && !lastUser.event && lastAssistant && lastAssistant.seq === lastUser.seq + 1
   const project = projects.data?.find((p) => p.id === conversation.data?.project_id)
   const actionError = send.error ?? regenerate.error ?? selectVersion.error ?? cancel.error ?? resume.error ?? editLast.error ?? branch.error ?? answer.error
   // A paused agent run: a message resumes it (the agent reads the message first).
   const paused = Boolean(activeRunId) && live.status === 'paused'
+  // What the assistant is doing (only the state), for anything that shows it, e.g. plugins.
+  useReportAssistantActivity(Boolean(activeRunId) && !paused && !question, live.text.length)
 
   // Phones while the Dynamic Island shows: the header takes two rows (see below).
   const stacked = island && !desktop
@@ -247,7 +253,8 @@ function Conversation() {
 
   return (
     // From `md` up the chat (and what opens beside it) is one panel on the ground, like the sidebar.
-    <div className="flex h-full md:mx-3 md:my-3 md:h-[calc(100%-1.5rem)] md:overflow-hidden md:rounded-panel md:border md:border-border md:bg-surface md:shadow-soft">
+    // chat-panel, glass: the background of Settings > Appearance shows through (styles/appearance.css).
+    <div className="chat-panel glass flex h-full md:mx-3 md:my-3 md:h-[calc(100%-1.5rem)] md:overflow-hidden md:rounded-panel md:border md:border-border md:bg-surface md:shadow-soft">
     <div className="flex h-full min-w-0 flex-1 flex-col">
       <header className="shrink-0 border-b border-border">
         <div className="flex h-12 items-center gap-1 px-1.5 md:h-14 md:px-6">
@@ -273,7 +280,7 @@ function Conversation() {
       {/* relative: what is positioned in the history (an sr-only label, a tooltip) is placed and
           clipped in here; otherwise it lands on the page under the chat and makes it scroll. */}
       <div ref={scrollRef} className="relative min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex max-w-3xl flex-col gap-6 px-3 py-5 md:px-6 md:py-8">
+        <div className="mx-auto flex max-w-3xl flex-col gap-(--msg-gap) px-3 py-5 md:px-6 md:py-8">
           {conversation.data?.branched_from_id && (
             <Link to={`/c/${conversation.data.branched_from_id}`}
               className="flex items-center gap-1.5 self-center rounded-full bg-surface-2 px-3 py-1 text-[12px] text-muted hover:text-text">
@@ -281,6 +288,9 @@ function Conversation() {
             </Link>
           )}
           {list.map((m) => {
+            if (m.role === 'user' && m.event) {
+              return <div key={m.id} className={enter(m.id)}><EventCard event={m.event} /></div>
+            }
             if (m.role === 'user') {
               return (
                 <div key={m.id} className={enter(m.id)}>

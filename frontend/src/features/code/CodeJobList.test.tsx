@@ -5,12 +5,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CodeFilters } from './api'
 import { codeJob } from './testJobs'
 import type { CodeJob } from './threads'
+import type { CodeUsage } from './usage'
 
-type ListState = { isPending?: boolean; isError?: boolean; error?: Error; jobs?: CodeJob[]; projects?: string[] }
+type ListState = { isPending?: boolean; isError?: boolean; error?: Error; jobs?: CodeJob[]; projects?: string[]; usage?: CodeUsage[] }
 let state: ListState = {}
 const asked: CodeFilters[] = []
 const refetch = vi.fn()
 vi.mock('./api', () => ({
+  useCodeUsage: () => ({ data: state.usage }),
   useCodeJobs: (filters: CodeFilters) => {
     asked.push(filters)
     return {
@@ -130,3 +132,37 @@ describe('the Code list', () => {
     expect(refetch).toHaveBeenCalled()
   })
 })
+
+describe('the usage indicator', () => {
+  beforeEach(() => {
+    state = { jobs: JOBS }
+  })
+
+  it('shows nothing until a computer reported its usage', () => {
+    show()
+    expect(screen.queryByTestId('code-usage')).toBeNull()
+  })
+
+  it('shows each window’s share, the reset of a window near its limit, and when it was seen', () => {
+    const soon = new Date(Date.now() + 2 * 3600_000).toISOString()
+    state.usage = [{
+      device_id: 'dev-1', device_name: 'Desk PC', status: 'allowed_warning', limit_type: 'five_hour', resets_at: soon,
+      windows: [
+        { name: 'five_hour', utilization: 0.91, resets_at: soon, status: 'allowed_warning' },
+        { name: 'seven_day', utilization: 0.25, resets_at: new Date(Date.now() + 3 * 86400_000).toISOString(), status: 'allowed' },
+      ],
+      observed_at: new Date(Date.now() - 5 * 60_000).toISOString(), job_id: null,
+    }]
+    show()
+    const bar = screen.getByTestId('code-usage')
+    expect(within(bar).getByText('91%')).toBeTruthy()
+    expect(within(bar).getByText('25%')).toBeTruthy()
+    expect(within(bar).getByText(/^resets /)).toBeTruthy()
+    expect(within(bar).getByText(/^as of /)).toBeTruthy()
+    const meters = within(bar).getAllByRole('meter')
+    expect(meters[0].getAttribute('aria-valuenow')).toBe('91')
+    // One computer: its name isn't repeated.
+    expect(within(bar).queryByText('Desk PC')).toBeNull()
+  })
+})
+

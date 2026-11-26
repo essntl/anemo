@@ -26,17 +26,30 @@ export interface MenuAction {
  * low for it). On phones it is a sheet along the bottom edge instead, like the dialogs:
  * a popup next to a button low in a list had no room and ran off the screen.
  */
-export function ActionMenu({ actions, label = t('More actions'), className }: { actions: MenuAction[]; label?: string; className?: string }) {
+export function ActionMenu({ actions, label = t('More actions'), className, icon, heading }: {
+  actions: MenuAction[]
+  label?: string
+  className?: string
+  /** A small title over the list, e.g. "Start from a template". */
+  heading?: string
+  /** The button's icon (default "⋯"), e.g. a chevron for the menu half of a split button. */
+  icon?: ReactNode
+}) {
   const [open, setOpen] = useState(false)
   const desktop = useMediaQuery(DESKTOP)
   useCloseOnScroll(open && desktop, useCallback(() => setOpen(false), []))
   const trigger = (
     <button type="button" aria-label={label}
       className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-control text-muted hover:bg-surface-hover hover:text-text', className)}>
-      <MoreHorizontal className="h-4.5 w-4.5" />
+      {icon ?? <MoreHorizontal className="h-4.5 w-4.5" />}
     </button>
   )
-  const list = <ActionList actions={actions} large={!desktop} onDone={() => setOpen(false)} />
+  const list = (
+    <>
+      {heading && <div className="px-3 pb-1 pt-1.5 text-[11.5px] font-semibold uppercase tracking-wider text-muted">{heading}</div>}
+      <ActionList actions={actions} large={!desktop} onDone={() => setOpen(false)} />
+    </>
+  )
 
   if (!desktop) {
     return (
@@ -45,7 +58,7 @@ export function ActionMenu({ actions, label = t('More actions'), className }: { 
         <RadixDialog.Portal>
           <RadixDialog.Overlay className="fade fixed inset-0 z-50 bg-black/30" />
           <RadixDialog.Content aria-describedby={undefined}
-            className="sheet fixed inset-x-0 bottom-0 z-50 flex max-h-[85dvh] flex-col rounded-t-panel border border-border bg-card px-2 pt-2 shadow-float focus:outline-none pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+            className="glass sheet fixed inset-x-0 bottom-0 z-50 flex max-h-[85dvh] flex-col rounded-t-panel border border-border bg-card px-2 pt-2 shadow-float focus:outline-none pb-[max(0.5rem,env(safe-area-inset-bottom))]">
             <RadixDialog.Title className="sr-only">{label}</RadixDialog.Title>
             <div className="min-h-0 overflow-y-auto">{list}</div>
           </RadixDialog.Content>
@@ -59,7 +72,7 @@ export function ActionMenu({ actions, label = t('More actions'), className }: { 
       <Popover.Trigger asChild>{trigger}</Popover.Trigger>
       <Popover.Portal>
         <Popover.Content align="end" sideOffset={4} collisionPadding={12}
-          className="pop z-50 max-h-[var(--radix-popover-content-available-height)] min-w-48 overflow-y-auto rounded-card border border-border bg-card p-1.5 shadow-float">
+          className="glass pop z-50 max-h-[var(--radix-popover-content-available-height)] min-w-48 overflow-y-auto rounded-card border border-border bg-card p-1.5 shadow-float">
           {list}
         </Popover.Content>
       </Popover.Portal>

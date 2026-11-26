@@ -36,7 +36,11 @@ public sealed class DeviceConnectionOptions
 
     public Func<Backoff> Backoff { get; init; } = Connection.Backoff.Default;
 
-    public int MaxMessageBytes { get; init; } = 4 * 1024 * 1024;
+    /// <summary>
+    /// The largest message taken from Anemo. A <c>code_start</c> with images (up to 10 MB of
+    /// them, as base64) is the largest there is.
+    /// </summary>
+    public int MaxMessageBytes { get; init; } = 16 * 1024 * 1024;
 }
 
 /// <summary>
@@ -54,6 +58,9 @@ public sealed class DeviceConnection
     private readonly string _version;
     private readonly DeviceConnectionOptions _options;
     private readonly ICodeJobsHost? _codeJobs;
+    private readonly string _platform; // hello.platform
+    private readonly Func<string> _shellKind; // offer.shell_kind
+    private readonly Func<DeviceInfo, bool> _filesOffered; // offer.files (§8)
     private readonly object _lock = new();
     private TaskCompletionSource _kick = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private bool _kicked;
@@ -73,8 +80,14 @@ public sealed class DeviceConnection
         IDiagnosticLog log,
         string version,
         DeviceConnectionOptions? options = null,
-        ICodeJobsHost? codeJobs = null)
+        ICodeJobsHost? codeJobs = null,
+        string platform = "windows",
+        Func<string>? shellKind = null,
+        Func<DeviceInfo, bool>? filesOffered = null)
     {
+        _platform = platform;
+        _filesOffered = filesOffered ?? (_ => false);
+        _shellKind = shellKind ?? (() => "powershell");
         _settings = settings;
         _control = control;
         _shellSwitchedOn = shellSwitchedOn;
@@ -247,7 +260,7 @@ public sealed class DeviceConnection
                 connectCts.CancelAfter(_options.WelcomeTimeout);
                 await ws.ConnectAsync(settings.Address.WebSocketUri, connectCts.Token);
                 var session = new Session(this, ws, sessionCts.Token);
-                await session.SendAsync(Wire.Hello(settings.Token, _version, _cursor));
+                await session.SendAsync(Wire.Hello(settings.Token, _version, _cursor, _platform));
                 var welcome = await session.ReceiveWelcomeAsync(connectCts.Token);
                 if (welcome is null)
                 {
@@ -364,7 +377,8 @@ public sealed class DeviceConnection
             {
                 var code = Device is { } device && _owner._codeJobs?.Offered(device) == true;
                 var codeStart = Device is { } d && _owner._codeJobs?.OfferedStart(d) == true;
-                await SendAsync(Wire.Offer(_owner._control.Effective, _owner._shellSwitchedOn(), code, codeStart));
+                var files = Device is { } f && _owner._filesOffered(f);
+                await SendAsync(Wire.Offer(_owner._control.Effective, _owner._shellSwitchedOn(), code, codeStart, _owner._shellKind(), files, codeInput: _owner._platform == "windows"));
             }
             catch (Exception e) when (e is WebSocketException or OperationCanceledException or ObjectDisposedException)
             {

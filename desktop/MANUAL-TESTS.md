@@ -256,6 +256,129 @@ with the Code page's phase 2.
     the prompt runs as text (Claude Code sees it literally), no calculator opens.
     `logs\commands-<day>.jsonl` has `code_start` with the job id and the prompt's length only.
 
+## Files between the computer and the workspace (Anemo Desktop 1.7.0)
+
+On the VM (trusted) and on a watched PC. In Anemo, *Files on your computers* at its default
+(*Always ask*). The contract is `docs/device-contracts.md` §8.
+
+71. *Let Anemo read and write files* off (the default): the turn context's line of the computer
+    has no `files on`; asking the agent to fetch a file is denied without a question, no command
+    reaches the client (`logs\commands-<day>.jsonl` has no `file_*` line). Tick it and Save: within
+    30 s the line says `files on`.
+72. **Get**: "Copy `C:\Users\<you>\Documents\<a 20 MB PDF>` from VM to `inbox/`": asked once
+    (*Copy … from VM to the workspace*); the file appears in Files with the same size; its SHA-256
+    (`Get-FileHash`) matches the server's (`sha256sum` in the workspace). The run's file changes
+    list it; *Revert* moves it to the trash.
+73. **Put**: "Put `inbox/report.pdf` on VM as `C:\Users\<you>\Desktop\report.pdf`": asked; the
+    file appears on the desktop only at the end (during a large copy only a hidden
+    `.report.pdf.anemo-xxxxxxxx.part` is there: show hidden files in Explorer), same hash. Again
+    without overwrite: refused, "already exists". With overwrite: asked as **dangerous**, the file
+    is replaced.
+74. **Folders**: try `C:\Users\<you>\.ssh\id_ed25519`, a `.bat` in
+    `C:\Users\<you>\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup`,
+    `%APPDATA%\Anemo Desktop\settings.json`, `C:\Windows\win.ini`, `\\server\share\x`,
+    `C:\Users\<you>\x.txt:stream`: each refused with a sentence, nothing written. A junction in
+    Documents pointing at `C:\Windows` (`mklink /J`): a file through it is refused. Set *Folders for
+    files* to `D:\Shared`: the home folder is refused, `D:\Shared` works; a relative folder can't be
+    saved.
+75. **Size**: Settings → Devices → *Largest file* 1 MB: a 2 MB file is refused before any chunk
+    (one `file_stat` in the command log). Back to 50.
+76. **Broken copy**: during a 150 MB put (largest file 200 MB) quit Anemo Desktop: no file under the
+    final name; the hidden `.part` file stays (delete it by hand). During one, pull the network:
+    within a minute the `.part` file is gone (the 60 s rule) and the agent's call failed.
+77. **Stop**: press the stop key during a large copy: the call fails ("stopped"), the `.part` file
+    goes; copies are refused until the pause ends. *Allow control* off alone doesn't stop copies.
+78. **Watched**: on the watched PC with the switch on: denied without asking, and the client
+    refuses too (send `file_stat` from a test server).
+79. Unicode names (`Grüße ✓.txt`), a 0-byte file and a file open in Word (read: works; replacing it
+    with overwrite: Windows may refuse, a sentence comes back) behave.
+80. The command log: `file_*` lines have paths, offsets and sizes, never contents.
+
+## Updates (Anemo Desktop 1.8.0)
+
+1.7.0 has no updater: install 1.8.0 by hand first. So as not to touch the real Releases, use a
+**test repository** (public, e.g. `<you>/anemo-update-test`, no code needed) and builds that point at
+it. In `desktop/` (Git Bash):
+
+```
+dotnet publish src/Anemo.Desktop/Anemo.Desktop.csproj -c Release -r win-x64 -o t/old -p:Version=1.8.0 -p:AnemoUpdateRepository=<you>/anemo-update-test
+dotnet publish src/Anemo.Desktop/Anemo.Desktop.csproj -c Release -r win-x64 -o t/new -p:Version=1.8.1 -p:AnemoUpdateRepository=<you>/anemo-update-test
+cp "t/new/Anemo Desktop.exe" t/Anemo-Desktop-win-x64.exe && (cd t && sha256sum Anemo-Desktop-win-x64.exe > SHA256SUMS-desktop.txt)
+gh release create desktop-v1.8.1 t/Anemo-Desktop-win-x64.exe t/SHA256SUMS-desktop.txt --repo <you>/anemo-update-test --title t --notes t
+```
+
+Copy `t/old/Anemo Desktop.exe` to `%LOCALAPPDATA%\Programs\Anemo Desktop\` (the real client quit)
+and start it.
+
+81. **Found and ready**: within about a minute Settings → This computer → Updates says "1.8.1 is
+    ready…", the tray menu shows *Update to 1.8.1 ready: Restart to update* at the top, the tooltip
+    adds "update to 1.8.1 ready". Beside the exe: `Anemo Desktop.new.exe`, no `.download` left. The
+    connection log has `update 1.8.1: downloading …` and `ready`.
+82. **Install at quit**: Quit. Expected: `Anemo Desktop.exe` is 1.8.1 (Properties → Details),
+    `Anemo Desktop.old.exe` is 1.8.0, no `.new.exe`. Start it: Settings says "1.8.1 is the newest
+    version", the Startup shortcut still works after a sign-out.
+83. **Restart to update, waiting**: back to 1.8.0 (quit, rename `.old.exe` back), wait for *ready*.
+    Let the agent run a long `computer_*` task, click *Restart to update*: nothing restarts while it
+    works; Settings says what it waits for; about a minute after the last command the client restarts
+    as 1.8.1 by itself, with a "was updated to 1.8.1" balloon. With a shared Claude Code job running:
+    it waits until the job ended. Quit during the wait: installed at once, not started.
+84. **A corrupted download is refused**: make a release `desktop-v1.8.2` whose
+    `SHA256SUMS-desktop.txt` has a wrong hash (edit one digit). *Check now*: "The download of 1.8.2
+    didn't match the release's checksum, so it was deleted and not installed"; nothing beside the exe.
+    A release whose exe is some other program with the right checksum: refused ("isn't Anemo Desktop
+    1.8.2"). A draft or pre-release `desktop-v1.9.0`, and a `voice-v9.0.0`: never offered.
+85. **Turned off**: untick *Update automatically*, Save, publish `desktop-v1.8.3`, restart the client
+    and wait 10 minutes: no request (the connection log has no `update` line), nothing downloaded.
+    *Check now*: it is fetched and installed at quit. Turning the switch off while an automatically
+    fetched update is ready removes it (`.new.exe` gone within a few seconds).
+86. **A failed swap recovers**: while ready, open `Anemo Desktop.exe` in a program that locks it
+    against renaming (or make the folder read-only for a moment after the download), quit: the old
+    exe is still there and starts; the log says "couldn't be moved aside; not installed". Then: make
+    a `desktop-v1.8.4` from a build that exits at once (e.g. `Environment.Exit(3)` at the top of
+    `TrayApp`'s constructor, version 1.8.4), *Restart to update*: within a minute the old version is
+    back and running, `updates\failed` says 1.8.4, and it isn't fetched again by itself; *Check now*
+    tries again.
+87. **Not where it can't**: the exe under `C:\Program Files\…` (installed as admin): Settings says
+    it can't write there and how to move it, and nothing is ever requested. A `dotnet build` output
+    (`bin\Release\…`): "a development build", no requests.
+88. **With the release key** (after desktop/README.md *Signing updates*, in the test repository with
+    its own key and builds made with `-p:AnemoUpdatePublicKey=…`): a release without `.sig` files is
+    refused before the exe is downloaded; one signed with another key is refused; a correctly signed
+    one installs. GitHub offline (unplug the network): "GitHub couldn't be reached", retried after an
+    hour, nothing else changes.
+
+## Messages while a Claude Code job runs (Anemo Desktop 1.9.0)
+
+Checked by hand on the build VM with Claude Code 2.1.330 (the pipeline, queue, send now and
+the end after the last answer); these need a real computer and account:
+
+89. **Queue**: start a job from the Code page whose first step takes a while ("run
+    `sleep 60`, then …"). While it runs, write a message and press Queue message: the card
+    says "Queued: Claude Code takes it in after its current step"; when the command ends,
+    the message shows in the timeline as yours with "Delivered …", and the job works on it
+    in the same session (the session id in the header doesn't change). `C:\anemo-bridge\jobs\<id>\inbox\`
+    has the message as a `.sent` file.
+90. **Send now**: in a running job, write a message and press Send now: the running command
+    stops ("[Request interrupted by user for tool use]"), the message is delivered and the
+    job goes on with it. The job stays *running* the whole time.
+91. **Edit and remove**: queue a message during a long command and press Edit before the
+    command ends: the text is back in the box and the job never gets it. Remove does the
+    same without putting it back. After it was delivered, Edit says "Claude Code took this
+    message in already."
+92. **The end**: after its last answer the job ends by itself within about 5 seconds
+    (*done*), `inbox\closed` exists, and no `powershell.exe` of the job is left (Task
+    Manager → Details, command line with `feed.ps1`).
+93. **A restart in between**: while a job runs, quit Anemo Desktop and start it again (or let
+    an update restart it): the job keeps running, a message queued after the restart is still
+    delivered at its next step, and the page catches up.
+94. **Cancel**: Cancel on the page ends `cmd.exe`, `powershell.exe` and `claude.exe` of the
+    job; the job shows *cancelled*, not *done*, even though it had answered before.
+95. **Images with a message**: queue a message with a screenshot: it lands in
+    `<job>\messages\<id>\images\`, and Claude Code opens it with Read.
+96. **Older jobs**: a job started by `cc.ps1` (or by Anemo Desktop 1.8): a message written
+    while it runs waits ("sent as a follow-up when it ends") and becomes the next follow-up
+    when the job ends, also with the browser closed.
+
 ## Platforms
 
 45. All of the above on **Windows 10 22H2 x64**, **Windows 11 x64**, and the ARM64 build on a

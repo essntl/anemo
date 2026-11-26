@@ -1,0 +1,69 @@
+# Publishes a new Release of Anemo Voice or Anemo Desktop by itself, whenever main has a
+# version of the app that has no Release yet. So a pull request that raises the version
+# (CI's "App versions" check asks for that when the app's code changes) is released once it
+# is merged; nobody has to push a tag.
+#
+# How: for each app, read its version from the source; if the tag (voice-v<version> or
+# desktop-v<version>) doesn't exist yet, create it on this commit and start release.yml for
+# that tag. release.yml then builds, signs and publishes as for a tag pushed by hand.
+#
+# Why release.yml is started explicitly: a tag pushed with the workflow's own token does not
+# start other workflows (GitHub's rule against loops), but asking for a run
+# (workflow_dispatch) does.
+name: Auto release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - android/**
+      - desktop/**
+      - .github/workflows/release.yml
+      - .github/workflows/auto-release.yml
+  workflow_dispatch:
+
+# One at a time, so two quick merges don't both create the same tag.
+concurrency:
+  group: auto-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write # create the tags
+  actions: write # start release.yml
+
+jobs:
+  tag:
+    name: Tag and release new app versions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # all tags
+
+      - name: Tag each app whose version has no Release yet
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          voice=$(sed -n 's/^ *versionName = "\(.*\)"$/\1/p' android/app/build.gradle.kts)
+          desktop=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' desktop/Directory.Build.props)
+
+          # app = the inputs.app value release.yml expects; prefix = the tag's prefix.
+          release_if_new() {
+            app=$1 prefix=$2 version=$3
+            tag="$prefix$version"
+            if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::$app: no x.y.z version in the source (found '$version')"
+              return 1
+            fi
+            if git rev-parse -q --verify "refs/tags/$tag" > /dev/null; then
+              echo "$tag already exists: nothing to release for $app"
+              return 0
+            fi
+            echo "New version: $tag on $GITHUB_SHA"
+            git tag "$tag" "$GITHUB_SHA"
+            git push origin "refs/tags/$tag"
+            gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$tag" -f app="$app"
+          }
+
+          release_if_new voice voice-v "$voice"
+          release_if_new desktop desktop-v "$desktop"

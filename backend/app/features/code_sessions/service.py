@@ -8,7 +8,7 @@ devices feature calls into this feature only through ingest.py.
 import logging
 import time
 import uuid
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
@@ -18,15 +18,19 @@ from sqlalchemy.orm import aliased
 
 from app.core.db import get_sessionmaker
 from app.core.errors import NotFound
+from app.features.attachments import service as attachments
+from app.features.code_sessions import images, inbox
 from app.features.code_sessions.models import CodeJob, CodeJobEvent, State
 from app.features.code_sessions.schemas import (
     CodeDeviceOut,
     CodeEventOut,
     CodeEventsOut,
+    CodeImageOut,
     CodeJobDetailOut,
     CodeJobListOut,
     CodeJobOut,
     CodeTodoOut,
+    CodeTokensOut,
 )
 from app.features.conversations.models import Conversation
 from app.features.devices import relay
@@ -103,7 +107,27 @@ def job_out(
         conversation_id=job.conversation_id,
         run_id=job.run_id,
         conversation_title=conversation_title if job.conversation_id else None,
+        images=[CodeImageOut.model_validate(ref) for ref in images.refs(job.images)],
+        tokens=_tokens(job.tokens),
+        input_open=job.input_open,
+        limit_hit=job.limit_hit,
+        limit_resets_at=job.limit_resets_at,
+        resume_state=job.resume_state,
+        resume_at=job.resume_at,
+        resume_note=job.resume_note,
+        resume_attempt=job.resume_attempt,
+        resumed_job_id=job.resumed_job_id,
+        resumed_from=job.resumed_from,
     )
+
+
+def _tokens(raw: object) -> CodeTokensOut | None:
+    if not isinstance(raw, dict):
+        return None
+    counts = {
+        k: v for k, v in raw.items() if k in CodeTokensOut.model_fields and isinstance(v, int)
+    }
+    return CodeTokensOut(**counts)
 
 
 def event_out(event: CodeJobEvent) -> CodeEventOut:
@@ -251,10 +275,15 @@ async def list_jobs(
 
 async def thread(db: AsyncSession, job: CodeJob) -> list[CodeJob]:
     """Every job of the job's thread, in start order."""
+    return await thread_of(db, job.thread_id)
+
+
+async def thread_of(db: AsyncSession, thread_id: uuid.UUID) -> list[CodeJob]:
+    """Every job of the thread, in start order."""
     return list(
         await db.scalars(
             select(CodeJob)
-            .where(CodeJob.thread_id == job.thread_id)
+            .where(CodeJob.thread_id == thread_id)
             .order_by(CodeJob.started_at, CodeJob.id)
         )
     )
@@ -267,7 +296,9 @@ async def detail(db: AsyncSession, job_id: uuid.UUID) -> CodeJobDetailOut:
         jobs.append(job)
     shaped = await jobs_out(db, jobs)
     mine = next(j for j in shaped if j.id == job.id)
-    return CodeJobDetailOut(job=mine, thread=shaped)
+    return CodeJobDetailOut(
+        job=mine, thread=shaped, messages=await inbox.of_thread(db, job.thread_id)
+    )
 
 
 async def one_out(db: AsyncSession, job_id: uuid.UUID) -> CodeJobOut | None:
@@ -324,16 +355,37 @@ async def prune(now: datetime | None = None) -> int:
             .correlate(CodeJob)
             .exists()
         )
-        result = await db.execute(
-            delete(CodeJob)
-            .where(last_activity < cutoff, ~and_(CodeJob.state == "running", device_active))
-            .execution_options(synchronize_session=False)
+        pruned = list(
+            await db.scalars(
+                delete(CodeJob)
+                .where(last_activity < cutoff, ~and_(CodeJob.state == "running", device_active))
+                .returning(CodeJob.images)
+                .execution_options(synchronize_session=False)
+            )
         )
+        await _delete_images(db, pruned)
         await db.commit()
-    count = int(result.rowcount or 0)  # type: ignore[attr-defined]
+    count = len(pruned)
     if count:
         log.info("code jobs pruned", extra={"ctx": {"count": count}})
     return count
+
+
+async def _delete_images(db: AsyncSession, pruned: Sequence[object]) -> None:
+    """The images of pruned jobs, unless a job that stays has them too (a queued message
+    sent twice) or a chat does. Part of prune's change: doesn't commit."""
+    ids: list[uuid.UUID] = []
+    for ref in (r for value in pruned for r in images.refs(value)):
+        try:
+            image_id = uuid.UUID(ref["id"])
+        except ValueError:
+            continue
+        still_used = await db.scalar(
+            select(CodeJob.id).where(CodeJob.images.contains([{"id": ref["id"]}])).limit(1)
+        )
+        if still_used is None:
+            ids.append(image_id)
+    await attachments.delete_unclaimed(db, ids)
 
 
 async def prune_if_due() -> None:

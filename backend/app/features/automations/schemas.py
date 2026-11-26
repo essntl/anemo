@@ -2,9 +2,10 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, ModelWrapValidatorHandler, model_validator
+from pydantic import BaseModel, Field, ModelWrapValidatorHandler, field_validator, model_validator
 
 from app.features.automations.schedule import MIN_GAP, MIN_GAP_CHECKED, Schedule, floor
+from app.features.provenance.schemas import ActorOut
 from app.features.runs.schemas import RunTiming
 
 OnAsk = Literal["pause", "deny", "fail"]
@@ -111,6 +112,9 @@ class AutomationOut(BaseModel):
             return handler(data)
 
     id: uuid.UUID
+    # agent: a prompt a model answers. script: code that runs without a model (the
+    # prompt is then its description; its code is at GET /automations/{id}/script).
+    kind: Literal["agent", "script"] = "agent"
     name: str
     prompt: str
     schedule: Schedule
@@ -141,6 +145,10 @@ class AutomationOut(BaseModel):
     last_status: str | None
     last_run_id: uuid.UUID | None
     active_run_id: uuid.UUID | None = None
+    # A script: it has a version the user approved (the one that runs), and a newer one
+    # waits for their review (it can't be switched on until they approve or discard it).
+    script_approved: bool = False
+    script_pending: bool = False
     created_at: datetime
 
 
@@ -186,12 +194,21 @@ class RunChange(BaseModel):
     ref: str | None = None  # the item's reference (/tasks?task=..., /calendar?event=...)
 
 
+class RunEvent(BaseModel):
+    """The event that started a run (an event trigger, features/triggers)."""
+
+    type: str  # e.g. task.created
+    summary: str  # "Task created: Buy milk"
+    at: datetime
+    coalesced: int = 1  # how many events this one firing stands for
+
+
 class AutomationRunOut(BaseModel):
     """One run in an automation's run log."""
 
     run_id: uuid.UUID
     status: str
-    trigger: str | None = None  # schedule | manual | retry
+    trigger: str | None = None  # schedule | manual | retry | event
     created_at: datetime
     ended_at: datetime | None
     outcome_line: str | None
@@ -201,3 +218,98 @@ class AutomationRunOut(BaseModel):
     error: str | None
     # How long it took, as the chat shows it: finished_at - started_at - waiting_ms.
     timing: RunTiming
+    event: RunEvent | None = None  # trigger "event": which event started it
+
+
+# -- scripts (docs/specs/08-automation-scripts.md) ----------------------------------------
+
+MAX_SCRIPT_CODE = 100_000  # characters
+SecretName = Annotated[str, Field(min_length=1, max_length=60, pattern=r"^[A-Z][A-Z0-9_]*$")]
+# A host name, or *.example.com for its subdomains (lower-cased before the check).
+HostName = Annotated[
+    str,
+    Field(
+        min_length=1,
+        max_length=253,
+        pattern=r"^(\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$",
+    ),
+]
+
+
+class ScriptCode(BaseModel):
+    """What a version of a script is: its code and what the code may use. All of it is
+    reviewed together: changing any part is a new version."""
+
+    code: str = Field(min_length=1, max_length=MAX_SCRIPT_CODE)
+    tools: list[ToolName] = Field(default_factory=list, max_length=60)
+    hosts: list[HostName] = Field(default_factory=list, max_length=20)
+    secrets: list[SecretName] = Field(default_factory=list, max_length=20)
+    think_tools: list[ToolName] = Field(default_factory=list, max_length=30)
+
+    @field_validator("hosts", mode="before")
+    @classmethod
+    def _lower(cls, v: Any) -> Any:
+        return [h.strip().lower() for h in v] if isinstance(v, list) else v
+
+
+class ScriptCreateIn(ScriptCode):
+    """A new script from the app: approved at once (the user wrote or saw it), off
+    until it is switched on."""
+
+    name: str = Field(min_length=1, max_length=120)
+    description: str = Field("", max_length=2000)
+    schedule: Schedule = Field(default_factory=lambda: Schedule(kind="manual"))
+    profile_id: uuid.UUID | None = None
+    model_id: uuid.UUID | None = None  # for its think steps
+    project_id: uuid.UUID | None = None
+    on_ask: OnAsk = "pause"
+    notify: Notify = "agent_decides"
+    max_retries: int = Field(0, ge=0, le=5)
+    max_tool_calls: int = Field(DEFAULT_MAX_TOOL_CALLS, ge=1, le=500)
+    max_runtime_s: int = Field(DEFAULT_MAX_RUNTIME_S, ge=30, le=24 * 3600)
+    chat_retention_days: int | None = Field(None, ge=1, le=3650)
+
+    @model_validator(mode="wrap")
+    @classmethod
+    def _not_too_often(
+        cls, data: Any, handler: ModelWrapValidatorHandler["ScriptCreateIn"]
+    ) -> "ScriptCreateIn":
+        with floor(MIN_GAP):
+            return handler(data)
+
+
+class ScriptVersionOut(BaseModel):
+    number: int
+    hash: str
+    code: str
+    tools: list[str]
+    hosts: list[str]
+    secrets: list[str]
+    think_tools: list[str]
+    created_by: ActorOut | None  # who saved it: you, the assistant in a chat, an automation
+    created_at: datetime
+    approved_at: datetime | None
+
+
+class ScriptSecretOut(BaseModel):
+    name: str
+    value_hint: str | None  # ••••1234; None: not set yet
+
+
+class ScriptOut(BaseModel):
+    automation_id: uuid.UUID
+    # The version that runs, and a newer one that waits for review (shown as a diff).
+    approved: ScriptVersionOut | None
+    pending: ScriptVersionOut | None
+    owner: ActorOut | None  # who wrote its first version
+    secrets: list[ScriptSecretOut]
+
+
+class ScriptApproveIn(BaseModel):
+    # The version the user looked at: approving fails when a newer one came meanwhile.
+    hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    enable: bool = False
+
+
+class ScriptSecretIn(BaseModel):
+    value: str = Field(min_length=1, max_length=4000)

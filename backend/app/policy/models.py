@@ -73,6 +73,12 @@ class Action(BaseModel):
     # runs these are asked about every time, unless that automation allows the tool
     # (see engine.evaluate's `ask_contacts`).
     contacts_people: bool = False
+    # One item of a call that changes many things at once (update_tasks, update_events):
+    # what changes on it, and the reference of the object (e.g. /tasks?task=<id>), so the
+    # approval can list every item. The call's summary is on its first action; the items'
+    # own actions have none, so the summary stays one line however many items there are.
+    item: str | None = None
+    ref: str | None = None
 
 
 class Grant(BaseModel):

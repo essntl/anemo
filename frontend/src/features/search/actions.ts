@@ -1,14 +1,15 @@
 /**
- * Things the search box (Ctrl+K) can do, besides finding and opening: the focus timer
- * and the music player. Offered once something matching is typed ("focus", "pause",
+ * Things the search box (Ctrl+K) can do, besides finding and opening: the focus timer,
+ * the music player, a new document or sketch. Offered once something matching is typed ("focus", "pause",
  * "next", "music"…).
  */
-import { CirclePlay, Keyboard, LayoutGrid, Link2, type LucideIcon, Pause, SkipForward, Timer } from 'lucide-react'
+import { CirclePlay, Eye, EyeOff, FilePlus, Keyboard, LayoutGrid, Link2, type LucideIcon, Pause, PenLine, SkipForward, Timer } from 'lucide-react'
 import { promptDialog } from '@/components/ui/dialogs'
 import { toast } from '@/components/ui/toast'
 import { msg, t } from '@/lib/i18n'
 import { timerActions, useTimerStore } from '@/features/focus/timerStore'
 import { player } from '@/features/music/player/controller'
+import { usePluginOverlays } from '@/features/plugins/overlayStore'
 import { askPlaylistChoice } from '@/features/music/playlistChoice'
 import type { PageId } from '@/features/settings/navigation'
 import { hasKeyboard, useShortcutSheet } from '@/features/shortcuts/sheetStore'
@@ -52,6 +53,9 @@ export const ACTIONS: PaletteAction[] = [
       player.add(link.trim(), { choice }).catch((err: Error) => toast({ message: err.message }))
     },
   },
+  // Documents asks for the title (and puts it in the project chosen, as its own "New" does).
+  { label: msg('New document'), icon: FilePlus, keywords: msg('new create document note write markdown'), of: 'documents', run: (navigate) => navigate('/documents?new=document') },
+  { label: msg('New sketch'), icon: PenLine, keywords: msg('new create sketch drawing draw whiteboard handwriting'), of: 'documents', run: (navigate) => navigate('/documents?new=sketch') },
   { label: msg('Edit home layout'), icon: LayoutGrid, keywords: msg('home widgets layout dashboard edit arrange'), run: (navigate) => navigate('/home?edit=1') },
   {
     label: msg('Keyboard shortcuts'),
@@ -59,6 +63,21 @@ export const ACTIONS: PaletteAction[] = [
     keywords: msg('keyboard shortcuts keys hotkeys help cheat sheet'),
     run: () => afterPaletteCloses(() => useShortcutSheet.getState().setOpen(true)),
     available: hasKeyboard,
+  },
+  // Plugins' overlays (a layer over the window): hidden and shown again on this device.
+  {
+    label: msg('Hide plugin overlays'),
+    icon: EyeOff,
+    keywords: msg('plugin overlay overlays hide layer'),
+    run: () => usePluginOverlays.getState().setHidden(true),
+    available: () => !usePluginOverlays.getState().hidden && usePluginOverlays.getState().count > 0,
+  },
+  {
+    label: msg('Show plugin overlays'),
+    icon: Eye,
+    keywords: msg('plugin overlay overlays show layer'),
+    run: () => usePluginOverlays.getState().setHidden(false),
+    available: () => usePluginOverlays.getState().hidden,
   },
 ]
 

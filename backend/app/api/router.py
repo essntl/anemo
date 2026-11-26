@@ -3,19 +3,24 @@
 Routers in `protected` require a logged-in session for every endpoint.
 Only health checks, the login flow, viewing a share link (a frozen copy the owner
 chose to share, see features/shares/public_router.py) and the one-time approval buttons
-on push notifications (see features/notifications/push_router.py) are reachable
-without one. The browser extension's WebSocket (features/extension/router.py) checks its
-API token itself, in its first message.
+on push notifications (see features/notifications/push_router.py) and the plugin frame
+document (the same static page for every plugin, features/plugins/frame_router.py) and
+incoming webhooks (signed with the trigger's secret, features/triggers/hooks_router.py)
+are reachable without one. The browser extension's WebSocket
+(features/extension/router.py) checks its API token itself, in its first message.
 """
 
 from fastapi import APIRouter, Depends
 
 from app.api import health
 from app.api.deps import require_session
+from app.features.activity.router import router as activity_router
+from app.features.appearance.router import router as appearance_router
 from app.features.attachments.router import router as attachments_router
 from app.features.audit.router import router as audit_router
 from app.features.auth.router import router as auth_router
 from app.features.automations.router import router as automations_router
+from app.features.automations.scripts_router import router as scripts_router
 from app.features.browser_router import router as browser_router
 from app.features.calendar.router import router as calendar_router
 from app.features.capture.router import router as capture_router
@@ -26,6 +31,7 @@ from app.features.devices.router import router as devices_router
 from app.features.devices.ws import router as devices_ws_router
 from app.features.dictation.router import router as dictation_router
 from app.features.documents.router import router as documents_router
+from app.features.documents.sketch_router import router as sketch_router
 from app.features.extension.http_router import router as extension_http_router
 from app.features.extension.router import router as extension_router
 from app.features.files.router import router as files_router
@@ -39,6 +45,9 @@ from app.features.notifications.push_router import public_router as push_public_
 from app.features.notifications.push_router import router as push_router
 from app.features.notifications.router import router as notifications_router
 from app.features.permissions_router import router as permissions_router
+from app.features.plugins.chat_router import router as plugin_chat_router
+from app.features.plugins.frame_router import router as plugin_frame_router
+from app.features.plugins.router import router as plugins_router
 from app.features.profiles.router import router as profiles_router
 from app.features.projects.router import router as projects_router
 from app.features.properties.router import router as properties_router
@@ -56,6 +65,8 @@ from app.features.stats.router import router as stats_router
 from app.features.system_router import router as system_router
 from app.features.tasks.router import router as tasks_router
 from app.features.trash.router import router as trash_router
+from app.features.triggers.hooks_router import router as hooks_router
+from app.features.triggers.router import router as triggers_router
 from app.features.updates.router import router as updates_router
 from app.features.usage.router import router as usage_router
 from app.features.views.router import router as views_router
@@ -69,14 +80,18 @@ api_router.include_router(shares_public_router)  # read-only, by secret link
 api_router.include_router(push_public_router)  # one-time approval buttons, by secret token
 api_router.include_router(extension_router)  # WebSocket; authenticates with an API token
 api_router.include_router(devices_ws_router)  # WebSocket; authenticates with a device's token
+api_router.include_router(plugin_frame_router)  # the plugin frame document: static, no data
+api_router.include_router(hooks_router)  # incoming webhooks; each request is signed (HMAC)
 
 protected = APIRouter(dependencies=[Depends(require_session)])
 protected.include_router(settings_router)
 protected.include_router(audit_router)
+protected.include_router(activity_router)
 protected.include_router(providers_router)
 protected.include_router(conversations_router)
 protected.include_router(runs_router)
 protected.include_router(attachments_router)
+protected.include_router(appearance_router)
 protected.include_router(agent_router)
 protected.include_router(permissions_router)
 protected.include_router(links_router)
@@ -87,6 +102,7 @@ protected.include_router(skills_router)
 protected.include_router(web_router)
 protected.include_router(memory_router)
 protected.include_router(documents_router)
+protected.include_router(sketch_router)
 protected.include_router(daily_notes_router)
 protected.include_router(tasks_router)
 protected.include_router(trash_router)
@@ -105,6 +121,8 @@ protected.include_router(devices_router)
 protected.include_router(code_router)
 protected.include_router(research_router)
 protected.include_router(automations_router)
+protected.include_router(scripts_router)
+protected.include_router(triggers_router)
 protected.include_router(mcp_router)
 protected.include_router(browser_router)
 protected.include_router(search_router)
@@ -115,4 +133,6 @@ protected.include_router(updates_router)
 protected.include_router(properties_router)
 protected.include_router(views_router)
 protected.include_router(voice_router)
+protected.include_router(plugins_router)
+protected.include_router(plugin_chat_router)  # "Continue building with the assistant"
 api_router.include_router(protected)

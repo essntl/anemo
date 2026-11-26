@@ -1,20 +1,21 @@
 namespace Anemo.Desktop.Core.Platform;
 
-/// <summary>A rectangle in physical screen pixels.</summary>
+/// <summary>A rectangle in screen units: physical pixels on Windows, points on macOS (<see cref="DisplayLayout"/>).</summary>
 public readonly record struct ScreenRect(int X, int Y, int Width, int Height)
 {
     public ScreenPoint Center => new(X + Width / 2, Y + Height / 2);
 }
 
-/// <summary>A point in physical screen pixels.</summary>
+/// <summary>A point in screen units: physical pixels on Windows, points on macOS.</summary>
 public readonly record struct ScreenPoint(int X, int Y);
 
-/// <summary>A top-level window. <see cref="Handle"/> is the HWND.</summary>
+/// <summary>A top-level window. <see cref="Handle"/> is the HWND on Windows, the CGWindowID on macOS.</summary>
 public sealed record WindowInfo(long Handle, string Title, string App, bool Minimized, ScreenRect Bounds);
 
 /// <summary>
 /// A screenshot already scaled to at most <see cref="ScreenshotScaler.MaxSide"/> pixels on
-/// its long side. Screen point = origin + screenshot pixel × scale.
+/// its long side. Screen point = origin + screenshot pixel × scale (screen units: pixels on
+/// Windows, points on macOS, so a Retina screen's scale is about 1, not 2).
 /// </summary>
 public sealed record ScreenCapture(byte[] Png, int Width, int Height, double Scale, int OriginX, int OriginY);
 

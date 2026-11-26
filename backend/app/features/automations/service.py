@@ -29,11 +29,11 @@ from sqlalchemy import update as sql_update
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.actor import acting_as
+from app.core.actor import Actor, acting_as, current_actor
 from app.core.db import get_sessionmaker
 from app.core.errors import AppError, Conflict, NotFound
 from app.events import bus
-from app.features.automations.models import Automation
+from app.features.automations.models import Automation, ScriptVersion
 from app.features.automations.schedule import (
     TOO_OFTEN,
     Schedule,
@@ -49,11 +49,13 @@ from app.features.automations.schemas import (
     ChangeCheck,
     PendingApproval,
     RunChange,
+    RunEvent,
 )
 from app.features.conversations.models import ChatMessage, Conversation
 from app.features.documents import service as documents
 from app.features.notifications import service as notifications
 from app.features.notifications.models import NotificationDestination
+from app.features.plugins import gate
 from app.features.profiles.models import AgentProfile
 from app.features.providers.models import Model
 from app.features.runs import service as runs
@@ -61,6 +63,7 @@ from app.features.runs.models import ACTIVE_STATUSES, Approval, Run, ToolCall
 from app.features.settings import service as settings_service
 from app.features.settings.sections import AutomationSettings
 from app.features.tasks.models import Project
+from app.features.triggers import events as trigger_events
 from app.jobs import queue
 from app.jobs.models import Job
 from app.workspace import files
@@ -204,8 +207,19 @@ async def automation_out(db: AsyncSession, a: Automation) -> AutomationOut:
     # Only a run that is working shows as the live status; one that waits for approval
     # is listed under pending_approvals, and later runs report how they went.
     run = await busy_run(db, a.id)
+    approved, pending = False, False
+    if a.kind == "script":
+        newest = await db.scalar(
+            select(ScriptVersion.hash)
+            .where(ScriptVersion.automation_id == a.id)
+            .order_by(ScriptVersion.number.desc())
+            .limit(1)
+        )
+        approved = a.script_hash is not None
+        pending = newest is not None and newest != a.script_hash
     return AutomationOut(
         id=a.id,
+        kind=a.kind,  # type: ignore[arg-type]
         name=a.name,
         prompt=a.prompt,
         schedule=schedule,
@@ -240,6 +254,8 @@ async def automation_out(db: AsyncSession, a: Automation) -> AutomationOut:
         last_status=_LIVE_STATUS[run.status] if run else a.last_status,
         last_run_id=a.last_run_id,
         active_run_id=run.id if run else None,
+        script_approved=approved,
+        script_pending=pending,
         created_at=a.created_at,
     )
 
@@ -284,6 +300,20 @@ def run_log_entry(run: Run, tool_calls: int = 0) -> AutomationRunOut:
         conversation_id=run.conversation_id,
         error=(run.error or {}).get("message"),
         timing=runs.run_timing(run, tool_calls),
+        event=_event_of(run),
+    )
+
+
+def _event_of(run: Run) -> RunEvent | None:
+    """The event that started the run, for its line in the run log."""
+    event = run.options.get("event")
+    if not isinstance(event, dict) or not event.get("type"):
+        return None
+    return RunEvent(
+        type=str(event["type"]),
+        summary=str(event.get("summary") or event["type"]),
+        at=datetime.fromisoformat(event["at"]) if event.get("at") else run.created_at,
+        coalesced=int(event.get("coalesced") or 1),
     )
 
 
@@ -328,9 +358,17 @@ def _checks(checks: list[ChangeCheck] | None) -> list[dict[str, Any]] | None:
     return [c.model_dump(mode="json") for c in checks] if checks else None
 
 
-def _reschedule(automation: Automation) -> None:
+def reschedule(automation: Automation) -> None:
+    """Its next run time, after it was switched on or off or its schedule changed."""
     schedule = stored(automation.schedule)
     automation.next_run_at = next_run(schedule, _now()) if automation.enabled else None
+
+
+def _time_passed(automation: Automation) -> bool:
+    """It is on but will never run again by itself (a one-time schedule in the past).
+    A script that runs only when started never does, and that is fine."""
+    manual = automation.schedule.get("kind") == "manual"
+    return automation.enabled and automation.next_run_at is None and not manual
 
 
 async def protections(db: AsyncSession) -> AutomationSettings:
@@ -375,8 +413,8 @@ async def create(db: AsyncSession, data: AutomationIn, *, created_by: str = "use
         change_check=_checks(data.change_check),
         run_anyway_hours=data.run_anyway_hours,
     )
-    _reschedule(automation)
-    if automation.enabled and automation.next_run_at is None:
+    reschedule(automation)
+    if _time_passed(automation):
         raise AppError("That time has already passed", code="schedule_in_past")
     db.add(automation)
     await db.flush()
@@ -430,6 +468,8 @@ async def update(db: AsyncSession, automation: Automation, data: AutomationPatch
         timing_changed = new != automation.schedule
         automation.schedule = new
     if data.enabled is not None and data.enabled != automation.enabled:
+        if data.enabled and automation.kind == "script":
+            await check_script_may_run(db, automation)
         automation.enabled = data.enabled
         timing_changed = True
         if not data.enabled and automation.last_status == "retrying":
@@ -452,10 +492,28 @@ async def update(db: AsyncSession, automation: Automation, data: AutomationPatch
         except ValueError as exc:
             raise AppError(TOO_OFTEN, code="schedule_too_often") from exc
     if timing_changed:
-        _reschedule(automation)
-        if automation.enabled and automation.next_run_at is None:
+        reschedule(automation)
+        if _time_passed(automation):
             raise AppError("That time has already passed", code="schedule_in_past")
     await db.flush()
+
+
+async def check_script_may_run(db: AsyncSession, automation: Automation) -> None:
+    """A script is switched on only with an approved version and no change waiting for
+    review (the user looks at the diff first). Raises Conflict."""
+    newest = await db.scalar(
+        select(ScriptVersion)
+        .where(ScriptVersion.automation_id == automation.id)
+        .order_by(ScriptVersion.number.desc())
+        .limit(1)
+    )
+    if automation.script_hash is None or newest is None:
+        raise Conflict("Approve the script's code first", code="script_not_approved")
+    if newest.hash != automation.script_hash:
+        raise Conflict(
+            "The script was changed: review the change before switching it on",
+            code="script_change_pending",
+        )
 
 
 # -- running ------------------------------------------------------------------------------
@@ -469,10 +527,21 @@ async def start_run(
     retry: int = 0,
     now: datetime | None = None,
     change: dict[str, Any] | None = None,
+    script_input: Any = None,
+    event: dict[str, Any] | None = None,
 ) -> Run:
     """A new conversation holding the prompt, and a queued agent run to answer it.
     `change`: what the change check found (its old and new results), for the run's
-    context. Adds to the caller's transaction."""
+    context. `event`: the event that started it (trigger "event", features/triggers:
+    {id, type, subject, at, coalesced, depth, trigger_id, summary}). A script gets a
+    script run of its approved version instead (only that one ever runs), with
+    `script_input` (what an agent passed to run_script). Adds to the caller's
+    transaction."""
+    if automation.kind == "script" and automation.script_hash is None:
+        raise Conflict("Approve the script's code first", code="script_not_approved")
+    if reason := await gate.blocked_reason(db, "automation", automation.id):
+        # A plugin's script or automation: not while plugins or that plugin are off.
+        raise Conflict(reason, code="plugin_unavailable")
     now = now or _now()
     schedule = stored(automation.schedule)
     local = now.astimezone(ZoneInfo(schedule.tz))
@@ -504,8 +573,9 @@ async def start_run(
     )
     db.add_all([user, assistant])
     await db.flush()
+    script = automation.kind == "script"
     run = Run(
-        kind="agent",
+        kind="script" if script else "agent",
         status="queued",
         conversation_id=conversation.id,
         automation_id=automation.id,
@@ -519,7 +589,14 @@ async def start_run(
                 "trigger": trigger,
                 "retry": retry,
                 **({"change": change} if change is not None else {}),
-            }
+            },
+            **({"event": event} if event is not None else {}),
+            # The version it runs (a run that waits for an approval goes on with it).
+            **(
+                {"script": {"hash": automation.script_hash, "input": script_input}}
+                if script
+                else {}
+            ),
         },
     )
     db.add(run)
@@ -566,9 +643,15 @@ async def fire_due(now: datetime | None = None) -> int:
             automation.next_run_at = next_run(schedule, now, scheduled)
             if automation.next_run_at is None:
                 automation.enabled = False  # a one-time schedule is done
+            if automation.kind == "script" and automation.script_hash is None:
+                automation.enabled, automation.next_run_at = False, None  # never approved
+                continue
             if now - scheduled > GRACE:
                 # The app was off at the time. Catching up hours later would surprise.
                 automation.last_status = "missed"
+            elif await gate.blocked_reason(db, "automation", automation.id):
+                # A plugin's, and plugins (or that plugin) are switched off.
+                automation.last_status = "skipped"
             elif await busy_run(db, automation.id) is not None:
                 # The previous run is still going. (One waiting for approval is not.)
                 automation.last_status = "skipped"
@@ -605,8 +688,12 @@ async def retry_run(
         if await busy_run(db, automation.id) is not None:
             return
         failed = await db.get(Run, failed_run_id) if failed_run_id else None
-        change = ((failed.options if failed else {}).get("automation") or {}).get("change")
-        await start_run(db, automation, trigger="retry", retry=retry, change=change)
+        options = failed.options if failed else {}
+        change = (options.get("automation") or {}).get("change")
+        # A run an event started is retried with that event.
+        await start_run(
+            db, automation, trigger="retry", retry=retry, change=change, event=options.get("event")
+        )
         await db.commit()
     await notify_changed()
 
@@ -856,7 +943,7 @@ async def on_run_finished(db: AsyncSession, run: Run, status: str, error: str | 
             )
             await db.commit()
         else:
-            await count_failure(db, automation, error or "The run failed.", link)
+            await count_failure(db, automation, error or "The run failed.", link, run_id=run_id)
     await notify_changed()
 
 
@@ -866,6 +953,7 @@ async def count_failure(
     error: str,
     link: str | None,
     detail: str | None = None,
+    run_id: uuid.UUID | None = None,
 ) -> None:
     """A run (or change check) failed for good: count it, and tell the user. With
     agent_decides once, when it has failed FAILURES_BEFORE_ALERT times in a row; else, as
@@ -882,6 +970,20 @@ async def count_failure(
     automation.last_error_at = _now()
     name, notify, streak = automation.name, automation.notify, automation.failure_streak
     destinations = _destinations(automation)
+    # Caused by the automation's own run: its own triggers never fire on it (loop rule).
+    actor = Actor.automation(automation.id, run_id) if run_id else current_actor()
+    with acting_as(actor):
+        await trigger_events.emit(
+            db,
+            "automation.run_failed",
+            {
+                "automation_id": str(automation.id),
+                "run_id": str(run_id) if run_id else None,
+                "name": name,
+                "failure_streak": streak,
+            },
+            subject=str(automation.id),
+        )
     await db.commit()
     if notify == "agent_decides":
         if streak != FAILURES_BEFORE_ALERT:

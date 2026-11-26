@@ -99,6 +99,23 @@ class ResearchRef(BaseModel):
     session_id: str
 
 
+class EventRef(BaseModel):
+    """An event that woke the chat (a "wake me" trigger, features/triggers): the whole
+    content of a user-role message that the user didn't write. The runtime replaces it
+    with text, the payload marked as data, before a request is sent (runtime/history.py),
+    so providers never see it; the app shows it as an event card."""
+
+    type: Literal["event"] = "event"
+    event_id: str
+    event_type: str
+    trigger_id: str | None = None
+    at: str
+    coalesced: int = 1
+    summary: str = ""
+    note: str = ""
+    data: dict[str, Any] | None = None
+
+
 ContentBlock = Annotated[
     TextBlock
     | ImageBlock
@@ -108,7 +125,8 @@ ContentBlock = Annotated[
     | AttachmentRef
     | ConversationRef
     | PageRef
-    | ResearchRef,
+    | ResearchRef
+    | EventRef,
     Field(discriminator="type"),
 ]
 

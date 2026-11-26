@@ -1,0 +1,48 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Anemo.Desktop.Mac.UI.PermissionsWindow"
+        Title="Anemo Desktop: permissions"
+        Width="560" SizeToContent="Height" CanResize="False"
+        WindowStartupLocation="CenterScreen">
+  <!-- docs/specs/09-desktop-macos.md D7: what each permission is for, a button that asks macOS,
+       one that opens the right place in System Settings. Nothing here grants anything itself. -->
+  <StackPanel Margin="24" Spacing="16">
+    <TextBlock FontSize="18" FontWeight="SemiBold" Text="Let Anemo see and use this Mac" />
+    <TextBlock TextWrapping="Wrap"
+               Text="Anemo's agent can look at this Mac and act on it only with two permissions that only you can give, in System Settings. You can take them back there at any time. Without them, Claude Code jobs and the shell still work." />
+
+    <Border BorderBrush="#33808080" BorderThickness="1" CornerRadius="8" Padding="16">
+      <StackPanel Spacing="8">
+        <DockPanel>
+          <TextBlock x:Name="ScreenState" DockPanel.Dock="Right" FontWeight="SemiBold" />
+          <TextBlock FontWeight="SemiBold" Text="Screen Recording" />
+        </DockPanel>
+        <TextBlock TextWrapping="Wrap" Opacity="0.8"
+                   Text="For screenshots: when the agent looks at the screen or a window, and when you share the screen with Anemo. The screenshots go to your Anemo, into the run's timeline." />
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button x:Name="AskScreen" Content="Allow…" />
+          <Button x:Name="OpenScreen" Content="Open System Settings" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <Border BorderBrush="#33808080" BorderThickness="1" CornerRadius="8" Padding="16">
+      <StackPanel Spacing="8">
+        <DockPanel>
+          <TextBlock x:Name="AccessState" DockPanel.Dock="Right" FontWeight="SemiBold" />
+          <TextBlock FontWeight="SemiBold" Text="Accessibility" />
+        </DockPanel>
+        <TextBlock TextWrapping="Wrap" Opacity="0.8"
+                   Text="For reading the buttons and fields of a window and for clicking, typing and pressing keys. Only while Allow control is on, and on a watched Mac only after you approve each action in Anemo. Password fields are never typed into." />
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button x:Name="AskAccess" Content="Allow…" />
+          <Button x:Name="OpenAccess" Content="Open System Settings" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <TextBlock TextWrapping="Wrap" Opacity="0.7" FontSize="12"
+               Text="After allowing Screen Recording, macOS may ask you to quit and reopen Anemo Desktop. A build that isn't signed by a developer loses both permissions when it is updated: then remove Anemo Desktop from both lists in System Settings (the − button) and allow it again." />
+    <Button x:Name="Done" Content="Done" HorizontalAlignment="Right" IsDefault="True" />
+  </StackPanel>
+</Window>

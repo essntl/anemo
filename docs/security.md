@@ -107,6 +107,48 @@ password again.
   (Ctrl+Alt+Shift+S) on the computer cancels the running command and takes control away
   for an hour; the server sends no action until the client offers control again
   (looking still works, see above).
+- **Files on a computer** (`device_file_get`, `device_file_put`, Anemo Desktop 1.7.0).
+  Only on a *trusted* computer whose client has *Let Anemo read and write files* on (off by
+  default); a watched one is refused, by the server before asking and live before the first
+  command, and by the client. **What the agent can read and write there**: any file the
+  logged-in user can, but only inside the folders the client allows, checked by the client
+  with every link and junction followed first: the home folder, or the folders listed in
+  the client's Settings; never a hidden file or folder below them (`.ssh`, `.aws`, `.gnupg`,
+  `.config`, `.git`, the shell's start files), never the home folder's `AppData` (Windows:
+  browser profiles, credentials, the Startup folder) or `Library` (macOS: keychains, mail,
+  `LaunchAgents`), never the client's own folder (its token), and on Windows no network or
+  device paths. That closes reading keys and planting a program that starts at the next
+  sign-in, but not everything: a document, a download or a script on the desktop the user
+  later opens is reachable, so the permission (*Files on your computers*) asks by default,
+  and replacing an existing file on the computer is a *dangerous* action that is never done
+  unless the agent asked for `overwrite`. Each chunk and the whole file are checked by
+  SHA-256 on both ends; a copy onto the computer is written to a hidden temporary file and
+  only renamed once complete. In the workspace a copied-in file is a revertible run file
+  change, respects the folder access of Settings → Workspace (a folder hidden from agents
+  can't be sent away either), and its content is untrusted for the model. Stop pauses
+  copies too. The client's log keeps paths and sizes, never contents.
+- **Updates of Anemo Desktop** (1.8.0). The client asks GitHub's API for this repository's
+  Releases every 6 hours, unauthenticated: GitHub sees the computer's address and
+  `Anemo-Desktop/<version>`, nothing else (no token, device or Anemo address); Anemo's server
+  isn't involved. **What it trusts:** a stable `desktop-v…` Release of the repository compiled
+  into it, fetched over HTTPS from addresses it builds itself, whose file matches the SHA-256 in
+  the Release's checksum file. That checksum comes from the same Release, so on its own it guards
+  against a damaged download, not against someone who can change the Release. With the release
+  key set up (`desktop/README.md`, *Signing updates*), the checksum file must also carry a valid
+  ECDSA signature by the key compiled into the client, bound to the tag; that stops someone who
+  can edit Releases but not run the release workflow with its secret. Neither stops someone who
+  controls the repository (they can have the workflow build and sign their code): review of what
+  reaches `main` is the boundary. The signing secret belongs in the `desktop-release`
+  environment, restricted to `desktop-v*` tags, so that a workflow run on a branch can't read it.
+  On a Mac with a Developer ID build, the new app must also be signed by the same Apple team,
+  checked as a code requirement anchored to Apple (`codesign -R`), not from what the signature
+  claims; if the app can't read its own signature, it doesn't update. An ad hoc build's signature
+  only proves the bundle is intact. On
+  Windows the exe has no Authenticode signature. Before swapping, the new version is started once
+  with `--self-test`; it is never restarted into while the agent is working; the previous
+  version is kept beside it and put back if the new one doesn't start. Downloads carry no Mark of
+  the Web / quarantine, so SmartScreen and Gatekeeper don't ask again: the checks above are what
+  decides. Design: [specs/23-desktop-auto-update.md](specs/23-desktop-auto-update.md).
 - **Screens are untrusted.** Screenshots, window text and a shared screen can contain
   text written to steer the agent (an email, a web page, a document). They reach the
   model labelled as untrusted, like web pages, and what contains the damage is the
@@ -196,6 +238,22 @@ cookies, no token and nothing about you or your data; the answer only fills Sett
 → Advanced. Anemo never downloads or installs anything itself. Switch it off in
 Settings → Advanced or for good with `UPDATE_CHECK=false`.
 
+## Appearance uploads
+
+Backgrounds, fonts and the avatar (Settings → Appearance and Profile) are recognised by
+their content, never by the file name or the type the browser sends
+(`features/appearance/files.py`): pictures must open in Pillow as PNG, JPEG, WebP, AVIF or
+GIF, videos must have a WebM or MP4 header, fonts the magic bytes of WOFF2, WOFF, TTF or
+OTF. SVG, and anything else that starts like XML or HTML, is refused, because an SVG can
+carry script. Each kind has a size cap, and at most 60 uploads are kept. Still pictures
+are re-encoded (no EXIF, GPS or XMP is kept); animated pictures and videos are stored as
+sent.
+
+They are served with the type we recognised, `X-Content-Type-Options: nosniff`,
+`Content-Security-Policy: default-src 'none'` and a file name of our own. Every route needs
+a login. Colours and fonts reach the page only as CSS variables built from checked values
+(hex colours, a fixed list of font names, ids of uploads), never as CSS from the user.
+
 ## Images in answers and documents
 
 Answers, documents, task notes and notifications can contain Markdown written by a model or an
@@ -204,6 +262,14 @@ data (`https://example.org/x.png?q=…`), and the browser sends it as soon as th
 only images from Anemo itself (and `data:`/`blob:` images) load by themselves; an image from
 another site shows as a "show image from example.org" button and loads when you click it. The
 document itself is not changed.
+
+Pictures made with `generate_image` are shown from Anemo too. When an image provider
+answers with an address instead of the picture, the server fetches it with the same guarded
+client as web pages (no addresses on your network unless allowed), at most 25 MB, and keeps
+it only if the server says it is an image and the bytes are a PNG, JPEG, WebP or GIF. The
+provider's API key stays an encrypted secret: the model never sees it. Each picture costs
+money, so automation runs ask before each call unless you switch that off in Settings →
+Providers & Models → Image generation; that rule can only make a call stricter.
 
 ## Diagrams, charts and math
 
@@ -222,6 +288,64 @@ document), so drawing one can't do more than show a picture:
 - Formulas use KaTeX with `trust` off, so commands such as `\href`, `\url` or
   `\includegraphics` don't work. KaTeX, its fonts and Mermaid are part of the app;
   nothing comes from a CDN.
+
+## Plugins
+
+A plugin (Settings → Plugins, spec `docs/specs/12-plugins.md`) is code and settings
+someone else wrote, so it gets nothing by default:
+
+- **Nothing runs unreviewed, nothing widens silently.** A new plugin waits until you
+  approve it with your password; the approval names the hash of the exact files you
+  reviewed (a newer upload in between is refused) and grants its permissions to the
+  plugin. An update you install yourself applies at once only when it asks for nothing
+  beyond those grants and adds or changes no MCP server; anything wider waits, and the
+  running version stays until you approve. Every change an assistant saves waits for
+  review: its tools can create and change plugins, never approve, enable or grant. (So
+  an update you upload can change a plugin's code without a second look: install
+  updates only from where you got the plugin.)
+- **Its UI is sealed off.** Each panel or page runs in an `<iframe sandbox="allow-scripts">`
+  with an opaque origin, loaded from one fixed document whose Content-Security-Policy
+  blocks every request (`default-src 'none'`, `connect-src 'none'`, pictures and fonts
+  only `data:`/`blob:`). It has no access to your cookies, the app's storage or the page,
+  and it receives its own files from the app over a private message channel. It asks the
+  app for data through named methods; the page checks each against the approved
+  permissions, then the server checks it again.
+- **Every call is a tool call.** On the server a plugin call goes through the same
+  permission engine as an agent's tool call, with only what the approved permissions
+  cover allowed. Shell, computer, browser and device tools are *critical*: a plugin may
+  hold them, but every single call asks you in Anemo's own dialog (never in the plugin's
+  frame), with no "for this run" or "always". What a plugin writes carries
+  `plugin:<id>@<version>`, and its writes, confirmations and refusals are in the security
+  log.
+- **Your computers' code is read, never run.** `code:read` (high risk) lets a plugin list
+  a trusted computer's projects and read their git history through Anemo Desktop: a fixed
+  set of read-only git commands with argument lists (no shell), in a folder inside the
+  projects folder (no `..`, no links out), with hooks such as `core.fsmonitor` turned off.
+  The server checks the project name, the commit hash and the limit before asking, and the
+  answer's shape after; only metadata comes back (no file contents, no diffs, no
+  credentials from remote URLs).
+  Anemo's own Git view on the Code page uses the same reads. A GitHub repository that
+  isn't cloned is named only as `owner/name`, and Anemo Desktop takes it only if it is in
+  its owner's `gh repo list` (it clones the URL from that list, never one it is sent) into
+  a size-capped blobless bare cache in its own data folder (outside the projects folder,
+  with the same link check). A fetch (`git fetch --prune`, only when asked: the Refresh
+  button or `fetch: true`) runs with hooks off and the `ext`/`file` transports refused; it
+  uses the computer's own git credentials, which never leave it. Pull requests come from
+  `gh pr list` with fixed arguments, and only github.com links are passed on.
+- **Its output is data.** Results of plugin scripts and plugin MCP tools reach models
+  marked as untrusted, and when an agent reads a task, document or event a plugin wrote
+  last, the text is labelled with the plugin and marked as untrusted. (Static text you
+  reviewed as part of a version, such as a skill's instructions, is used as written.)
+- **Logic runs in existing sandboxes**: plugin scripts in the Deno sandbox (see
+  *Scripts* above), plugin MCP servers in the MCP host or remotely; their tools ask every
+  time until you change that. Never in the app's own processes.
+- **Packages** are checked before anything is stored: at most 500 files and 5 MB, safe
+  paths only (no `..`, no links), a fixed list of file types (no SVG, no executables),
+  pictures and fonts recognised by their content. Every file's SHA-256 is recorded and
+  checked again when it is used. A Git address must be https and public; it is cloned
+  without credentials, after the host is checked like any web address.
+- **Kill switch.** *Turn off all plugins* stops every frame, call, command, script and
+  plugin MCP tool at once.
 
 ## Permission levels
 
@@ -248,11 +372,16 @@ The kinds of action and their defaults:
 | Edit documents | Always ask |
 | Manage tasks, manage calendar, send notifications | Ask for dangerous actions |
 | Update memory | Fully autonomous |
+| Earlier chats (search and read them; automations only when their tool list names them) | Fully autonomous |
 | MCP tools | Always ask (each tool can be set on its own) |
 | Start sub-agents | Never |
+| Generate images | Fully autonomous (automations ask first, see below) |
 | See your computers | Ask for dangerous actions (looking is safe, so it goes ahead) |
 | Use your computers | Always ask (a watched computer asks every time whatever the level) |
 | Commands on your computers | Always ask (never offered on a watched computer) |
+| Schedules | Always ask (a new schedule, or a changed prompt, time or trigger list, asks every time) |
+| Event triggers | Always ask (adding one to an automation, or changing what or when one fires, asks every time; switching one off follows the level) |
+| Wake this chat on events | Ask for dangerous actions (a one-shot wait of at most 24 hours on an internal event is safe; repeating or longer is not) |
 
 Whether an action is "dangerous" is decided by code, not by the model: for
 example `rm -r`, `git push --force`, piping a download into a shell, or any
@@ -277,8 +406,9 @@ When a run waits for you, you can approve once, approve for the rest of that run
 (for that kind of action in that place), or deny, with a reason the agent sees.
 An approval for the run never overrides "Never" or the ceiling, and some actions are
 asked about every time regardless: clicks, hovering, typing and key presses in your own
-Chrome, and creating a schedule or changing what one does or when (the request shows the
-prompt and the times). Unanswered
+Chrome, creating a schedule or changing what one does or when (the request shows the
+prompt and the times), and adding an event trigger to an automation or changing what or
+when it fires. Unanswered
 requests expire after 24 hours and count as denied. Unattended automations follow
 their own setting for this: wait and notify you, skip the action, or stop.
 
@@ -299,9 +429,11 @@ sub-agent depth. When one is reached the run stops and says which.
 | A tab you shared | "Share this tab with Anemo" in Anemo Companion sends a copy of that one page's text. The agent can read that copy (no approval; "Never" for "Your own Chrome" takes the tool away), and nothing else: it cannot list or read other tabs, or see the shared one again after it changed. One tab at a time, forgotten after 12 hours or when you stop sharing; kept in Valkey, not the database. Not for automations. |
 | Music through the server | With "Keep playing in the background" on (Settings → Music), a YouTube track's audio is fetched by the Anemo host and passed on to your browser; nothing is stored. yt-dlp is given only an address built from an 11-character video id, with only its YouTube extractor enabled; the stream itself is fetched through the guarded client and only from YouTube's media hosts (`*.googlevideo.com`, https), so the route cannot be pointed at your network. It needs a signed-in session like every other route. YouTube's terms do not provide for this way of playing; switch it off to use YouTube's own embedded player only. |
 | Video transcripts | Read with yt-dlp on the Anemo host, from YouTube, Vimeo, Dailymotion and TED addresses only (checked by host name; yt-dlp's fetch-anything extractor is off), so the tool cannot be pointed at your network. If YouTube blocks the server and browser control is on, the transcript is read through your Chrome instead (a read, like opening a page there). |
+| Scripts | A script's code runs in Deno as a child process of the worker with no permissions except its own folder (`/data/scripts/<id>`): no network, no environment variables, no subprocesses, no other files, no remote or npm imports; 256 MB of memory, the automation's time and tool-call limits, 1 MB per message, 64 KB of log and of result. It reaches Anemo only through JSON messages the worker answers: each call is checked against the version's tool list (and web addresses against its hosts) and then goes through the permission engine and approvals exactly like an agent's, as the automation's run. Code an agent writes or changes is saved switched off and never runs until you approve that exact version (by its hash, with your password); `update_schedule` cannot switch a script on. `think` gives its data to a model inside an untrusted block, with no tools unless the script lists some. Secrets are filled in by the worker only in request headers to a declared host and replaced by their placeholder in what comes back. Deno has no kernel-level isolation: approved code runs inside the worker container. |
 | Schedules | An agent can set up a prompt that runs by itself (an automation) only with your confirmation, every time, whatever the "Schedules" level says. Scheduled runs wait for you when an action needs approval, cannot create or change schedules themselves, are stopped after the time limit for scheduled runs (30 minutes unless changed), run at most every 5 minutes, and all stop starting while "Pause all" is on (Automations page). |
 | Deleting | Files, tasks and calendar events an agent deletes go to a trash only you can restore from or empty. Forgetting a memory and deleting a schedule are permanent; both say so. |
-| MCP | Local MCP servers run in their own container without database, workspace or app secrets. Each tool is permission-checked. If a server changes a tool's definition, the tool is switched to "ask" until you review it. |
+| MCP | Local MCP servers run in their own container without database, workspace or app secrets. Each tool is permission-checked. If a server changes a tool's definition, the tool is switched to "ask" until you review it. A trigger on a server's notifications (*MCP triggers*) must name that server, so a server can only fire the triggers that name it; what it sends is untrusted data like its tool results (caused by "external", cut to 12 KB of params, given to a model only inside an untrusted-data block, never in a system prompt or a tool description), and a server sending more than 120 notifications a minute is not listened to for 15 minutes. A wake-me on one asks (moderate). A loop through a server (a run calls its tool, the server notifies, the trigger fires again) can't be told apart from outside changes: the hourly limits and the server ceiling cap it. |
+| Undo (Activity) | Undoing a change from the activity log is for you only: an endpoint behind login, no agent tool, so an agent can't undo your changes or another run's. It goes through the same services and checks as any edit and refuses to overwrite a later change unless you confirm. It can't bring back what is gone for good: a task or event purged from the trash, a file the workspace trash no longer has, an agent's file change whose run was deleted, a document text whose revision was pruned, a value too long to keep. The log keeps ids, changed field values (capped) and paths, never file or message contents, for 90 days. |
 | Claude Code | Runs in its own container without workspace, database or app secrets, and with no tools of its own: every tool call it makes is a normal Anemo tool call, checked here. |
 | Your computers (Anemo Desktop) | No isolation from the computer itself: the client acts as the logged-in Windows user, so the trust level and the permissions are the boundary (see [Devices](#devices-anemo-desktop-anemo-voice)). A watched computer asks before every action and never gets the PowerShell tool. Not for automations unless the automation lists the tool. |
 
@@ -317,10 +449,34 @@ can reach the runner (internal network plus a token). The Claude Code login stay
 or forwards it, and the CLI's environment is built from an allowlist (no Anthropic API
 key, token or base URL, none of Anemo's secrets).
 
+## Webhooks
+
+An automation can have a webhook trigger: another service calls
+`POST /api/hooks/<trigger id>` and the automation runs with the request's body as data.
+That path needs no login, so the request is checked instead:
+
+- `X-Anemo-Timestamp` (the time in Unix seconds) must be within 5 minutes of the
+  server's clock, and `X-Anemo-Signature` must be `sha256=` and the HMAC-SHA256 of
+  `<timestamp>.<raw body>` with the trigger's secret. The secret is shown once when the
+  trigger is made (or rotated, which needs your password), stored encrypted, and never
+  given to a model: a webhook an assistant sets up gets its secret from you, on the
+  Automations page.
+- A request seen before (the same signature in the last 10 minutes) is refused, so a
+  captured request can't be replayed.
+- The body may be at most 64 KB; a trigger accepts at most 30 requests a minute.
+- An unknown or switched-off trigger, a bad or missing signature, an old timestamp and a
+  replay all get the same `404`, so the endpoint doesn't tell anyone which triggers exist.
+- The body is untrusted data for the run, never instructions: it is marked as such in
+  the run's context and never put in a system prompt. Tools that reach other people
+  still ask in that run.
+
+Expose only `/api/hooks/*` to the internet for this, never the whole app (see
+`docs/deployment.md`, *Webhooks from other services*).
+
 ## Secrets
 
-API keys, webhook addresses, push subscriptions and keys, and MCP credentials are
-encrypted in the database with
+API keys, webhook addresses, push subscriptions and keys, MCP credentials and the
+values of script secrets are encrypted in the database with
 `APP_SECRET_KEY`. The API never returns them (you see the last four characters),
 they are not written to logs or run records, and they are never given to a model
 or a tool. The test suite checks this by saving a key, running an agent and then
@@ -338,6 +494,20 @@ searching every response, record and stored file for it.
   prefer "ask" there.
 - **What you approve, runs.** Read approval requests; the exact command or change
   is shown.
+- **An approved script runs as written, unattended.** Read the code (and the diff of a
+  change) before approving it. Its sandbox is Deno's permission system, not a separate
+  container: a flaw in Deno or V8 would reach the worker. And a secret in a custom
+  header (not `Authorization`) follows a redirect from a declared host to another one;
+  declare only hosts you trust.
+- **What a plugin can read, a malicious plugin could send out.** Its frame can't make
+  requests, but a browser can't stop a sandboxed frame from navigating itself to another
+  address, which can carry data. Anemo removes a frame the moment it does that (and says
+  so on the plugin's page), but that first request has gone. WebRTC is outside the
+  Content-Security-Policy too; the frame's startup code removes it, which slows a plugin
+  down rather than stopping it. Keep read permissions narrow and install plugins you
+  trust; the review shows the code.
+- **A plugin's local MCP server runs code that isn't in the package** (for example
+  `npx some-server`), which is why the review marks it critical.
 - **A trusted computer is the agent's computer.** On a computer marked trusted, with
   acting or PowerShell set to fully autonomous, the agent does what that Windows user
   can, without asking, steered partly by what is on the screen. Keep your own logins,

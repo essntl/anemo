@@ -207,33 +207,6 @@ describe('buildTimeline', () => {
     const orphan = tools(items)[1]
     expect(orphan).toMatchObject({ id: 'nobody', name: '', result: { text: '', images: 1 } })
   })
-
-  it('hides routine rate-limit and progress events, and shows a limit when it changes', () => {
-    at = 0
-    const limit = (status: unknown, resetsAt?: unknown) =>
-      ev({ type: 'rate_limit_event', rate_limit_info: { status, rateLimitType: 'five_hour', ...(resetsAt === undefined ? {} : { resetsAt }) }, session_id: SESSION })
-    const items = buildTimeline([
-      toolUse('toolu_task', 'Task', { description: 'Look around', prompt: 'Look.' }),
-      limit('allowed', 1764000000), limit('allowed', 1764000000),
-      ev({ type: 'tool_progress', tool_use_id: 'toolu_task', tool_name: 'Task', elapsed_time_seconds: 3 }),
-      toolUse('toolu_sub', 'Bash', { command: 'ls' }, 'toolu_task'),
-      limit('allowed_warning', 1764000000), limit('allowed_warning', 1764000000), limit('allowed_warning'),
-      limit('rejected', '1764000000'), limit('rejected'),
-      limit('allowed'),
-      limit('allowed_warning', 1764000000000),
-      limit(42), ev({ type: 'rate_limit_event' }),
-      ev({ type: 'rate_limit_event', anemo_trimmed: 'too large' }, { trimmed: true }),
-    ])
-    // Nothing for the dozens of "allowed" and progress events; one notice per change.
-    expect(items.map((i) => i.kind)).toEqual(['tool', 'rate_limit', 'rate_limit', 'rate_limit'])
-    expect(items.slice(1)).toMatchObject([
-      { status: 'warning', resetsAt: 1764000000000 },
-      { status: 'rejected', resetsAt: 1764000000000 },
-      { status: 'warning', resetsAt: 1764000000000 },
-    ])
-    // The sub-agent's own events still go inside its call.
-    expect(call(items, 'Task').children.map((c) => c.kind)).toEqual(['tool'])
-  })
 })
 
 describe('merging events', () => {
@@ -269,3 +242,55 @@ describe('toTodos', () => {
     ])
   })
 })
+
+describe('bookkeeping events', () => {
+  it('leaves rate_limit_event out of the timeline, also between stubs', () => {
+    at = 0
+    const limit = { type: 'rate_limit_event', rate_limit_info: { status: 'allowed', resetsAt: 1795435800 } }
+    const items = buildTimeline([
+      assistant([{ type: 'text', text: 'Working.' }]),
+      ev(limit),
+      ev({ type: 'assistant' }, { dropped: true }),
+      ev(limit),
+      ev({ type: 'user' }, { dropped: true }),
+    ])
+    expect(items.map((i) => i.kind)).toEqual(['text', 'dropped'])
+    const dropped = items[1]
+    expect(dropped.kind === 'dropped' && dropped.count).toBe(2)
+  })
+
+  it('leaves tool_progress out, also inside a sub-agent', () => {
+    at = 0
+    const progress = (parent: string | null) =>
+      ev({ type: 'tool_progress', tool_use_id: 'toolu_task', tool_name: 'Task', parent_tool_use_id: parent, elapsed_time_seconds: 3 })
+    const items = buildTimeline([
+      toolUse('toolu_task', 'Task', { description: 'Look around', prompt: 'Look.' }),
+      progress(null), progress(null),
+      toolUse('toolu_sub', 'Bash', { command: 'ls' }, 'toolu_task'),
+      progress('toolu_task'),
+      ev({ type: 'tool_progress', anemo_trimmed: 'too large' }, { trimmed: true }),
+    ])
+    expect(items.map((i) => i.kind)).toEqual(['tool'])
+    expect(call(items, 'Task').children.map((c) => c.kind)).toEqual(['tool'])
+  })
+})
+
+describe('messages sent while the job ran (§15)', () => {
+  it('shows each message where Claude Code took it in, but not the prompt’s own echo', () => {
+    at = 0
+    const replay = (text: string, uuid: string) => ev({ type: 'user', message: { role: 'user', content: text }, isReplay: true, uuid }, { created_at: '2026-11-26T10:05:00Z' })
+    const items = buildTimeline([
+      ev({ type: 'command_lifecycle', command_uuid: 'x', state: 'queued' }),
+      replay('Fix the login bug', 'p'),
+      toolUse('toolu_1', 'Bash', { command: 'sleep 15' }),
+      ev({ type: 'control_response', response: { subtype: 'success', request_id: 'interrupt-1' } }),
+      toolResult('toolu_1', 'done'),
+      replay('Also update the docs.', '0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b'),
+      assistant([{ type: 'text', text: 'Updating the docs.' }]),
+    ])
+    expect(items.map((i) => i.kind)).toEqual(['tool', 'message', 'text'])
+    const message = items[1]
+    expect(message.kind === 'message' && [message.text, message.at]).toEqual(['Also update the docs.', '2026-11-26T10:05:00Z'])
+  })
+})
+

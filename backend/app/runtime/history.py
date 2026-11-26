@@ -8,10 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.features.attachments.service import render_blocks
 from app.features.conversations.models import ChatMessage
+from app.features.settings import service as settings_service
+from app.features.triggers import render as event_render
 from app.providers.base import (
     AttachmentRef,
     ContentBlock,
     ConversationRef,
+    EventRef,
     ImageBlock,
     Message,
     PageRef,
@@ -75,6 +78,7 @@ async def resolve_attachments(
     from app.runtime.references import render_reference
 
     resolved: list[Message] = []
+    tz: str | None = None  # the user's, for an event's time (looked up when needed)
     # Research sources go in full only with the latest message that has them.
     last_research = max(
         (i for i, m in enumerate(history) if any(isinstance(b, ResearchRef) for b in m.content)),
@@ -90,6 +94,9 @@ async def resolve_attachments(
                 blocks.append(TextBlock(text=text))
             elif isinstance(block, PageRef):
                 blocks.append(TextBlock(text=pages.render(block)))
+            elif isinstance(block, EventRef):
+                tz = tz or await settings_service.user_timezone(db)
+                blocks.append(TextBlock(text=event_text(block, tz)))
             elif isinstance(block, ResearchRef):
                 text = (
                     await research.render(db, block.session_id)
@@ -101,6 +108,20 @@ async def resolve_attachments(
                 blocks.append(block)
         resolved.append(Message(role=msg.role, content=blocks))
     return resolved
+
+
+def event_text(block: EventRef, tz: str) -> str:
+    """An event that woke the chat, as the model gets it: said to be from the system, its
+    payload marked as data."""
+    body = event_render.block_text(
+        block.event_type,
+        block.data,
+        at=block.at,
+        coalesced=block.coalesced,
+        tz=tz,
+        note=block.note,
+    )
+    return f"{event_render.WAKE_HEADER}\n\n{body}"
 
 
 def latest_user_attachment_kinds(history: list[Message]) -> set[str]:

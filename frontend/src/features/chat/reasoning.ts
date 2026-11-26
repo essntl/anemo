@@ -16,8 +16,10 @@ export const effortIndex = (level: ReasoningEffort): number =>
 
 /**
  * Whether the reasoning slider means anything for a model: it can reason, and its
- * provider is told how hard to think. Generic OpenAI-compatible servers get no level
- * (they differ too much), so the slider would change nothing there.
+ * provider is told how hard to think. Generic OpenAI-compatible servers and Google's
+ * OpenAI-compatible endpoint get no level (the server sends it to OpenAI and OpenRouter
+ * only), so the slider would change nothing there.
  */
+const NO_EFFORT = new Set(['openai_compatible', 'google'])
 export const canSetEffort = (model: Pick<Model, 'capabilities' | 'provider_type'> | undefined): boolean =>
-  !!model?.capabilities.reasoning && model.provider_type !== 'openai_compatible'
+  !!model?.capabilities.reasoning && !NO_EFFORT.has(model.provider_type)

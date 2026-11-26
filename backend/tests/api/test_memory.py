@@ -201,7 +201,8 @@ async def test_chat_gets_no_write_tools_when_writing_needs_approval(authed):
     cid = await setup(authed, **{"memory.write": "ask"})
     script("hello", [TextDelta("hi"), Done("end")])
     await chat_turn(authed, cid, "hello")
-    assert [t.name for t in FakeAdapter.requests[-1].tools] == ["search_memory"]
+    # (generate_image is offered in chat too; it is not a memory tool.)
+    assert [t.name for t in FakeAdapter.requests[-1].tools] == ["generate_image", "search_memory"]
 
 
 async def test_update_search_and_forget_in_agent_mode(authed):

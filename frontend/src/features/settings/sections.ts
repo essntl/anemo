@@ -12,6 +12,7 @@ export interface SectionLink {
 
 export const SETTINGS_SECTIONS: SectionLink[] = [
   { to: 'general', label: msg('General') },
+  { to: 'profile', label: msg('Profile') },
   { to: 'appearance', label: msg('Appearance') },
   { to: 'pages', label: msg('Pages') },
   { to: 'focus', label: msg('Focus & music'), of: ['focus', 'music'] },
@@ -24,6 +25,8 @@ export const SETTINGS_SECTIONS: SectionLink[] = [
   { to: 'workspace', label: msg('Workspace'), sensitive: true },
   { to: 'web', label: msg('Web & Search'), sensitive: true },
   { to: 'mcp', label: msg('MCP'), sensitive: true },
+  // Installing and approving plugins weighs as much as adding an MCP server (password, security log).
+  { to: 'plugins', label: msg('Plugins'), sensitive: true },
   { to: 'notifications', label: msg('Notifications') },
   { to: 'memory', label: msg('Memory') },
   { to: 'properties', label: msg('Properties'), of: ['documents'] },

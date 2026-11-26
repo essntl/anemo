@@ -13,6 +13,9 @@ PUBLIC_PATHS = {
     # The one-time approval buttons on push notifications: authenticated by their own
     # single-use token (tests/api/test_push.py).
     "/api/public/push/actions",
+    # Incoming webhooks: each request is signed with its trigger's secret
+    # (tests/api/test_webhooks.py).
+    "/api/hooks/{trigger_id}",
 }
 
 

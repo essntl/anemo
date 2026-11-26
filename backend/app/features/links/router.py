@@ -20,6 +20,7 @@ from app.features.links.schemas import (
     LinkItem,
     LinksOut,
     LinkTo,
+    TargetsIn,
     TaskFileOut,
 )
 from app.features.tasks import service as tasks
@@ -110,6 +111,13 @@ def _ref(object_type: str, object_id: uuid.UUID) -> ObjectRef:
 async def broken_links(db: Db) -> list[BrokenLinkOut]:
     """Links to items deleted for good, and where each is, so they can be fixed."""
     return await service.broken_links(db)
+
+
+@router.post("/links/targets", response_model=list[LinkItem])
+async def link_targets(body: TargetsIn, db: Db) -> list[LinkItem]:
+    """What these references point to now (title, state), in the order given: the approval
+    of a batch change names its tasks or events this way."""
+    return await service.describe_refs(db, body.refs)
 
 
 @router.get("/links/{object_type}/{object_id}", response_model=LinksOut)

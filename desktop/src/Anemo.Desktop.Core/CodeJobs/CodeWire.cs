@@ -31,7 +31,8 @@ public sealed record JobSnapshot(
     string State,
     DateTimeOffset? Ended,
     string? Branch,
-    string? StderrTail);
+    string? StderrTail,
+    bool Input = false); // it takes messages now (§15): running, and its feeder hasn't closed its stdin
 
 /// <summary>One item of a <c>code.events</c> frame, already serialized.</summary>
 public sealed record EventItem(long Seq, string Json, long EndOffset);
@@ -69,6 +70,7 @@ public static class CodeWire
                     ["ended"] = job.Ended is { } ended ? Time(ended) : null,
                     ["branch"] = Text(job.Branch, CodeJobLimits.MaxBranchChars),
                     ["stderr_tail"] = stderr,
+                    ["input"] = job.Input,
                 },
             });
             if (text.Length <= CodeJobLimits.MaxJobMessageChars || (prompt.Length == 0 && string.IsNullOrEmpty(stderr)))

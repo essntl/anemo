@@ -52,7 +52,8 @@ public sealed class SessionTests : IDisposable
         Assert.Null(sent["ended"]);
         Assert.Equal("feat/flaky-test", (string?)sent["branch"]);
         Assert.Null(sent["stderr_tail"]);
-        Assert.Equal(13, sent.Count);
+        Assert.False((bool)sent["input"]!); // a job of cc.ps1 takes no messages while it runs (§15)
+        Assert.Equal(14, sent.Count);
 
         // Nothing more before the ack.
         await _h.StepAsync();
@@ -134,6 +135,21 @@ public sealed class SessionTests : IDisposable
         Assert.Equal(new JobRecord { AckedSeq = 6, AckedOffset = new FileInfo(job.OutPath).Length, SentState = "done", Settled = true }, _store.Get(job.Id));
         Assert.Empty(_h.Session.Following);
         Assert.Contains($"code job ended: {job.Id} (done)", _log.Lines);
+    }
+
+    [Fact]
+    public async Task Only_running_jobs_count_as_running_not_ended_ones_waiting_for_an_ack()
+    {
+        var job = Running(Now.AddMinutes(-1));
+        await _h.StepAsync();
+        Assert.Equal(1, _h.Session.RunningCount);
+
+        job.Finish();
+        _processes.Running.Clear();
+        await _h.StepAsync(); // no ack comes (offline): the job stays followed, but it ended
+
+        Assert.Contains(job.Id, _h.Session.Following);
+        Assert.Equal(0, _h.Session.RunningCount);
     }
 
     [Fact]

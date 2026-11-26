@@ -77,4 +77,16 @@ public sealed class SettingsDraftTests
 
         Assert.Equal("Ctrl+Alt+Shift+Q", check.Settings!.StopHotkey);
     }
+
+    [Fact]
+    public void Automatic_updates_are_on_by_default_and_can_be_turned_off()
+    {
+        Assert.True(new DesktopSettings().AutoUpdate);
+        Assert.True(SettingsDraft.From(Current).AutoUpdate);
+
+        var check = (SettingsDraft.From(Current) with { AutoUpdate = false }).Check(Current);
+
+        Assert.False(check.Settings!.AutoUpdate);
+        Assert.True((SettingsDraft.From(check.Settings) with { AutoUpdate = true }).Check(check.Settings).Settings!.AutoUpdate);
+    }
 }

@@ -30,7 +30,7 @@ from app.features.attachments import service as attachments
 from app.features.attachments.models import Attachment
 from app.policy.models import Action
 from app.tools.base import Tool, ToolContext, ToolResult
-from app.tools.builtin.workspace import _backup, _exists, path_action
+from app.tools.builtin.workspace import backup_file, path_action, path_exists
 from app.workspace import files, fs_guard, safe_fs
 from app.workspace.access import access_for
 
@@ -83,7 +83,7 @@ class SaveAttachment(Tool):
     idempotent = False
 
     def actions(self, args: SaveAttachmentInput, ctx: ToolContext) -> list[Action]:
-        exists = _exists(args.path)
+        exists = path_exists(args.path)
         return [
             path_action(
                 ctx,
@@ -121,7 +121,7 @@ class SaveAttachment(Tool):
             data = await asyncio.to_thread(attachments.file_path(att).read_bytes)
         except OSError:
             return ToolResult(content="The attached file is no longer available.", is_error=True)
-        backup = await asyncio.to_thread(_backup, path) if path.is_file() else None
+        backup = await asyncio.to_thread(backup_file, path) if path.is_file() else None
         try:
             _, before, after = await asyncio.to_thread(files.write_bytes, args.path, data)
         except AppError as exc:
@@ -340,7 +340,7 @@ class CreateZip(Tool):
     timeout_s = 300.0
 
     def actions(self, args: ZipInput, ctx: ToolContext) -> list[Action]:
-        exists = _exists(args.destination)
+        exists = path_exists(args.destination)
         reads = [path_action(ctx, "fs.read", p, "Pack", "read") for p in args.paths]
         write = path_action(
             ctx,
@@ -378,7 +378,7 @@ class CreateZip(Tool):
         if not entries:
             return ToolResult(content="There are no files to pack.", is_error=True)
         before = files.sha256_file(target) if target.is_file() else None
-        backup = await asyncio.to_thread(_backup, target) if before else None
+        backup = await asyncio.to_thread(backup_file, target) if before else None
         await asyncio.to_thread(_write_zip, target, entries)
         after = files.sha256_file(target)
         rel = fs_guard.relative(target)

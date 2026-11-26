@@ -34,9 +34,12 @@ def deleted_by(actor_ref: str) -> str:
         kind = Actor.parse(actor_ref).kind
     except ValueError:
         return "someone"
-    return {"user": "the user", "chat": "the assistant", "automation": "an automation"}.get(
-        kind, "someone"
-    )
+    return {
+        "user": "the user",
+        "chat": "the assistant",
+        "automation": "an automation",
+        "plugin": "a plugin",
+    }.get(kind, "someone")
 
 
 class ExternalKeyTaken(Conflict):

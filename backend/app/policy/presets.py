@@ -126,8 +126,92 @@ CATEGORIES: list[Category] = [
         "bypassPermissions).",
         "autonomous",
     ),
+    # generate_image (tools/builtin/images.py): each call costs money at the provider.
+    # Automation runs ask anyway unless Settings > Providers & Models says otherwise
+    # (features/image_generation/service.py).
+    Category(
+        "image.generate",
+        "Generate images",
+        "Make pictures with the image model chosen in Settings > Providers & Models "
+        "(each one costs money at the provider). Automations ask first.",
+        "autonomous",
+    ),
     Category("mcp.*", "MCP tools", "Tools from connected MCP servers.", "ask"),
     Category("agent.spawn", "Start sub-agents", "Delegate work to other agents.", "deny"),
+    # Automation scripts (docs/specs/08-automation-scripts.md). Whatever this level says, a
+    # script an agent writes or changes is switched off until you approve its code.
+    Category(
+        "scripts.manage",
+        "Scripts",
+        "Write and change automation scripts (code that runs without a model). They stay "
+        "off until you approve the code on the Automations page.",
+        "ask",
+    ),
+    Category(
+        "scripts.run",
+        "Run scripts",
+        "Start a script you approved and switched on.",
+        "ask",
+    ),
+    # Anemo Voice's voice mode (docs/specs/07-voice-mode-android.md): the agent can only
+    # end it, never start it.
+    Category(
+        "voice.control",
+        "Voice mode",
+        "End voice mode on your phone when a spoken conversation is over.",
+        "autonomous",
+    ),
+    # Plugins (docs/specs/12-plugins.md). Whatever this level says, a plugin an agent
+    # writes or changes is a draft: nothing in it runs until you approve that version in
+    # Settings > Plugins, and no tool can approve or enable one (tools/builtin/plugins.py).
+    Category(
+        "plugins.build",
+        "Build plugins",
+        "Write and change plugins. They stay off until you review and approve them in "
+        "Settings > Plugins.",
+        # Saving a draft never asks (the owner's decision): the review happens before
+        # anything in it runs, not before it is written.
+        "autonomous",
+    ),
+    # Event triggers (docs/specs/16-event-triggers.md). Adding a trigger to an automation
+    # (or a webhook), and changing what or when one fires, always asks in code, whatever
+    # this level says (tools/builtin/triggers.py, schedules.py); turning one off or
+    # deleting it follows the level.
+    Category(
+        "triggers.manage",
+        "Event triggers",
+        "Make automations run when something happens (a task is created, a Claude Code "
+        "job ends, a webhook is called). Adding one or changing it always asks.",
+        "ask",
+    ),
+    # Wake me: a one-shot trigger on an internal event that waits at most 24 hours is
+    # safe; repeating or longer is moderate.
+    Category(
+        "triggers.wake",
+        "Wake this chat on events",
+        "Let the assistant continue a chat when something it waits for happens (“tell me "
+        "when the job ends”).",
+        "ask_dangerous",
+    ),
+    # search_chats and read_chat (tools/builtin/chats.py): reading only, so "safe".
+    # Automations get them only when their tool list names them (tools/registry.py).
+    Category(
+        "chats.read",
+        "Read earlier chats",
+        "Search your earlier chats and read them (never the chat the agent is in, nor "
+        "temporary chats). Automations only when their tool list names these tools.",
+        "autonomous",
+    ),
+    # Files between the workspace and the computers that run Anemo Desktop
+    # (docs/specs/22-device-files.md). Only trusted computers that allow it in Anemo
+    # Desktop; replacing a file on a computer is dangerous (tools/builtin/device_files.py).
+    Category(
+        "device.files",
+        "Files on your computers",
+        "Copy files between the workspace and trusted computers that allow it in Anemo "
+        "Desktop. Replacing a file on a computer counts as dangerous.",
+        "ask",
+    ),
 ]
 CATEGORY_BY_CAP = {c.cap: c for c in CATEGORIES}
 
@@ -142,6 +226,7 @@ INTERNAL_RULES = [
     Rule(cap="calendar.read", decision="allow"),
     Rule(cap="automation.state", decision="allow"),  # an automation's own notes
     Rule(cap="automation.read", decision="allow"),  # looking at the schedules
+    Rule(cap="plugins.read", decision="allow"),  # the plugins, their files and the guide
 ]
 
 

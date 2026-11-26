@@ -185,3 +185,15 @@ export function useCreateMeetingNotes() {
 export function allLinks(groups: LinkGroups | undefined): LinkOut[] {
   return groups ? LINK_TYPES.flatMap((type) => groups[type] ?? []) : []
 }
+
+export type LinkTarget = Schemas['LinkItem']
+
+/** What these references (/tasks?task=<id>, ...) point to now, in the same order: titles for a list of items named by reference. */
+export function useLinkTargets(refs: string[]) {
+  return useQuery({
+    queryKey: ['links', 'targets', refs] as const,
+    enabled: refs.length > 0,
+    staleTime: 30_000,
+    queryFn: async () => unwrap(await api.POST('/api/links/targets', { body: { refs } })),
+  })
+}

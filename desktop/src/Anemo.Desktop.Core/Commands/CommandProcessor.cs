@@ -17,6 +17,9 @@ public sealed class CommandOptions
 
     /// <summary>PowerShell's working folder when none is set (<c>%USERPROFILE%\AnemoWork</c>).</summary>
     public string DefaultWorkFolder { get; init; } = "AnemoWork";
+
+    /// <summary>The system the client runs on (its texts, its key rules).</summary>
+    public DesktopPlatform Platform { get; init; } = DesktopPlatform.Windows;
 }
 
 /// <summary>
@@ -49,6 +52,7 @@ public sealed partial class CommandProcessor : ICommandExecutor
     private readonly CommandLog? _log;
     private readonly CommandOptions _options;
     private readonly CodeJobs.CodeJobControl? _codeJobs;
+    private readonly Files.DeviceFiles? _files;
     private readonly ControlRefs _refs = new();
     private readonly WindowRefs _windows = new();
     private ScreenCapture? _lastCapture;
@@ -60,7 +64,8 @@ public sealed partial class CommandProcessor : ICommandExecutor
         Func<DesktopSettings> settings,
         CommandLog? log = null,
         CommandOptions? options = null,
-        CodeJobs.CodeJobControl? codeJobs = null)
+        CodeJobs.CodeJobControl? codeJobs = null,
+        Files.DeviceFiles? files = null)
     {
         _platform = platform;
         _control = control;
@@ -68,6 +73,7 @@ public sealed partial class CommandProcessor : ICommandExecutor
         _log = log;
         _options = options ?? new CommandOptions();
         _codeJobs = codeJobs;
+        _files = files;
     }
 
     private IDesktop Desktop => _platform.Desktop;
@@ -128,6 +134,11 @@ public sealed partial class CommandProcessor : ICommandExecutor
             return await CodeJobAsync(action, args, device, ct);
         }
 
+        if (Files.DeviceFiles.Handles(action))
+        {
+            return FileAction(action, args, device);
+        }
+
         if (!ActingActions.Contains(action))
         {
             throw CommandException.Failed($"Unknown action “{action}”");
@@ -159,12 +170,12 @@ public sealed partial class CommandProcessor : ICommandExecutor
         RequireControl();
         if (!device.Trusted)
         {
-            throw CommandException.Refused("PowerShell is only for trusted devices, and this one is watched.");
+            throw CommandException.Refused($"{_options.Platform.ShellName} is only for trusted devices, and this one is watched.");
         }
 
         if (!_settings().PowerShellEnabled)
         {
-            throw CommandException.Refused("PowerShell is switched off in Anemo Desktop on this computer.");
+            throw CommandException.Refused($"{_options.Platform.ShellName} is switched off in Anemo Desktop on this computer.");
         }
     }
 
@@ -172,7 +183,7 @@ public sealed partial class CommandProcessor : ICommandExecutor
     {
         if (Desktop.IsSecureDesktop())
         {
-            throw CommandException.Unavailable(SecureDesktopMessage);
+            throw CommandException.Unavailable(_options.Platform.SecureScreenMessage);
         }
     }
 

@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError, type Schemas, unwrap } from '@/api/client'
+import { withReauth } from '@/features/auth/reauthStore'
 import { mcpKey } from '@/features/mcp/api'
 import { runsKey, runsSummaryKey } from '@/features/runs/api'
 import { msg, t } from '@/lib/i18n'
@@ -32,6 +33,17 @@ export const STATUS_LABELS: Record<string, string> = {
   missed: msg('Missed (the app was off)'),
   skipped: msg('Skipped (still running)'),
   no_change: msg('Skipped (no change)'),
+}
+
+/** How a status looks in the list. */
+export const STATUS_TONES: Record<string, 'neutral' | 'accent' | 'success' | 'warning' | 'error'> = {
+  running: 'accent',
+  waiting: 'warning',
+  paused: 'warning',
+  completed: 'success',
+  failed: 'error',
+  retrying: 'warning',
+  missed: 'warning',
 }
 
 export function useAutomations() {
@@ -167,5 +179,164 @@ export function useRunAutomation() {
     mutationFn: async (id: string) =>
       unwrap(await api.POST('/api/automations/{automation_id}/run', { params: { path: { automation_id: id } } })),
     onSettled: refresh,
+  })
+}
+
+// -- scripts (docs/specs/08-automation-scripts.md) ------------------------------------
+
+/** A script's approved version, the one waiting for review, its owner and secrets. */
+export type Script = Schemas['ScriptOut']
+export type ScriptVersion = Schemas['ScriptVersionOut']
+export type ScriptCode = Schemas['ScriptCode']
+export type ScriptCreate = Schemas['ScriptCreateIn']
+
+/** Change some settings of a script (name, description, schedule, what to do when a call
+ *  needs approval, notifications, limits). Its code goes through useSaveScriptCode. */
+export function usePatchAutomation() {
+  const refresh = useRefresh()
+  return useMutation({
+    mutationFn: async (v: { id: string; body: Schemas['AutomationPatch'] }) =>
+      unwrap(await api.PATCH('/api/automations/{automation_id}', { params: { path: { automation_id: v.id } }, body: v.body })),
+    onSuccess: refresh,
+  })
+}
+
+export const scriptKey = (id: string) => [...automationsKey, 'script', id] as const
+
+/** `id` null: nothing to load (a new script). `version`: refetch when this changes. */
+export function useScript(id: string | null, version = '') {
+  return useQuery({
+    queryKey: [...scriptKey(id ?? ''), version],
+    enabled: id !== null,
+    placeholderData: keepPreviousData,
+    queryFn: async () =>
+      unwrap(await api.GET('/api/automations/{automation_id}/script', { params: { path: { automation_id: id ?? '' } } })),
+  })
+}
+
+/** A new script written in the app (approved at once; needs the password). */
+export function useCreateScript() {
+  const refresh = useRefresh()
+  return useMutation({
+    mutationFn: (body: ScriptCreate) =>
+      withReauth(async () => unwrap(await api.POST('/api/automations/scripts', { body }))),
+    onSuccess: refresh,
+  })
+}
+
+/** Save new code from the app (approved at once; needs the password). */
+export function useSaveScriptCode() {
+  const refresh = useRefresh()
+  return useMutation({
+    mutationFn: (v: { id: string; body: ScriptCode }) =>
+      withReauth(async () =>
+        unwrap(await api.PUT('/api/automations/{automation_id}/script', { params: { path: { automation_id: v.id } }, body: v.body })),
+      ),
+    onSuccess: refresh,
+  })
+}
+
+/** Approve the version the user looked at (by its hash; needs the password). */
+export function useApproveScript() {
+  const refresh = useRefresh()
+  return useMutation({
+    mutationFn: (v: { id: string; hash: string; enable: boolean }) =>
+      withReauth(async () =>
+        unwrap(
+          await api.POST('/api/automations/{automation_id}/script/approve', {
+            params: { path: { automation_id: v.id } },
+            body: { hash: v.hash, enable: v.enable },
+          }),
+        ),
+      ),
+    onSuccess: refresh,
+  })
+}
+
+export function useDiscardScriptChange() {
+  const refresh = useRefresh()
+  return useMutation({
+    mutationFn: async (id: string) =>
+      unwrap(await api.DELETE('/api/automations/{automation_id}/script/pending', { params: { path: { automation_id: id } } })),
+    onSuccess: refresh,
+  })
+}
+
+/** Set (value) or clear (null) one of a script's secrets. Setting needs the password. */
+export function useScriptSecret() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (v: { id: string; name: string; value: string | null }) => {
+      const params = { params: { path: { automation_id: v.id, name: v.name } } }
+      return v.value === null
+        ? (async () => unwrap(await api.DELETE('/api/automations/{automation_id}/script/secrets/{name}', params)))()
+        : withReauth(async () =>
+            unwrap(await api.PUT('/api/automations/{automation_id}/script/secrets/{name}', { ...params, body: { value: v.value ?? '' } })),
+          )
+    },
+    onSuccess: (_, v) => void qc.invalidateQueries({ queryKey: scriptKey(v.id) }),
+  })
+}
+
+// -- event triggers (docs/specs/16-event-triggers.md) ---------------------------------
+
+/** A trigger: an event that starts a run of an automation, or wakes a chat ("wake me"). */
+export type Trigger = Schemas['TriggerOut']
+export type TriggerInput = Schemas['TriggerIn']
+export type TriggerPatch = Schemas['TriggerPatch']
+/** An event type a trigger can wait for, with the fields its filter may name. */
+export type EventType = Schemas['EventTypeOut']
+
+/** Under the automations' key: "automations.changed" (sent when a trigger changes or
+ *  fires) refetches them. */
+export const triggersKey = [...automationsKey, 'triggers'] as const
+
+export function useTriggers() {
+  return useQuery({
+    queryKey: triggersKey,
+    queryFn: async () => unwrap(await api.GET('/api/triggers')),
+  })
+}
+
+export function useEventCatalogue() {
+  return useQuery({
+    queryKey: [...triggersKey, 'catalogue'],
+    queryFn: async () => unwrap(await api.GET('/api/triggers/catalogue')),
+    staleTime: 60 * 60_000,
+  })
+}
+
+/** Add a trigger to an automation, or change one. A new webhook comes back with its
+ *  secret, this once. */
+export function useSaveTrigger() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (v: { id?: string; create?: TriggerInput; patch?: TriggerPatch }): Promise<{ trigger: Trigger; secret: string | null }> => {
+      if (v.id) {
+        const trigger = unwrap(await api.PATCH('/api/triggers/{trigger_id}', { params: { path: { trigger_id: v.id } }, body: v.patch ?? {} }))
+        return { trigger, secret: null }
+      }
+      const created = unwrap(await api.POST('/api/triggers', { body: v.create as TriggerInput }))
+      return { trigger: created.trigger, secret: created.secret ?? null }
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: triggersKey }),
+  })
+}
+
+export function useDeleteTrigger() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => unwrap(await api.DELETE('/api/triggers/{trigger_id}', { params: { path: { trigger_id: id } } })),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: triggersKey }),
+  })
+}
+
+/** A new signing secret for a webhook trigger (needs the password); the old one stops working. */
+export function useRotateSecret() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) =>
+      withReauth(async () => unwrap(await api.POST('/api/triggers/{trigger_id}/secret', { params: { path: { trigger_id: id } } }))),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: triggersKey }),
   })
 }

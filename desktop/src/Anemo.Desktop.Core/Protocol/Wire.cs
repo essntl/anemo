@@ -33,28 +33,45 @@ public static class Wire
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
-    public static string Hello(string token, string version, string? lastId) => Json(new JsonObject
+    /// <summary>The first message; <paramref name="platform"/>: <c>windows</c> or <c>macos</c> (§2).</summary>
+    public static string Hello(string token, string version, string? lastId, string platform = "windows") => Json(new JsonObject
     {
         ["type"] = "hello",
         ["token"] = token,
         ["kind"] = "computer",
         ["version"] = version,
         ["last_id"] = lastId,
+        ["platform"] = platform,
     });
 
     public static string Ping() => Json(new JsonObject { ["type"] = "ping" });
 
     /// <summary>
     /// The offer; <paramref name="code"/>: Claude Code jobs are shared (device-contracts.md §7);
-    /// <paramref name="codeStart"/>: Anemo may start and cancel them (§7.4).
+    /// <paramref name="codeStart"/>: Anemo may start and cancel them (§7.4). <c>code_images</c>:
+    /// a <c>code_start</c> may carry images (1.3.0); always so where starting is offered.
+    /// <c>code_git</c>: the read-only git actions <c>code_git_graph</c> and <c>code_git_commit</c>
+    /// are there (§7.5, 1.5.0); offered with sharing, which they need. <c>code_git_remote</c>: they
+    /// also take <c>repo</c> and <c>fetch</c>, and <c>code_git_cache_clear</c> is there (§7.6, 1.6.0);
+    /// always with <c>code_git</c>.
+    /// <paramref name="shellKind"/>: powershell, pwsh, zsh or bash (§2, 1.4.0).
+    /// <paramref name="files"/>: the file actions of §8 are there (1.7.0): the switch is on and the device is trusted.
+    /// <paramref name="codeInput"/>: the jobs Anemo starts take messages while they run
+    /// (<c>code_input</c>, <c>code_input_withdraw</c>, 1.9.0); only where starting is offered.
     /// </summary>
-    public static string Offer(bool control, bool shell, bool code, bool codeStart) => Json(new JsonObject
+    public static string Offer(bool control, bool shell, bool code, bool codeStart, string shellKind = "powershell", bool files = false, bool codeInput = false) => Json(new JsonObject
     {
         ["type"] = "device.offer",
         ["control"] = control,
         ["shell"] = shell,
         ["code"] = code,
         ["code_start"] = codeStart,
+        ["code_images"] = codeStart,
+        ["code_git"] = code,
+        ["code_git_remote"] = code,
+        ["shell_kind"] = shellKind,
+        ["files"] = files,
+        ["code_input"] = codeStart && codeInput,
     });
 
     public static string Stopped() => Json(new JsonObject { ["type"] = "device.stopped" });

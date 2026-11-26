@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router'
 import { toast } from '@/components/ui/toast'
 import { approvalsKey } from '@/features/agents/api'
 import { automationsKey } from '@/features/automations/api'
-import { codeKey } from '@/features/code/api'
+import { codeKey, codeUsageKey } from '@/features/code/api'
+import { type CodeJobNotice, noticeCodeJob } from '@/features/code/codeJobNotices'
 import { mcpKey } from '@/features/mcp/api'
 import { notificationsKey } from '@/features/notifications/api'
 import { isQuiet } from '@/features/island/alerts'
@@ -94,7 +95,13 @@ export function useAppEvents() {
     source.addEventListener('automations.changed', () => void qc.invalidateQueries({ queryKey: automationsKey }))
     // A Claude Code job changed (throttled), or a computer that shares jobs went offline:
     // the lists and threads load again. A running job's events come by its own stream.
-    source.addEventListener('code.job', () => void qc.invalidateQueries({ queryKey: codeKey }))
+    // Plugin tabs on the Code page hear of their project's jobs from it (codeJobNotices.ts).
+    source.addEventListener('code.job', ((e: MessageEvent<string>) => {
+      void qc.invalidateQueries({ queryKey: codeKey })
+      noticeCodeJob(JSON.parse(e.data) as CodeJobNotice)
+    }) as EventListener)
+    // A computer's Claude subscription usage changed (a job wrote a rate_limit_event).
+    source.addEventListener('code.usage', () => void qc.invalidateQueries({ queryKey: codeUsageKey }))
     // A new notification (a reminder, an automation's result, ...): show it as a
     // desktop notification when the tab is in the background, else as a notice here.
     source.addEventListener('notification', ((e: MessageEvent<string>) => {

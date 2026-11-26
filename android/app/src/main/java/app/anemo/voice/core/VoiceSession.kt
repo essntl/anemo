@@ -39,7 +39,8 @@ class ExecutorTimer(private val executor: ScheduledExecutorService) : Timer {
  * - A microphone read error closes it and opens it again after each of [retryDelaysMs];
  *   after that, or when it can't be opened, or when the wake word or VAD engine fails,
  *   the session stops and [onFatal] gets a sentence for the user.
- * - [stop] runs [cleanup] once, after the controller stopped, and shuts [voice] down.
+ * - [stop] runs [cleanup] once, after the controller stopped, and shuts [voice] down. The
+ *   connection stops after the controller, so a last message (voice mode off) still goes.
  */
 class VoiceSession(
     private val voice: ScheduledExecutorService,
@@ -88,6 +89,16 @@ class VoiceSession(
 
     fun status() = onVoice { controller.requestStatus() }
 
+    /** The tile or the notification switched voice mode (turning it on also resumes). */
+    fun setVoiceMode(on: Boolean, cause: VoiceModeCause) = onVoice {
+        if (on && paused) {
+            paused = false
+            controller.resume()
+            openMicrophone()
+        }
+        controller.setVoiceMode(on, cause)
+    }
+
     /** Re-opens the microphone, e.g. when a Bluetooth headset came or went. */
     fun reopenMicrophone() = onVoice {
         if (!micOpen) return@onVoice
@@ -97,10 +108,10 @@ class VoiceSession(
 
     fun stop() {
         if (!stopped.compareAndSet(false, true)) return
-        connection.stop()
         val finish = {
             closeMicrophone()
             controller.stop()
+            connection.stop()
             cleanup.forEach { runCatching(it) }
         }
         try {

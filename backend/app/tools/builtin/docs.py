@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_sessionmaker
 from app.core.errors import AppError
 from app.core.refs import ObjectRef
-from app.features.documents import meta, paths, service
+from app.features.documents import meta, paths, service, sketch
 from app.features.documents import properties as doc_properties
 from app.features.documents import search as doc_search
 from app.features.documents.models import Document
@@ -32,12 +32,14 @@ from app.features.projects import service as projects
 from app.features.properties import frontmatter
 from app.features.properties import items as item_properties
 from app.features.properties import service as properties
+from app.features.provenance import service as provenance
 from app.features.tasks.models import Project
 from app.knowledge import index
 from app.policy.models import Action
 from app.tools.base import Tool, ToolContext, ToolResult
 from app.tools.builtin import linking
-from app.tools.builtin.workspace import _backup, path_action
+from app.tools.builtin.sketch_read import sketch_result
+from app.tools.builtin.workspace import backup_file, path_action
 from app.workspace import files
 
 MAX_WRITE_CHARS = 1_000_000
@@ -308,7 +310,8 @@ class ReadDocument(Tool):
     name = "read_document"
     description = (
         "Read one of the user's documents as Markdown, with its properties and what links "
-        "to it above it." + LINKING
+        "to it above it. A sketch (a drawing, `.sketch.md`) comes as an image with its text."
+        + LINKING
     )
     capability = "fs.read"
     Input = ReadDocumentInput
@@ -325,12 +328,14 @@ class ReadDocument(Tool):
                 backlinks = await linking.backlinks_text(
                     db, ObjectRef("document", found.doc.id), ctx
                 )
-            path = found.doc.path
-            content, _ = await asyncio.to_thread(files.read_text, path, service.MAX_DOC_BYTES)
+                path = found.doc.path
+                content, _ = await asyncio.to_thread(files.read_text, path, service.MAX_DOC_BYTES)
+                text = content[args.start : args.start + args.max_chars]
+                end = args.start + len(text)
+                # A plugin wrote it last: its text is data (CONTRACTS-plugins.md §6.4).
+                text = await provenance.plugin_text(db, found.doc.updated_by_ref, text)
         except AppError as exc:
             return ToolResult(content=exc.message, is_error=True)
-        text = content[args.start : args.start + args.max_chars]
-        end = args.start + len(text)
         note = (
             f"\n\n[Characters {args.start:,}-{end:,} of {len(content):,}. "
             f"Call read_document again with start={end} for more.]"
@@ -347,6 +352,8 @@ class ReadDocument(Tool):
         if backlinks and args.start == 0:
             lines.append(backlinks)
         top = "".join(f"{line}\n" for line in lines)
+        if sketch.is_sketch(path):
+            return await sketch_result(found.doc.id, path, f"{header}:\n{top}", content, ctx)
         return ToolResult(
             content=f"{header}:\n{top}{text}{note}", data={"path": path, "chars": len(content)}
         )
@@ -531,7 +538,7 @@ class WriteDocument(Tool):
                     values = await properties.validate(db, "document", project_id, args.properties)
                     content = frontmatter.update(content, values)
                 before = doc.content_hash
-                backup = await asyncio.to_thread(_backup, files.resolve(path))
+                backup = await asyncio.to_thread(backup_file, files.resolve(path))
                 doc = await service.save(
                     db, doc, content, base_hash=None, author="agent", run_id=ctx.run_id
                 )
@@ -603,7 +610,7 @@ class EditDocument(Tool):
                 updated = content.replace(args.old_text, args.new_text)
                 notes = await _check_front_matter(db, path, content, updated)
                 before = doc.content_hash
-                backup = await asyncio.to_thread(_backup, files.resolve(path))
+                backup = await asyncio.to_thread(backup_file, files.resolve(path))
                 doc = await service.save(
                     db, doc, updated, base_hash=before, author="agent", run_id=ctx.run_id
                 )
@@ -709,7 +716,7 @@ class SetDocumentProperties(Tool):
                     if doc is None:
                         continue
                     before = doc.content_hash
-                    backup = await asyncio.to_thread(_backup, files.resolve(doc.path))
+                    backup = await asyncio.to_thread(backup_file, files.resolve(doc.path))
                     doc = await doc_properties.set_properties(
                         db,
                         doc,

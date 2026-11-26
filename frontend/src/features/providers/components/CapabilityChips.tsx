@@ -13,6 +13,7 @@ const CAPABILITY_LABELS: Record<string, string> = {
   structured_output: 'JSON',
   embeddings: msg('Embeddings'),
   transcription: msg('Speech to text'),
+  image_generation: msg('Image generation'),
 }
 
 export function CapabilityChips({ capabilities }: { capabilities: Record<string, boolean> }) {

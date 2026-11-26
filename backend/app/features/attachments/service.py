@@ -195,9 +195,11 @@ async def store_output(
     conversation_id: uuid.UUID | None,
     message_id: uuid.UUID | None,
     run_id: uuid.UUID | None,
+    workspace_path: str | None = None,
 ) -> Attachment:
     """A file the agent hands to the user (attach_file): a snapshot of a workspace file,
-    shown as a download under its answer. Its text is not extracted (the agent made it)."""
+    shown as a download under its answer. Its text is not extracted (the agent made it).
+    `workspace_path`: the workspace file it is a copy of, when the chat should link to it."""
     filename = Path(filename).name[:255] or "file"
     try:
         kind = classify(filename, "", data)
@@ -205,6 +207,7 @@ async def store_output(
         kind = "file"  # e.g. a damaged image: still downloadable
     att = await _store(db, filename, _mime_for(kind, filename, "", data), kind, data, None, None)
     att.conversation_id, att.message_id, att.run_id = conversation_id, message_id, run_id
+    att.workspace_path = workspace_path
     await db.flush()
     return att
 
@@ -321,6 +324,7 @@ async def duplicate(
         storage_path=str(rel),
         extracted_text=att.extracted_text,
         extraction_note=att.extraction_note,
+        workspace_path=att.workspace_path,
     )
     db.add(copy)  # run_id stays empty: the copy belongs to no run of the new chat
     await db.flush()
@@ -409,6 +413,27 @@ async def delete_for_message(
     for att in rows:
         if except_run is not None and att.run_id == except_run:
             continue
+        try:
+            await asyncio.to_thread(file_path(att).unlink, True)
+        except OSError:
+            pass
+        await db.delete(att)
+
+
+async def delete_unclaimed(db: AsyncSession, ids: list[uuid.UUID]) -> None:
+    """Delete these attachments (rows and bytes) unless a chat has them: uploads used
+    outside the chat only, such as the images of Claude Code jobs that were pruned.
+    Part of the caller's change: doesn't commit."""
+    if not ids:
+        return
+    rows = await db.scalars(
+        select(Attachment).where(
+            Attachment.id.in_(ids),
+            Attachment.message_id.is_(None),
+            Attachment.conversation_id.is_(None),
+        )
+    )
+    for att in rows:
         try:
             await asyncio.to_thread(file_path(att).unlink, True)
         except OSError:

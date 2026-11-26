@@ -1,7 +1,8 @@
 import { useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState, Fragment, type DragEvent, type KeyboardEvent, type ReactNode, type Ref, type RefObject } from 'react'
 import * as Popover from '@radix-ui/react-popover'
 import { Link } from 'react-router'
-import { ClipboardPaste, MessagesSquare, Paperclip, Plus, Settings2, SlidersHorizontal, Square, SquareSlash, X } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { ClipboardPaste, MessagesSquare, Paperclip, PenLine, Plus, Settings2, SlidersHorizontal, Square, SquareSlash, X } from 'lucide-react'
 import { Lingering } from '@/components/ui/Lingering'
 import { MESSAGE_BOX, MESSAGE_BOX_BORDER, MESSAGE_TEXT, SendButton } from '@/components/ui/MessageBox'
 import { toast } from '@/components/ui/toast'
@@ -10,13 +11,15 @@ import { useDictationMessageBox } from '@/features/dictation/useDictationMessage
 import { type Skill, useSlashSkills } from '@/features/profiles/api'
 import { matchesShortcut, SHORTCUTS } from '@/features/shortcuts/registry'
 import { SkillIcon } from '@/features/skills/icons'
+import { sketchForChat } from '@/features/sketch/ensurePreview'
+import { SketchPickerDialog } from '@/features/sketch/SketchPickerDialog'
 import { localSkills, matchSkills, slashQuery, typedCommand } from '@/features/skills/slash'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
 import { t } from '@/lib/i18n'
 import { LIST_MAX, type MenuPlacement, placeMenu, visibleArea } from '../menuPlacement'
 import { canReadClipboard, clipboardImages, isTextField, pastedFiles } from '../pastedFiles'
-import { MAX_ATTACHMENTS, useAttachments } from '../useAttachments'
+import { MAX_ATTACHMENTS, type UploadedAttachment, useAttachments } from '../useAttachments'
 import { AttachmentChip } from './AttachmentChip'
 import { type ChatRef, ChatPickerDialog, MAX_REFERENCES, ReferenceChip } from './ChatReference'
 
@@ -43,6 +46,8 @@ interface ComposerProps {
   placeholder?: string
   /** Text the box starts with (e.g. a question about a document). */
   initialText?: string
+  /** Attachments the box starts with (e.g. a sketch's image). */
+  initialAttachments?: UploadedAttachment[]
   /** The controls under the text box: the mode switch, the model and the like. */
   controls?: ComposerControls
   /** The chat this composer belongs to: it cannot reference itself. */
@@ -106,7 +111,7 @@ const ADD_ITEM = 'flex w-full items-center gap-3 rounded-control px-2.5 py-2 tex
 const MAX_HEIGHT = 240
 
 export function Composer({
-  handle, onSend, onStop, running, disabled, filesOnly = true, placeholder, initialText, controls, conversationId, skills: skillsOn = true, onSkillChange, autoFocus = true,
+  handle, onSend, onStop, running, disabled, filesOnly = true, placeholder, initialText, initialAttachments, controls, conversationId, skills: skillsOn = true, onSkillChange, autoFocus = true,
 }: ComposerProps) {
   const [text, setText] = useState(initialText ?? '')
   const [dragging, setDragging] = useState(false)
@@ -134,7 +139,10 @@ export function Composer({
     document.addEventListener('pointerdown', onPointerDown, true)
     return () => document.removeEventListener('pointerdown', onPointerDown, true)
   }, [narrow])
-  const files = useAttachments()
+  const files = useAttachments(initialAttachments)
+  // The sketch picker (the + menu): a sketch's image as an attachment.
+  const [pickingSketch, setPickingSketch] = useState(false)
+  const queryClient = useQueryClient()
   const [references, setReferences] = useState<ChatRef[]>([])
   const [picking, setPicking] = useState(false)
   // The "+" menu: attach files, reference a chat, use a skill.
@@ -341,6 +349,8 @@ export function Composer({
   return (
     <div
       ref={rootRef}
+      // Where the message box is, for plugins (layout.get anchors.composer; no content).
+      data-plugin-anchor="composer"
       onFocus={() => setFocused(true)}
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget) && !pressedInside.current) setFocused(false)
@@ -365,8 +375,8 @@ export function Composer({
           {files.items.map((f) => (
             <AttachmentChip
               key={f.key}
-              name={f.file.name}
-              size={f.file.size}
+              name={f.name}
+              size={f.size}
               kind={f.uploaded?.kind}
               imageUrl={f.previewUrl}
               status={f.status}
@@ -471,6 +481,11 @@ export function Composer({
                   <Paperclip className="h-4 w-4 shrink-0 text-muted" />
                   <span className="min-w-0 flex-1">{t('Attach files')}<span className="block text-[12px] font-normal text-muted">{t('Or drop or paste them')}</span></span>
                 </button>
+                <button type="button" className={ADD_ITEM} disabled={files.items.length >= MAX_ATTACHMENTS}
+                  onClick={() => { setAdding(false); setPickingSketch(true) }}>
+                  <PenLine className="h-4 w-4 shrink-0 text-muted" />
+                  <span className="min-w-0 flex-1">{t('Sketch…')}<span className="block text-[12px] font-normal text-muted">{t('A drawing from Documents, as an image')}</span></span>
+                </button>
                 {touch && canReadClipboard() && (
                   <button type="button" className={ADD_ITEM} disabled={files.items.length >= MAX_ATTACHMENTS}
                     onClick={() => { setAdding(false); void pasteImage() }}>
@@ -549,6 +564,12 @@ export function Composer({
           )}
         </div>
       </div>
+      <Lingering value={pickingSketch}>
+        {() => (
+          <SketchPickerDialog onClose={() => setPickingSketch(false)}
+            onPick={(sketch) => files.addMade(`${sketch.title}.png`, () => sketchForChat(sketch.id, queryClient))} />
+        )}
+      </Lingering>
       <Lingering value={picking}>
         {() => (
           <ChatPickerDialog

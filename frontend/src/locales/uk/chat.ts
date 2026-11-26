@@ -207,5 +207,9 @@ const messages: Messages = {
   "Takes as long as it needs": "Думає стільки, скільки потрібно",
   "Higher levels answer better on hard questions, but take longer and use more tokens. Saved for all chats.": "Вищі рівні краще відповідають на складні питання, але думають довше й витрачають більше токенів. Зберігається для всіх чатів.",
   "Could not save the reasoning level.": "Не вдалося зберегти рівень міркувань.",
+  "Open {name} in Files": "Відкрити {name} у «Файлах»",
+  "Open in Files: {path}": "Відкрити у «Файлах»: {path}",
+  "An event woke this chat": "Подія розбудила цей чат",
+  "{n} event in a short time | {n} events in a short time": "{n} подія за короткий час | {n} події за короткий час | {n} подій за короткий час",
 }
 export default messages

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -11,6 +11,8 @@ const state = vi.hoisted(() => ({
   asked: [] as (string | null)[],
   protections: { paused: false, max_run_minutes: 30 },
   save: vi.fn(),
+  triggers: [] as Record<string, unknown>[],
+  removeTrigger: vi.fn(),
 }))
 const idle = { mutate: vi.fn(), isPending: false, error: null }
 vi.mock('./api', () => ({
@@ -24,19 +26,48 @@ vi.mock('./api', () => ({
   useDeleteAutomation: () => idle,
   useRunAutomation: () => idle,
   useSetAutomationEnabled: () => idle,
+  useTriggers: () => ({ data: state.triggers }),
+  useDeleteTrigger: () => ({ mutate: state.removeTrigger, isPending: false, isError: false, error: null }),
+}))
+vi.mock('./components/TriggerDialog', () => ({
+  TriggerDialog: ({ trigger }: { trigger: { event_label: string } | null }) => <p>trigger dialog{trigger ? `: ${trigger.event_label}` : ''}</p>,
 }))
 vi.mock('@/features/settings/api', () => ({
   useSettings: () => ({ data: { automations: state.protections } }),
   useSaveSection: () => ({ mutate: state.save, isError: false, error: null }),
 }))
-vi.mock('./components/AutomationDialog', () => ({ AutomationDialog: () => null }))
-vi.mock('@/components/ui/ActionMenu', () => ({ ActionMenu: () => null })) // needs matchMedia, which jsdom lacks
+vi.mock('./components/AutomationDialog', () => ({
+  AutomationDialog: ({ template }: { template?: { name: string } }) => <p>automation dialog{template ? `: ${template.name}` : ''}</p>,
+}))
+vi.mock('./components/ScriptsTab', () => ({
+  ScriptsTab: ({ scripts }: { scripts: { name: string }[] }) => <p>scripts: {scripts.map((s) => s.name).join(', ')}</p>,
+}))
+vi.mock('./components/ScriptDialog', () => ({ ScriptDialog: () => <p>script dialog</p> }))
+// The real menu needs matchMedia, which jsdom lacks: its actions as plain buttons.
+vi.mock('@/components/ui/ActionMenu', () => ({
+  ActionMenu: ({ label, actions }: { label?: string; actions: { label: string; onSelect?: () => void }[] }) => (
+    <div role="group" aria-label={label}>{actions.map((a) => <button key={a.label} type="button" onClick={a.onSelect}>{a.label}</button>)}</div>
+  ),
+}))
+// A desktop: the title and the New button are in the page's column.
+vi.mock('@/hooks/useMediaQuery', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/hooks/useMediaQuery')>()),
+  useMediaQuery: () => true,
+}))
 
 const { AutomationsPage } = await import('./AutomationsPage')
+const { DialogHost } = await import('@/components/ui/DialogHost')
 
 const automation = (over: Record<string, unknown> = {}) => ({
   id: 'a1', name: 'Morning briefing', prompt: 'Give me my day', schedule_text: 'Every weekday at 07:00', enabled: true,
   next_run_at: null, last_run_at: null, last_status: null, active_run_id: null, created_by: 'user', ...over,
+})
+
+const trigger = (over: Record<string, unknown> = {}) => ({
+  id: 't1', automation_id: 'a1', conversation_id: null, kind: 'automation', event_type: 'task.created', event_label: 'Task created',
+  filter: {}, once: false, expires_at: null, debounce_s: 0, max_per_hour: 12, enabled: true, note: '', created_by: 'user',
+  fire_count: 0, last_fired_at: null, dropped_count: 0, last_drop_reason: null, waiting: false, webhook_url: null,
+  has_secret: false, created_at: '2026-11-20T09:00:00Z', ...over,
 })
 
 const show = (url = '/automations') => render(<MemoryRouter initialEntries={[url]}><AutomationsPage /></MemoryRouter>)
@@ -59,12 +90,14 @@ describe('the automations page', () => {
     state.asked = []
     state.protections = { paused: false, max_run_minutes: 30 }
     state.save.mockReset()
+    state.triggers = []
+    state.removeTrigger.mockReset()
   })
 
   it('pauses every schedule with one switch, keeping the other protections', async () => {
     show()
     expect(screen.getByText(/stopped after 30 minutes/)).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('switch', { name: 'Pause all automations' }))
+    await userEvent.click(screen.getByRole('switch', { name: 'Pause all automations and scripts' }))
     expect(state.save).toHaveBeenCalledWith({ paused: true, max_run_minutes: 30 })
   })
 
@@ -72,8 +105,8 @@ describe('the automations page', () => {
     state.protections = { paused: true, max_run_minutes: 30 }
     state.automations = []
     show()
-    expect(screen.getByText('All automations are paused')).toBeInTheDocument()
-    expect(screen.getByRole('switch', { name: 'Pause all automations' })).toBeChecked()
+    expect(screen.getByText('All automations and scripts are paused')).toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: 'Pause all automations and scripts' })).toBeChecked()
   })
 
   it('marks what the assistant set up', () => {
@@ -152,5 +185,98 @@ describe('the automations page', () => {
     show()
     expect(screen.getByText('Failed 3 times in a row: provider down')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Review and approve' })).toHaveAttribute('href', '/c/c7')
+  })
+
+  it('keeps scripts in their own tab', async () => {
+    state.automations = [automation(), automation({ id: 's1', kind: 'script', name: 'Booking sync' })]
+    show()
+    expect(screen.getByText('Morning briefing')).toBeInTheDocument()
+    expect(screen.queryByText('Booking sync')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('tab', { name: 'Scripts' }))
+    expect(screen.getByText('scripts: Booking sync')).toBeInTheDocument()
+    expect(screen.queryByText('Morning briefing')).not.toBeInTheDocument()
+  })
+
+  it('opens the Scripts tab for a link to a script', () => {
+    state.automations = [automation({ id: 's1', kind: 'script', name: 'Booking sync' })]
+    show('/automations?automation=s1&run=r1')
+    expect(screen.getByText('scripts: Booking sync')).toBeInTheDocument()
+  })
+
+  it('keeps an empty page compact: one New button, with the templates under it', async () => {
+    state.automations = []
+    show()
+    expect(screen.getByText('No automations yet')).toBeInTheDocument()
+    // Only the empty state's button: the header has none while the list is empty.
+    expect(screen.getAllByRole('button', { name: /New automation/ })).toHaveLength(1)
+    await userEvent.click(screen.getByRole('button', { name: 'Daily summary' }))
+    expect(screen.getByText('automation dialog: Daily summary')).toBeInTheDocument()
+  })
+
+  it('moves the templates into the New menu once there are automations', async () => {
+    show()
+    expect(screen.queryByText('Or start from a template')).not.toBeInTheDocument()
+    const menu = screen.getByRole('group', { name: 'Start from a template' })
+    await userEvent.click(within(menu).getByRole('button', { name: 'Daily summary' }))
+    expect(screen.getByText('automation dialog: Daily summary')).toBeInTheDocument()
+  })
+
+  it('has the New button follow the tab', async () => {
+    show()
+    expect(screen.getByRole('button', { name: 'New automation' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('tab', { name: 'Scripts' }))
+    expect(screen.queryByRole('button', { name: 'New automation' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'New script' }))
+    expect(screen.getByText('script dialog')).toBeInTheDocument()
+  })
+
+  it('lists the events that start an automation, and adds or edits one', async () => {
+    state.triggers = [
+      trigger({ id: 't1', event_label: 'Task created', filter: { tags: ['urgent', 'home'] }, debounce_s: 30, fire_count: 2, last_fired_at: '2026-11-20T10:00:00Z' }),
+      trigger({ id: 't2', event_type: 'webhook.received', event_label: 'Webhook', dropped_count: 1, last_drop_reason: 'over its limit' }),
+      trigger({ id: 't3', automation_id: 'other', event_label: 'Device online' }),
+    ]
+    show()
+    expect(screen.getByText('Also runs when')).toBeInTheDocument()
+    expect(screen.getByText(/tags: urgent, home/)).toBeInTheDocument()
+    expect(screen.getByText('bursts of 30 s')).toBeInTheDocument()
+    expect(screen.getByText(/fired 2 times/)).toBeInTheDocument()
+    expect(screen.getByText('1 dropped')).toHaveAttribute('title', 'over its limit')
+    expect(screen.queryByText('Device online')).not.toBeInTheDocument()  // another automation's
+    await userEvent.click(screen.getByRole('button', { name: /Task created/ }))
+    expect(screen.getByText('trigger dialog: Task created')).toBeInTheDocument()
+  })
+
+  it('asks before removing a trigger', async () => {
+    state.triggers = [trigger()]
+    show()
+    render(<DialogHost />)
+    await userEvent.click(screen.getByRole('button', { name: 'Remove the trigger' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Remove' }))
+    expect(state.removeTrigger).toHaveBeenCalledWith('t1')
+  })
+
+  it('lists the chats that wait for an event, and stops one waiting', async () => {
+    state.triggers = [
+      trigger({ id: 'w1', kind: 'wake', automation_id: null, conversation_id: 'c9', conversation_title: 'Fix the build',
+        event_label: 'Claude Code job ended', filter: { job_id: 'j1' }, expires_at: '2099-01-01T10:00:00Z', note: 'tell the user' }),
+      trigger({ id: 'w2', kind: 'wake', automation_id: null, conversation_id: 'c8', enabled: false }),
+    ]
+    show()
+    const section = screen.getByRole('region', { name: 'Chats waiting for an event' })
+    expect(within(section).getByRole('link', { name: 'Fix the build' })).toHaveAttribute('href', '/c/c9')
+    expect(within(section).getByText(/Claude Code job ended · job_id: j1/)).toBeInTheDocument()
+    expect(within(section).getAllByRole('listitem')).toHaveLength(1)  // one is off already
+    await userEvent.click(within(section).getByRole('button', { name: 'Stop waiting' }))
+    expect(state.removeTrigger).toHaveBeenCalledWith('w1')
+  })
+
+  it('says which event started a run', async () => {
+    state.runs = [logged({ trigger: 'event', event: { type: 'task.created', summary: 'Task created: Buy milk', at: '2026-11-20T10:00:00Z', coalesced: 3 } })]
+    show()
+    await userEvent.click(screen.getByRole('button', { name: 'History' }))
+    expect(screen.getByText('Task created: Buy milk')).toBeInTheDocument()
+    expect(screen.getByText('(3 events)')).toBeInTheDocument()
+    expect(screen.getByLabelText('Started by an event')).toBeInTheDocument()
   })
 })

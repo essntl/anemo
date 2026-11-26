@@ -32,7 +32,7 @@ export interface Shortcut {
   prefix?: string
 }
 
-export type AreaId = 'everywhere' | 'dictation' | 'search' | 'chat' | 'home' | 'focus' | 'music' | 'files' | 'diagram'
+export type AreaId = 'everywhere' | 'dictation' | 'search' | 'chat' | 'home' | 'board' | 'focus' | 'music' | 'files' | 'diagram' | 'sketch'
 
 export interface Area {
   id: AreaId
@@ -47,10 +47,12 @@ export const AREAS: Area[] = [
   { id: 'search', title: msg('Search box'), pages: (p) => p === '/search' },
   { id: 'chat', title: msg('Chat'), pages: (p) => p === '/' || p.startsWith('/c/') || p === '/chats' },
   { id: 'home', title: msg('Home'), pages: (p) => p === '/home' },
+  { id: 'board', title: msg('Boards'), pages: (p) => p === '/home' || p === '/tasks' || p.startsWith('/views/') },
   { id: 'focus', title: msg('Focus'), pages: (p) => p === '/focus' },
   { id: 'music', title: msg('Music'), pages: (p) => p === '/music' },
   { id: 'files', title: msg('Files'), pages: (p) => p === '/files' },
   { id: 'diagram', title: msg('Diagram or chart in full screen') },
+  { id: 'sketch', title: msg('Drawing in a sketch') },
 ]
 
 const ARROWS: KeyCombo[] = [{ key: 'ArrowUp' }, { key: 'ArrowDown' }, { key: 'ArrowLeft' }, { key: 'ArrowRight' }]
@@ -81,6 +83,11 @@ export const SHORTCUTS = {
   'home.resize': { area: 'home', keys: ARROWS.map((k) => ({ ...k, shift: true })), description: msg('While editing: make the focused widget wider, narrower, taller or shorter') },
   'home.hide': { area: 'home', keys: [{ key: 'Delete', shift: false }, { key: 'Backspace', shift: false, quiet: true }], description: msg('While editing: hide the focused widget') },
 
+  'board.open': { area: 'board', keys: [{ key: 'Enter' }], description: msg('Open the focused card') },
+  'board.pickUp': { area: 'board', keys: [{ key: ' ' }], description: msg('Pick up the focused card, or put it down where it is') },
+  'board.move': { area: 'board', keys: ARROWS.map((k) => ({ ...k, shift: false })), description: msg('While a card is picked up: move it to another column or place') },
+  'board.cancel': { area: 'board', keys: [{ key: 'Escape' }], description: msg('Put a picked-up card back where it was') },
+
   'focus.toggle': { area: 'focus', keys: [{ key: ' ' }], description: msg('Start or pause the timer') },
   'focus.reset': { area: 'focus', keys: [{ key: 'r' }], description: msg('Reset the timer') },
   'focus.skip': { area: 'focus', keys: [{ key: 's' }], description: msg('Skip to the next phase') },
@@ -94,6 +101,25 @@ export const SHORTCUTS = {
   'diagram.zoomIn': { area: 'diagram', keys: [{ key: '+' }, { key: '=', quiet: true }], description: msg('Zoom in') },
   'diagram.zoomOut': { area: 'diagram', keys: [{ key: '-' }], description: msg('Zoom out') },
   'diagram.fit': { area: 'diagram', keys: [{ key: '0' }], description: msg('Fit to the window') },
+
+  // On the sketch canvas (features/sketch/canvas), while it has the focus.
+  'sketch.undo': { area: 'sketch', keys: [{ key: 'z', mod: true, shift: false }], description: msg('Undo') },
+  'sketch.redo': { area: 'sketch', keys: [{ key: 'z', mod: true, shift: true }, { key: 'y', mod: true }], description: msg('Redo') },
+  'sketch.delete': { area: 'sketch', keys: [{ key: 'Delete' }, { key: 'Backspace', quiet: true }], description: msg('Delete what is selected') },
+  'sketch.deselect': { area: 'sketch', keys: [{ key: 'Escape' }], description: msg('Clear the selection') },
+  'sketch.pan': { area: 'sketch', keys: [{ key: ' ' }], prefix: msg('Hold'), description: msg('Drag to move around the sheet') },
+  'sketch.zoomIn': { area: 'sketch', keys: [{ key: '+' }, { key: '=', quiet: true }], description: msg('Zoom in') },
+  'sketch.zoomOut': { area: 'sketch', keys: [{ key: '-' }], description: msg('Zoom out') },
+  'sketch.fit': { area: 'sketch', keys: [{ key: '0' }], description: msg('Fit the drawing to the window') },
+  'sketch.pen': { area: 'sketch', keys: [{ key: 'p' }], description: msg('Pen') },
+  'sketch.highlighter': { area: 'sketch', keys: [{ key: 'h' }], description: msg('Highlighter') },
+  'sketch.eraser': { area: 'sketch', keys: [{ key: 'e' }], description: msg('Eraser') },
+  'sketch.select': { area: 'sketch', keys: [{ key: 'v' }], description: msg('Select') },
+  'sketch.text': { area: 'sketch', keys: [{ key: 't' }], description: msg('Text') },
+  'sketch.line': { area: 'sketch', keys: [{ key: 'l' }], description: msg('Line') },
+  'sketch.arrow': { area: 'sketch', keys: [{ key: 'a' }], description: msg('Arrow') },
+  'sketch.rect': { area: 'sketch', keys: [{ key: 'r' }], description: msg('Rectangle') },
+  'sketch.ellipse': { area: 'sketch', keys: [{ key: 'o' }], description: msg('Ellipse') },
 } satisfies Record<string, Shortcut>
 
 export type ShortcutId = keyof typeof SHORTCUTS

@@ -339,6 +339,18 @@ async def test_model(db: AsyncSession, model: Model) -> tuple[TestResult, Usage 
                 "chat to try it."
             )
         return status, None
+    if model.capabilities.get("image_generation"):
+        # Every picture costs money, so no request is made: the key is tried by asking
+        # for an image in a chat (generate_image reports what the provider says).
+        return (
+            TestResult(
+                ok=True,
+                message="Image models are not tried here: each picture costs money.",
+                detail="Choose it under Default models → Image generation and ask for a "
+                "picture in a chat to try it.",
+            ),
+            None,
+        )
     adapter = make_adapter(await build_config(db, model.provider))
     if model.capabilities.get("transcription"):
         return await _test_transcription(adapter, model), None

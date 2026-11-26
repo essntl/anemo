@@ -60,18 +60,24 @@ export const router = createBrowserRouter([
           { path: 'runs', ...page(() => import('@/features/runs/pages/RunsPage'), 'RunsPage') },
           { path: 'runs/:runId', ...page(() => import('@/features/runs/pages/RunDetailPage'), 'RunDetailPage') },
           { path: 'code', ...page(() => import('@/features/code/CodePage'), 'CodePage') },
+          // The Git view without a job (a static segment: ranked above code/:jobId).
+          { path: 'code/git', ...page(() => import('@/features/code/CodePage'), 'CodePage') },
           // One job: on a phone its own bar (back, state, title) is the header.
           { path: 'code/:jobId', ...page(() => import('@/features/code/CodePage'), 'CodePage'), handle: { ownPhoneHeader: true } satisfies RouteHandle },
           { path: 'automations', ...page(() => import('@/features/automations/AutomationsPage'), 'AutomationsPage') },
           { path: 'agents', ...page(() => import('@/features/profiles/pages/ProfilesPage'), 'ProfilesPage') },
           { path: 'memory', ...page(() => import('@/features/memory/MemoryPage'), 'MemoryPage') },
           { path: 'notifications', ...page(() => import('@/features/notifications/NotificationsPage'), 'NotificationsPage') },
+          { path: 'activity', ...page(() => import('@/features/activity/ActivityPage'), 'ActivityPage') },
+          // A plugin's own page (its `page` UI), listed under Plugins in the sidebar and Ctrl+K.
+          { path: 'plugins/:pluginId/:uiId', ...page(() => import('@/features/plugins/PluginPage'), 'PluginPage') },
           {
             path: 'settings',
             element: <SettingsLayout />,
             children: [
               { index: true, element: <SettingsIndex /> },
               { path: 'general', ...page(() => import('@/features/settings/pages/GeneralPage'), 'GeneralPage') },
+              { path: 'profile', ...page(() => import('@/features/profile/ProfilePage'), 'ProfilePage') },
               { path: 'appearance', ...page(() => import('@/features/settings/pages/AppearancePage'), 'AppearancePage') },
               { path: 'pages', ...page(() => import('@/features/settings/pages/PagesPage'), 'PagesPage') },
               { path: 'focus', ...page(() => import('@/features/focus/FocusSettingsPage'), 'FocusSettingsPage') },
@@ -84,6 +90,8 @@ export const router = createBrowserRouter([
               { path: 'workspace', ...page(() => import('@/features/files/WorkspaceSettingsPage'), 'WorkspaceSettingsPage') },
               { path: 'web', ...page(() => import('@/features/web/WebSettingsPage'), 'WebSettingsPage') },
               { path: 'mcp', ...page(() => import('@/features/mcp/McpSettingsPage'), 'McpSettingsPage') },
+              { path: 'plugins', ...page(() => import('@/features/plugins/PluginsSettingsPage'), 'PluginsSettingsPage') },
+              { path: 'plugins/:pluginId', ...page(() => import('@/features/plugins/PluginDetailPage'), 'PluginDetailPage') },
               { path: 'notifications', ...page(() => import('@/features/notifications/NotificationSettingsPage'), 'NotificationSettingsPage') },
               { path: 'memory', ...page(() => import('@/features/memory/MemorySettingsPage'), 'MemorySettingsPage') },
               { path: 'properties', ...page(() => import('@/features/properties/PropertiesSettingsPage'), 'PropertiesSettingsPage') },

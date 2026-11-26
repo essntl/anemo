@@ -253,6 +253,21 @@ public sealed class SettingsStoreTests : IDisposable
     }
 
     [Fact]
+    public void A_file_from_before_1_8_0_updates_automatically_and_off_stays_off()
+    {
+        Directory.CreateDirectory(_folder);
+        var path = Path.Combine(_folder, "settings.json");
+        File.WriteAllText(path, "{ \"address\": \"https://anemo.example.com\", \"shareFiles\": true }");
+        var store = new SettingsStore(path, new FakeProtector());
+
+        Assert.True(store.Load().AutoUpdate);
+
+        store.Save(store.Load() with { AutoUpdate = false });
+        Assert.False(store.Load().AutoUpdate);
+        Assert.Contains("\"autoUpdate\": false", File.ReadAllText(path));
+    }
+
+    [Fact]
     public void A_broken_file_gives_defaults_and_is_kept_aside()
     {
         Directory.CreateDirectory(_folder);
@@ -483,9 +498,15 @@ public sealed class WireTests
     [Fact]
     public void Messages_have_the_contract_shapes()
     {
-        Assert.Equal("""{"type":"hello","token":"anemo_t","kind":"computer","version":"1.0.0","last_id":null}""", Wire.Hello("anemo_t", "1.0.0", null));
+        // platform and shell_kind were added in 1.4.0 (round 3): optional on the server, Windows by default.
+        Assert.Equal("""{"type":"hello","token":"anemo_t","kind":"computer","version":"1.0.0","last_id":null,"platform":"windows"}""", Wire.Hello("anemo_t", "1.0.0", null));
+        Assert.Equal("""{"type":"hello","token":"anemo_t","kind":"computer","version":"1.4.0","last_id":"1-0","platform":"macos"}""", Wire.Hello("anemo_t", "1.4.0", "1-0", "macos"));
         Assert.Equal("""{"type":"ping"}""", Wire.Ping());
-        Assert.Equal("""{"type":"device.offer","control":true,"shell":false,"code":false,"code_start":false}""", Wire.Offer(true, false, false, false));
+        Assert.Equal("""{"type":"device.offer","control":true,"shell":false,"code":false,"code_start":false,"code_images":false,"code_git":false,"code_git_remote":false,"shell_kind":"powershell","files":false,"code_input":false}""", Wire.Offer(true, false, false, false));
+        // Images with code_start (1.3.0) come with starting.
+        Assert.Equal("""{"type":"device.offer","control":false,"shell":false,"code":true,"code_start":true,"code_images":true,"code_git":true,"code_git_remote":true,"shell_kind":"powershell","files":false,"code_input":false}""", Wire.Offer(false, false, true, true));
+        Assert.Equal("""{"type":"device.offer","control":true,"shell":true,"code":false,"code_start":false,"code_images":false,"code_git":false,"code_git_remote":false,"shell_kind":"zsh","files":false,"code_input":false}""", Wire.Offer(true, true, false, false, "zsh"));
+        Assert.EndsWith(""","shell_kind":"zsh","files":true,"code_input":false}""", Wire.Offer(true, true, false, false, "zsh", files: true));
         Assert.Equal("""{"type":"device.stopped"}""", Wire.Stopped());
         Assert.Equal("""{"type":"device.result","id":"1","ok":true,"state":{}}""", Wire.Result("1", CommandOutcome.Success(new JsonObject())));
         Assert.Equal("""{"type":"device.result","id":"2","ok":false,"error":"No.","code":"refused"}""", Wire.Result("2", CommandOutcome.Fail("refused", "No.")));

@@ -121,7 +121,7 @@ test('the pages bar grows into a card in the middle, and folds back', async ({ p
 
   await bar.click()
   const card = page.getByRole('dialog', { name: 'Pages' })
-  await expect(card.getByRole('link')).toHaveCount(13)
+  await expect(card.getByRole('link')).toHaveCount(14)
   // Once grown, it sits in the middle of the screen, not in the menu.
   const view = page.viewportSize()!
   await expect.poll(async () => {
@@ -346,7 +346,8 @@ test('settings is a list of sections with a way back', async ({ page }) => {
   await page.getByRole('link', { name: 'Appearance' }).click()
   await expect(page).toHaveURL(/\/settings\/appearance/)
   await expect(page.getByText('Accent color')).toBeVisible()
-  await page.getByRole('link', { name: 'Settings', exact: true }).click()
+  // The way back is the chevron before the section's name in the top bar.
+  await page.getByRole('link', { name: 'Back to Settings' }).click()
   await expect(page).toHaveURL(/\/settings$/)
   await expect(page.getByRole('link', { name: 'Providers & Models' })).toBeVisible()
 })

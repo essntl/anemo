@@ -57,6 +57,11 @@ public static class JobState
         }
 
         var alive = IsAlive(folder, meta, probe, now);
+        if (meta.Input && alive)
+        {
+            return JobStates.Running; // it answers more than once while it runs (§15)
+        }
+
         return ResultState(folder) ?? (alive ? JobStates.Running : JobStates.ExitedWithoutResult);
     }
 

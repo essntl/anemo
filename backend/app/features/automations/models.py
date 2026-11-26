@@ -2,7 +2,17 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, text
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -20,6 +30,9 @@ class Automation(Base, IdMixin, TimestampMixin):
     __table_args__ = (Index("ix_automations_due", "next_run_at", postgresql_where=text("enabled")),)
 
     name: Mapped[str] = mapped_column(String(120))
+    # agent: a prompt a model answers (`prompt`). script: code that runs without a model
+    # (docs/specs/08-automation-scripts.md); `prompt` is then its description.
+    kind: Mapped[str] = mapped_column(String(10), default="agent", server_default="agent")
     prompt: Mapped[str] = mapped_column(Text)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     schedule: Mapped[dict[str, Any]] = mapped_column(JSONB)  # see automations/schedule.py
@@ -75,3 +88,43 @@ class Automation(Base, IdMixin, TimestampMixin):
     # no_change (the change check found nothing new)
     last_status: Mapped[str | None] = mapped_column(String(12))
     last_run_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    # A script: the hash of the version the user approved, the only code that runs.
+    # None: nothing is approved yet (scripts.py).
+    script_hash: Mapped[str | None] = mapped_column(String(64))
+
+
+class ScriptVersion(Base, IdMixin, TimestampMixin):
+    """One saved version of a script's code and of what it may use. Never changed after
+    it is saved; the approved one is the one whose hash is the automation's script_hash."""
+
+    __tablename__ = "script_versions"
+    __table_args__ = (UniqueConstraint("automation_id", "number"),)
+
+    automation_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("automations.id", ondelete="CASCADE"), index=True
+    )
+    number: Mapped[int] = mapped_column(Integer)  # 1, 2, 3... per script
+    code: Mapped[str] = mapped_column(Text)
+    tools: Mapped[list[str]] = mapped_column(JSONB, default=list)  # what the code may call
+    hosts: Mapped[list[str]] = mapped_column(JSONB, default=list)  # what it may fetch from
+    secrets: Mapped[list[str]] = mapped_column(JSONB, default=list)  # secret names it uses
+    think_tools: Mapped[list[str]] = mapped_column(JSONB, default=list)  # for think steps
+    hash: Mapped[str] = mapped_column(String(64))  # of all of the above (scripts.version_hash)
+    # Who saved it, as an actor reference (app/core/actor.py): user, chat:..., automation:...
+    created_by: Mapped[str] = mapped_column(String(120))
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ScriptSecret(Base, IdMixin, TimestampMixin):
+    """The value the user set for one of a script's named secrets (encrypted in `secrets`)."""
+
+    __tablename__ = "script_secrets"
+    __table_args__ = (UniqueConstraint("automation_id", "name"),)
+
+    automation_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("automations.id", ondelete="CASCADE")
+    )
+    name: Mapped[str] = mapped_column(String(60))
+    secret_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("secrets.id", ondelete="CASCADE")
+    )

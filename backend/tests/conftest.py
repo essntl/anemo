@@ -90,6 +90,9 @@ async def db_clean(migrated_db: None) -> AsyncIterator[None]:
     from app.core.db import get_engine
     from app.core.redis import get_redis
     from app.db.models import Base
+    from app.features.triggers import listener
+
+    listener.install()  # as the API and the worker do (event triggers)
 
     tables = ", ".join(f'"{t.name}"' for t in Base.metadata.sorted_tables)
     async with get_engine().begin() as conn:

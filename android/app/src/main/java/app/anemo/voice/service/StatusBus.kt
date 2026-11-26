@@ -20,6 +20,8 @@ data class Status(
     val activeRuns: Int = 0,
     val notice: String? = null,
     val error: String? = null,
+    /** Voice mode is on: the microphone opens again after each answer. */
+    val voiceMode: Boolean = false,
 )
 
 /** In-process status of the listening service, for the activity and the tile. */

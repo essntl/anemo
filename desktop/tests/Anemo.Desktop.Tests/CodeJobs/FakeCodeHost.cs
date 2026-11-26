@@ -44,14 +44,24 @@ public sealed class FakeCodeHost : ICodeHost
         return AnswerAsync is { } answer ? answer(run, ct) : Task.FromResult(Answer(run));
     }
 
-    public int StartDetached(DetachedStart start)
+    /// <summary>Every job as Core described it.</summary>
+    public ConcurrentQueue<JobLaunch> Launches { get; } = new();
+
+    /// <summary>Records the job, and in <see cref="Started"/> the cmd.exe start Windows makes of it.</summary>
+    public int StartJob(JobLaunch launch)
     {
-        Started.Enqueue(start);
+        Launches.Enqueue(launch);
+        Started.Enqueue(WindowsJobCommand.For(launch));
         return NextPid ?? throw new System.ComponentModel.Win32Exception(2);
     }
 
     /// <summary>Runs as the process tree is ended (e.g. the job writes its result just then).</summary>
     public Action<int>? OnKill { get; set; }
+
+    /// <summary>Windows PowerShell "in the system folder"; null: not there.</summary>
+    public string? PowerShell { get; set; } = @"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe";
+
+    public string? WindowsPowerShell() => PowerShell;
 
     public bool KillTree(int pid)
     {

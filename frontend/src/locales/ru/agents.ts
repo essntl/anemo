@@ -223,5 +223,18 @@ const messages: Messages = {
   "Tools from connected MCP servers.": "Инструменты с подключённых серверов MCP.",
   "Start sub-agents": "Запуск субагентов",
   "Delegate work to other agents.": "Передача работы другим агентам.",
+  "Voice mode": "Голосовой режим",
+  "End voice mode on your phone when a spoken conversation is over.": "Завершение голосового режима на вашем телефоне, когда разговор окончен.",
+  "Generate images": "Создание изображений",
+  "Make pictures with the image model chosen in Settings > Providers & Models (each one costs money at the provider). Automations ask first.": "Создавать изображения моделью, выбранной в Настройки > Провайдеры и модели (каждое стоит денег у провайдера). Автоматизации сначала спрашивают.",
+  "Build plugins": "Создание плагинов",
+  "Write and change plugins. They stay off until you review and approve them in Settings > Plugins.": "Написание и изменение плагинов. Они остаются выключенными, пока вы не просмотрите и не одобрите их в Настройки > Плагины.",
+  "Open in Files: {path}": "Открыть в «Файлах»: {path}",
+  "not found": "не найдено",
+  "(untitled)": "(без названия)",
+  "(in the trash)": "(в корзине)",
+  "Hide the items": "Скрыть элементы",
+  "Show the {n} item | Show all {n} items": "Показать {n} элемент | Показать все {n} элемента | Показать все {n} элементов",
+  "Items in this batch": "Элементы этой группы изменений",
 }
 export default messages

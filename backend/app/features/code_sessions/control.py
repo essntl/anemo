@@ -3,9 +3,10 @@
 the agent tools (tools/builtin/code.py) alike.
 
 Every command goes to the computer through the relay (`device.command` actions
-`code_projects`, `code_start`, `code_cancel`). A computer must be a trusted one, online
-with a fresh offer, and offer what the action needs: `code` (sharing) for the projects,
-`code_start` ("Let Anemo start Claude Code jobs") for starting and cancelling.
+`code_projects`, `code_start`, `code_cancel`; the git reads are in git.py). A computer
+must be a trusted one, online with a fresh offer, and offer what the action needs: `code`
+(sharing) for the projects, `code_start` ("Let Anemo start Claude Code jobs") for
+starting and cancelling.
 """
 
 import logging
@@ -17,7 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, Conflict, Forbidden, NotFound
-from app.features.code_sessions import ingest, service
+from app.features.code_sessions import images, ingest, resume, service
 from app.features.code_sessions.models import STATES, TERMINAL, CodeJob, State
 from app.features.code_sessions.schemas import (
     CodeDeviceOut,
@@ -25,6 +26,7 @@ from app.features.code_sessions.schemas import (
     CodeProjectOut,
     CodeProjectsOut,
     CodeRemoteOut,
+    github_repo,
 )
 from app.features.devices import relay
 from app.features.devices.models import Device
@@ -75,6 +77,16 @@ class DeviceBusy(Conflict):
     code = "device_busy"
 
 
+class ImagesUnsupported(Conflict):
+    code = "images_unsupported"
+
+
+class DeviceUnauthenticated(Conflict):
+    """git or gh on the computer isn't signed in to the remote it had to reach."""
+
+    code = "device_unauthenticated"
+
+
 # -- the computer ----------------------------------------------------------------------------
 
 
@@ -91,7 +103,7 @@ async def devices(db: AsyncSession) -> list[CodeDeviceOut]:
     return [found[i] for i in ids if i in found]
 
 
-async def _computer(
+async def checked_computer(
     db: AsyncSession, device_id: uuid.UUID, *, need: service.Need
 ) -> tuple[Device, relay.Offer]:
     """The device, checked for an action that needs `need` (service.can)."""
@@ -116,7 +128,9 @@ async def _computer(
     return device, offer
 
 
-async def _send(device: Device, action: str, fields: dict[str, Any], timeout_s: float) -> dict:
+async def send_command(
+    device: Device, action: str, fields: dict[str, Any], timeout_s: float
+) -> dict:
     try:
         return await relay.send(device.id, action, fields, timeout_s=timeout_s)
     except relay.Busy as exc:
@@ -127,6 +141,12 @@ async def _send(device: Device, action: str, fields: dict[str, Any], timeout_s: 
         raise DeviceOffline(str(exc) or f"“{device.name}” didn't answer.") from exc
     except (relay.Refused, relay.Stopped) as exc:
         raise DeviceRefused(str(exc) or f"“{device.name}” refused.") from exc
+    except relay.Missing as exc:
+        raise NotFound(str(exc) or f"“{device.name}” doesn't have that.") from exc
+    except relay.Unauthenticated as exc:
+        raise DeviceUnauthenticated(
+            str(exc) or f"“{device.name}” isn't signed in to GitHub (gh auth login)."
+        ) from exc
     except relay.ActionFailed as exc:
         raise DeviceFailed(str(exc) or f"“{device.name}” couldn't do that.") from exc
 
@@ -135,12 +155,21 @@ def _text(value: Any, limit: int = MAX_TEXT) -> str:
     return str(value)[:limit] if value is not None else ""
 
 
-async def projects(db: AsyncSession, device_id: uuid.UUID) -> CodeProjectsOut:
-    """The computer's projects and the owner's GitHub repositories not cloned there."""
-    device, _ = await _computer(db, device_id, need="share")
-    state = await _send(device, "code_projects", {}, PROJECTS_TIMEOUT_S)
+async def projects(
+    db: AsyncSession, device_id: uuid.UUID, *, local_only: bool = False
+) -> CodeProjectsOut:
+    """The computer's projects and the owner's GitHub repositories not cloned there.
+    `local_only`: the projects folder only (Anemo Desktop 1.5.0 then skips `gh repo
+    list`; an older one lists the repositories anyway, and they are left out here)."""
+    device, _ = await checked_computer(db, device_id, need="share")
+    fields = {"local_only": True} if local_only else {}
+    state = await send_command(device, "code_projects", fields, PROJECTS_TIMEOUT_S)
     local = [p for p in state.get("projects") or [] if isinstance(p, dict) and p.get("name")]
-    remote = [r for r in state.get("remote") or [] if isinstance(r, dict) and r.get("name")]
+    remote = [
+        r
+        for r in ([] if local_only else state.get("remote") or [])
+        if isinstance(r, dict) and r.get("name")
+    ]
     note = state.get("note")
     return CodeProjectsOut(
         projects=[
@@ -148,11 +177,16 @@ async def projects(db: AsyncSession, device_id: uuid.UUID) -> CodeProjectsOut:
                 name=_text(p["name"], 200),
                 dir=_text(p.get("dir")),
                 remote=_text(p["remote"]) if p.get("remote") else None,
+                repo=github_repo(_text(p.get("remote"))),
             )
             for p in local[:MAX_LISTED]
         ],
         remote=[
-            CodeRemoteOut(name=_text(r["name"], 200), url=_text(r.get("url")))
+            CodeRemoteOut(
+                name=_text(r["name"], 200),
+                url=_text(r.get("url")),
+                repo=github_repo(_text(r.get("url"))),
+            )
             for r in remote[:MAX_LISTED]
         ],
         note=_text(note) if note else None,
@@ -175,12 +209,20 @@ async def start_job(
     conversation_id: uuid.UUID | None = None,
     run_id: uuid.UUID | None = None,
     follow_job_id: str | None = None,
+    image_ids: list[uuid.UUID] | None = None,
 ) -> CodeJobOut:
     """Start a job on the computer and make its row at once (running, with the chat and
     run that started it). `follow_job_id`: the job (its key) whose folder the new one
     runs in, the project then being ignored by the computer; when not given and
-    `resume_session` is, the computer's job that had that session."""
-    device, _ = await _computer(db, device_id, need="start")
+    `resume_session` is, the computer's job that had that session. `image_ids`: uploaded
+    images to send with the prompt (images.py)."""
+    device, offer = await checked_computer(db, device_id, need="start")
+    ready = await images.ready(db, image_ids or [])
+    if ready and not offer.code_images:
+        raise ImagesUnsupported(
+            f"Anemo Desktop on “{device.name}” can't take images yet: update it to 1.3.0 "
+            "or later, or send the message without them."
+        )
     if follow_job_id is None and resume_session:
         follow_job_id = await db.scalar(
             select(CodeJob.job_key)
@@ -198,8 +240,13 @@ async def start_job(
     }
     if follow_job_id is not None:
         fields["follow_job_id"] = follow_job_id
+    if ready:
+        fields["images"] = [image.command() for image in ready]
+    if offer.code_input:
+        # It takes messages while it runs (§15): Anemo Desktop 1.9.0 on Windows.
+        fields["input"] = True
     await db.close()  # nothing is held while the computer answers
-    state = await _send(device, "code_start", fields, START_TIMEOUT_S)
+    state = await send_command(device, "code_start", fields, START_TIMEOUT_S)
     job_key = state.get("job_id")
     if not isinstance(job_key, str) or not JOB_KEY.match(job_key):
         raise DeviceFailed(f"“{device.name}” started the job, but its answer could not be read.")
@@ -214,6 +261,7 @@ async def start_job(
             model=model,
             conversation_id=conversation_id,
             run_id=run_id,
+            images=[image.ref() for image in ready],
         ),
     )
     log.info(
@@ -226,7 +274,7 @@ async def start_job(
     return shaped
 
 
-async def _last_of_thread(db: AsyncSession, job: CodeJob) -> CodeJob:
+async def last_of_thread(db: AsyncSession, job: CodeJob) -> CodeJob:
     jobs = await service.thread(db, job)
     return jobs[-1] if jobs else job
 
@@ -240,12 +288,15 @@ async def follow_up(
     max_turns: int | None = None,
     conversation_id: uuid.UUID | None = None,
     run_id: uuid.UUID | None = None,
+    image_ids: list[uuid.UUID] | None = None,
 ) -> CodeJobOut:
     """Resume the session of the thread's last job, in its project on its computer: the
     new job joins the thread."""
-    last = await _last_of_thread(db, await service.get(db, job_id))
+    last = await last_of_thread(db, await service.get(db, job_id))
     if last.state not in TERMINAL:
         raise JobRunning("The thread's last job is still running.")
+    if resume.cancel(last, "You continued the thread yourself."):
+        await db.commit()  # an auto continue (§16) that waited is no longer wanted
     if not last.session_id:
         raise NoSession("The thread's last job has no Claude Code session to resume.")
     return await start_job(
@@ -259,6 +310,7 @@ async def follow_up(
         conversation_id=conversation_id,
         run_id=run_id,
         follow_job_id=last.job_key,
+        image_ids=image_ids,
     )
 
 
@@ -268,10 +320,13 @@ async def follow_up(
 async def cancel_job(db: AsyncSession, job_id: uuid.UUID) -> CodeJobOut:
     """Cancel a running job. One that has ended is returned as it is."""
     job = await service.get(db, job_id)
+    if resume.cancel(job, "The job was cancelled."):
+        await db.commit()  # a cancel also stops a continue that waits (§16)
+        await ingest.publish_job(job.id)
     if job.state not in TERMINAL:
-        device, _ = await _computer(db, job.device_id, need="cancel")
+        device, _ = await checked_computer(db, job.device_id, need="cancel")
         await db.close()
-        state = await _send(device, "code_cancel", {"job_id": job.job_key}, CANCEL_TIMEOUT_S)
+        state = await send_command(device, "code_cancel", {"job_id": job.job_key}, CANCEL_TIMEOUT_S)
         answered = state.get("state")
         if answered in STATES:
             answered_state: State = answered

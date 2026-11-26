@@ -15,10 +15,13 @@ from app.core.errors import AppError, Conflict, NotFound
 from app.events import bus
 from app.features.attachments import service as attachments
 from app.features.attachments.models import Attachment
+from app.features.conversations import recall
+from app.features.conversations import search as chat_search
 from app.features.conversations.models import ChatMessage, Conversation
 from app.features.conversations.schemas import (
     AttachmentSummary,
     ConversationOut,
+    EventSummary,
     MessageOut,
     MessageVersion,
     PageContentOut,
@@ -91,7 +94,9 @@ def _version_run_id(v: dict[str, Any]) -> uuid.UUID | None:
 
 
 def _attachment_summary(a: Attachment) -> AttachmentSummary:
-    return AttachmentSummary(id=a.id, filename=a.filename, kind=a.kind, mime=a.mime, size=a.size)
+    return AttachmentSummary(
+        id=a.id, filename=a.filename, kind=a.kind, mime=a.mime, size=a.size, path=a.workspace_path
+    )
 
 
 def message_out(
@@ -153,6 +158,7 @@ def message_out(
             if isinstance(b, dict) and b.get("type") == "conversation"
         ],
         page=_page_summary(m.content),
+        event=_event_summary(m.content),
         skill=SkillSummary.model_validate(m.skill) if m.skill else None,
         mode=mode if mode is not None else (info[0] if info else None),
         questions=_questions(info),
@@ -275,23 +281,8 @@ async def list_conversations(
     if active_before is not None:
         stmt = stmt.where(Conversation.last_message_at < active_before)
     if q:
-        tsq = func.websearch_to_tsquery("english", q)
-        hits = await db.execute(
-            select(
-                ChatMessage.conversation_id,
-                func.ts_headline(
-                    "english",
-                    ChatMessage.text_plain,
-                    tsq,
-                    "MaxWords=18, MinWords=6, StartSel=«, StopSel=»",
-                ),
-            )
-            .where(ChatMessage.tsv.op("@@")(tsq))
-            .order_by(func.ts_rank(ChatMessage.tsv, tsq).desc())
-            .limit(200)
-        )
-        for cid, snip in hits.all():
-            snippets.setdefault(cid, snip)
+        matches = await chat_search.matching_messages(db, q, max_words=18, min_words=6)
+        snippets = chat_search.first_snippets(matches)
         stmt = stmt.where(
             or_(Conversation.id.in_(list(snippets)), Conversation.title.ilike(f"%{q}%"))
         )
@@ -387,6 +378,7 @@ async def delete_conversations(db: AsyncSession, ids: list[uuid.UUID]) -> None:
         run_ids += list(await db.scalars(select(Run.id).where(Run.conversation_id == conv.id)))
         await db.delete(conv)
         await browser_client.close(conv.id)  # its browser session, if it has one
+    await recall.forget(db, ids)  # its messages in the index (chat recall)
     await db.flush()
     outputs.delete_for_runs(run_ids)
 
@@ -532,6 +524,19 @@ def page_block(page: PageIn) -> dict[str, Any]:
 
 def _page(content: list[Any]) -> dict[str, Any] | None:
     return next((b for b in content if isinstance(b, dict) and b.get("type") == "page"), None)
+
+
+def _event_summary(content: list[Any]) -> EventSummary | None:
+    block = next((b for b in content if isinstance(b, dict) and b.get("type") == "event"), None)
+    if block is None:
+        return None
+    return EventSummary(
+        event_type=str(block.get("event_type", "")),
+        summary=str(block.get("summary", "")),
+        at=datetime.fromisoformat(str(block["at"])),
+        coalesced=int(block.get("coalesced") or 1),
+        trigger_id=uuid.UUID(block["trigger_id"]) if block.get("trigger_id") else None,
+    )
 
 
 def _page_summary(content: list[Any]) -> PageSummary | None:
@@ -859,3 +864,36 @@ async def save_as_document(db: AsyncSession, conv: Conversation) -> Document:
     folder = project.slug if project else ""
     path = await asyncio.to_thread(documents.unique_path, folder, conv.title)
     return await documents.create(db, path, await export_markdown(db, conv), author="user")
+
+
+async def send_event_turn(
+    db: AsyncSession,
+    conversation_id: uuid.UUID,
+    block: dict[str, Any],
+    request: str,
+    options: dict[str, Any],
+) -> Run:
+    """A turn that an event adds to the chat (a "wake me" trigger, features/triggers): a
+    user-role message whose only content is the event `block` (never the user's words;
+    the app shows it as an event card), answered by an agent run with `options`.
+    Raises Conflict while the chat is answering. The caller commits."""
+    conv = await _lock_idle_conversation(db, conversation_id)
+    seq = await _next_seq(db, conv.id)
+    user = ChatMessage(
+        conversation_id=conv.id, seq=seq, role="user", content=[block], text_plain=""
+    )
+    assistant = ChatMessage(
+        conversation_id=conv.id,
+        seq=seq + 1,
+        role="assistant",
+        content=[],
+        text_plain="",
+        status="streaming",
+    )
+    db.add_all([user, assistant])
+    await db.flush()
+    run = await _start_run(
+        db, conv, assistant, request, conv.model_id, user.id, "agent", options=options
+    )
+    conv.last_message_at = func.now()
+    return run

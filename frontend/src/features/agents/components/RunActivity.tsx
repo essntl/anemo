@@ -35,7 +35,7 @@ import { Elapsed } from '@/components/ui/Elapsed'
 import { ZoomableImage } from '@/components/ui/ZoomableImage'
 import { FileIcon } from '@/components/ui/FileIcon'
 import { toolOutputUrl, useEditPlan, useRun } from '@/features/runs/api'
-import { codeJobLink } from '@/lib/appLinks'
+import { codeJobLink, fileLink } from '@/lib/appLinks'
 import { cn } from '@/lib/cn'
 import { formatCost, formatCount, formatDuration, formatSize } from '@/lib/format'
 import { dateLocale, msg, plural, rich, t } from '@/lib/i18n'
@@ -79,6 +79,31 @@ function shownImage(call: ToolCallView): { attachment_id: string; width: number;
 }
 
 type GivenFile = { attachment_id: string; filename: string; size: number; kind: string }
+
+/** A picture generate_image made: where it is saved, and its copy under the answer. */
+type GeneratedImage = { path: string; width: number; height: number; attachment_id: string | null }
+
+/** The pictures a generate_image call made, zoomable, with a link to each saved file. */
+function GeneratedImages({ images }: { images: GeneratedImage[] }) {
+  return (
+    <div className="ml-7 mt-1 flex flex-wrap gap-2">
+      {images.map((image) => (
+        <figure key={image.path} className="flex max-w-56 flex-col gap-1">
+          {image.attachment_id && (
+            <ZoomableImage src={`/api/attachments/${image.attachment_id}/content`} alt={image.path}
+              className="max-h-32 max-w-56 rounded-lg border border-border object-contain" />
+          )}
+          <figcaption>
+            <Link to={fileLink(image.path)} title={t('Open in Files: {path}', { path: image.path })}
+              className="block truncate text-[11.5px] text-accent hover:underline">
+              {image.path}
+            </Link>
+          </figcaption>
+        </figure>
+      ))}
+    </div>
+  )
+}
 
 /** The tools whose result names a Claude Code job (tools/builtin/code.py). */
 const CODE_JOB_TOOLS = ['code_start', 'code_status', 'code_cancel']
@@ -158,6 +183,7 @@ function ToolRow({ runId, call, docked }: { runId: string; call: ToolCallView; d
   const output = call.result_data?.output as { chars: number } | undefined
   const web = (call.result_data?.search ?? call.result_data?.web) as WebData | undefined
   const given = call.tool_name === 'attach_file' ? (call.result_data?.files as GivenFile[] | undefined) : undefined
+  const generated = call.tool_name === 'generate_image' ? (call.result_data?.generated as GeneratedImage[] | undefined) : undefined
   const codeJob = codeJobOf(call)
   return (
     <div className="py-1">
@@ -210,6 +236,7 @@ function ToolRow({ runId, call, docked }: { runId: string; call: ToolCallView; d
         </div>
       )}
       {given && given.length > 0 && <GivenFiles files={given} />}
+      {generated && generated.length > 0 && <GeneratedImages images={generated} />}
       {codeJob && (
         <div className="ml-7 mt-1">
           <Link to={codeJobLink(codeJob)}

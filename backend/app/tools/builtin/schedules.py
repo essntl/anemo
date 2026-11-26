@@ -47,9 +47,12 @@ from app.features.projects import service as projects
 from app.features.providers.models import Model
 from app.features.settings import service as settings_service
 from app.features.tasks.models import Project
+from app.features.triggers import service as trigger_service
+from app.features.triggers.models import Trigger
 from app.jobs import queue
 from app.policy.models import Action
 from app.tools.base import Tool, ToolContext, ToolResult
+from app.tools.builtin.triggers import TriggerSpec, spec_words
 
 READ = "automation.read"
 MANAGE = "automation.manage"
@@ -84,6 +87,12 @@ CHECK = (
     "each scheduled run; when their results are the same as at the last successful run, "
     "the run is skipped. In args, `{today}` is replaced by the user's date (YYYY-MM-DD) "
     "when the check runs"
+)
+TRIGGERS = (
+    "Events that start a run (besides or instead of the times): each {event, filter, "
+    "debounce_s, max_per_hour, once, expires_at, note}; see create_trigger for the event "
+    "types and their filter fields. With triggers alone (no rrule or at) it runs only on "
+    "its events. A run an event started gets the event as data"
 )
 PROFILE = (
     "An agent profile (its name, as in Settings > Agent profiles) whose permissions its "
@@ -310,8 +319,8 @@ class ListSchedules(Tool):
         "each runs, its next run, whether it is on, how the last run went, and the prompt. "
         "Also says when the user has paused all schedules, and each one's settings (who "
         "is notified, its tools, limits, how long its chats are kept, its change check). "
-        "Look here before creating one, to avoid a duplicate. It does not show the results "
-        "of past runs."
+        "Look here before creating one, to avoid a duplicate. Also the events that start "
+        "each one (its triggers). It does not show the results of past runs."
     )
     capability = READ
     Input = NoInput
@@ -324,6 +333,17 @@ class ListSchedules(Tool):
             tz = await settings_service.user_timezone(db)
             paused = (await service.protections(db)).paused
             rows = list(await db.scalars(select(Automation).order_by(Automation.name)))
+            on_events: dict[uuid.UUID, list[str]] = {}
+            for t in await db.scalars(
+                select(Trigger)
+                .where(Trigger.automation_id.is_not(None))
+                .order_by(Trigger.created_at)
+            ):
+                assert t.automation_id is not None
+                state = "" if t.enabled else " (off)"
+                on_events.setdefault(t.automation_id, []).append(
+                    f"{trigger_service.describe(t)}{state} [{t.id}]"
+                )
             names = {p.id: p.name for p in await db.scalars(select(Project))}
             profiles = {p.id: p.name for p in await db.scalars(select(AgentProfile))}
         zone = ZoneInfo(tz)
@@ -356,9 +376,11 @@ class ListSchedules(Tool):
                 checks = ", ".join(str(c.get("tool")) for c in a.change_check)
                 anyway = f", run anyway every {a.run_anyway_hours} h" * bool(a.run_anyway_hours)
                 settings.append(f"change check {checks}{anyway}")
+            events = on_events.get(a.id)
             lines.append(
                 f"[{a.id}] {a.name} ({'; '.join(facts)})\n    Settings: {'; '.join(settings)}"
-                f"\n    Prompt: {_short(a.prompt, 300)}"
+                + (f"\n    Triggers: {'; '.join(events)}" if events else "")
+                + f"\n    Prompt: {_short(a.prompt, 300)}"
             )
         if not rows:
             lines.append("There are no schedules.")
@@ -381,11 +403,12 @@ class CreateScheduleInput(SettingsIn):
     project: str | None = Field(
         None, max_length=100, description="An existing project to file the runs' chats under"
     )
+    triggers: list[TriggerSpec] | None = Field(None, max_length=10, description=TRIGGERS)
 
     @model_validator(mode="after")
     def _timing(self) -> "CreateScheduleInput":
-        if self.rrule is None and self.at is None:
-            raise ValueError("give rrule (repeating), at (once), or both")
+        if self.rrule is None and self.at is None and not self.triggers:
+            raise ValueError("give rrule (repeating), at (once), both, or triggers (events)")
         return self
 
 
@@ -401,16 +424,24 @@ class CreateSchedule(Tool):
         "(“every weekday at 7, give me my day”, “check this page tomorrow”). The user is "
         "always asked to confirm the prompt, the times and the settings. It cannot run "
         "more often than every 5 minutes; for a reminder without the assistant, a task "
-        "with a reminder is enough."
+        "with a reminder is enough. With `triggers` it (also) runs when an event happens "
+        "(a task is created, a Claude Code job ends, a webhook is called…)."
     )
     capability = MANAGE
     Input = CreateScheduleInput
     idempotent = False
 
     def actions(self, args: CreateScheduleInput, ctx: ToolContext) -> list[Action]:
-        when = f"repeating ({args.rrule})" if args.rrule else f"once at {args.at:%Y-%m-%d %H:%M}"
+        if args.rrule:
+            when = f"repeating ({args.rrule})"
+        elif args.at:
+            when = f"once at {args.at:%Y-%m-%d %H:%M}"
+        else:
+            when = "only on events"
         if args.rrule and args.at:
             when += f" from {args.at:%Y-%m-%d %H:%M}"
+        if args.triggers:
+            when += "; runs on " + " / ".join(spec_words(t, wake=False) for t in args.triggers)
         words = _settings_words(args, creating=True)
         settings = f" ({'; '.join(words)})" if words else ""
         head = f"Schedule “{args.name}”, {when}{settings}: "
@@ -427,7 +458,11 @@ class CreateSchedule(Tool):
         async with get_sessionmaker()() as db:
             tz = await settings_service.user_timezone(db)
             try:
-                schedule = _schedule(args.rrule, args.at, tz, every_minute=bool(args.change_check))
+                schedule = (
+                    _schedule(args.rrule, args.at, tz, every_minute=bool(args.change_check))
+                    if args.rrule or args.at
+                    else Schedule(kind="manual", tz=tz)  # only on its events
+                )
             except ValidationError as exc:
                 return ToolResult(content=f"Invalid schedule: {_problems(exc)}", is_error=True)
             except ValueError as exc:
@@ -458,14 +493,18 @@ class CreateSchedule(Tool):
             )  # defaults: wait for approvals ("pause"), notify when the run decides to
             try:
                 automation = await service.create(db, body, created_by="agent")
+                await _add_triggers(db, automation, args.triggers or [], tz)
             except AppError as exc:
+                await db.rollback()
                 return ToolResult(content=exc.message, is_error=True)
+            events = await _trigger_words(db, automation)
             await db.commit()
             paused = (await service.protections(db)).paused
         await service.notify_changed()
         note = " Note: the user has paused all schedules, so it will not run yet." * paused
+        timing = _when(schedule, tz) if schedule.kind != "manual" else "no fixed times"
         return ToolResult(
-            content=f"Scheduled “{automation.name}” [{automation.id}]: {_when(schedule, tz)}. "
+            content=f"Scheduled “{automation.name}” [{automation.id}]: {timing}{events}. "
             f"Each run is a new chat; the user is notified {NOTIFY_WORDS[automation.notify]} "
             f"and can change or stop it under Automations.{note}",
             data={"automation": {"id": str(automation.id), "name": automation.name}},
@@ -479,6 +518,12 @@ class UpdateScheduleInput(SettingsIn):
     rrule: str | None = Field(None, max_length=500, description=RRULE)
     at: datetime | None = Field(None, description=AT)
     enabled: bool | None = Field(None, description="false: switch it off without deleting it")
+    triggers: list[TriggerSpec] | None = Field(
+        None,
+        max_length=10,
+        description="Replaces its event triggers as a whole ([] removes them). A webhook "
+        "stays as it is (its URL is set up elsewhere): delete_trigger removes it",
+    )
 
     @model_validator(mode="after")
     def _something(self) -> "UpdateScheduleInput":
@@ -496,7 +541,8 @@ class UpdateSchedule(Tool):
         "off is the reversible way to stop it. Anything other than renaming or switching "
         "off is confirmed by the user every time. It cannot pause all schedules at once "
         "(the user does that) or let a schedule reach other people without asking (only "
-        "the user can, on the Automations page)."
+        "the user can, on the Automations page). `triggers` replaces the events that start "
+        "it."
     )
     capability = MANAGE
     Input = UpdateScheduleInput
@@ -514,6 +560,9 @@ class UpdateSchedule(Tool):
             start = f"{args.at:%Y-%m-%d %H:%M}" if args.at else None
             parts.append("new times: " + " from ".join(filter(None, [args.rrule, start])))
         parts += _settings_words(args, creating=False)
+        if args.triggers is not None:
+            events = " / ".join(spec_words(t, wake=False) for t in args.triggers)
+            parts.append(f"runs on: {events}" if events else "no event triggers")
         if args.prompt:
             parts.append(f"new prompt: {_short(args.prompt, 400)}")
         return [
@@ -531,6 +580,17 @@ class UpdateSchedule(Tool):
             automation = await db.get(Automation, automation_id) if automation_id else None
             if automation is None:
                 return ToolResult(content=f"No schedule with id {args.id}.", is_error=True)
+            changed = args.model_fields_set - {"id"}
+            if automation.kind == "script" and not (
+                changed <= {"name", "enabled"} and args.enabled is not True
+            ):
+                # Its code, tools and switching it on go through the user's review
+                # (update_script, the Automations page), never an approval card.
+                return ToolResult(
+                    content="This is a script: change it with update_script. Only the user "
+                    "can switch a script on.",
+                    is_error=True,
+                )
             tz = await settings_service.user_timezone(db)
             changes: dict[str, object] = {
                 k: getattr(args, k)
@@ -552,6 +612,8 @@ class UpdateSchedule(Tool):
                 return ToolResult(content=str(exc), is_error=True)
             try:
                 await service.update(db, automation, AutomationPatch(**changes))  # type: ignore[arg-type]
+                if args.triggers is not None:
+                    await _replace_triggers(db, automation, args.triggers, tz)
             except AppError as exc:
                 await db.rollback()
                 return ToolResult(content=exc.message, is_error=True)
@@ -614,3 +676,51 @@ class DeleteSchedule(Tool):
 SCHEDULE_TOOLS: list[Tool] = [ListSchedules(), CreateSchedule(), UpdateSchedule(), DeleteSchedule()]
 # Not for a run that was itself started by a schedule: schedules don't make schedules.
 SCHEDULE_WRITE_TOOLS = {"create_schedule", "update_schedule", "delete_schedule"}
+
+
+async def _add_triggers(db: Any, automation: Automation, specs: list[TriggerSpec], tz: str) -> None:
+    """The automation's event triggers (part of the caller's change; AppError for a bad
+    one). A webhook's secret is never shown to the model: the user makes one on the
+    Automations page."""
+    for spec in specs:
+        expires = spec.expires_at
+        if expires is not None and expires.tzinfo is None:
+            expires = expires.replace(tzinfo=ZoneInfo(tz))
+        await trigger_service.create_for_automation(
+            db,
+            automation,
+            event_type=spec.event,
+            filter_=spec.filter,
+            once=bool(spec.once),
+            expires_at=expires,
+            debounce_s=spec.debounce_s,
+            max_per_hour=spec.max_per_hour,
+            note=spec.note,
+        )
+
+
+async def _replace_triggers(
+    db: Any, automation: Automation, specs: list[TriggerSpec], tz: str
+) -> None:
+    """Its event triggers become these (a webhook stays). Part of the caller's change."""
+    current = await db.scalars(select(Trigger).where(Trigger.automation_id == automation.id))
+    for trigger in list(current):
+        if trigger.event_type != trigger_service.WEBHOOK:
+            await trigger_service.remove(db, trigger)
+    kept = [s for s in specs if s.event != trigger_service.WEBHOOK]
+    await _add_triggers(db, automation, kept, tz)
+
+
+async def _trigger_words(db: Any, automation: Automation) -> str:
+    rows = list(await db.scalars(select(Trigger).where(Trigger.automation_id == automation.id)))
+    if not rows:
+        return ""
+    words = "; ".join(trigger_service.describe(t) for t in rows)
+    hook = next((t for t in rows if t.event_type == trigger_service.WEBHOOK), None)
+    url = (
+        f" (webhook URL {trigger_service.webhook_url(hook)}; the user gets its secret on "
+        "the Automations page with New secret)"
+        if hook
+        else ""
+    )
+    return f"; runs on {words}{url}"

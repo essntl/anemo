@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useSettings } from '@/features/settings/api'
 import { useModels, useProviders, useSetupStatus } from './api'
+import { ImageSettingsCard } from './components/ImageSettingsCard'
 import { ModelDefaultsCard } from './components/ModelDefaultsCard'
 import { ProviderCard } from './components/ProviderCard'
 import { ProviderDialog } from './components/ProviderDialog'
@@ -23,7 +24,7 @@ export function ProvidersPage() {
   const allModels = models.data ?? []
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-(--card-gap)">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">{t('Providers & Models')}</h2>
@@ -65,6 +66,10 @@ export function ProvidersPage() {
           initial={settings.data.models}
           models={allModels}
         />
+      )}
+
+      {settings.data && (
+        <ImageSettingsCard key={JSON.stringify(settings.data.images)} initial={settings.data.images} />
       )}
 
       <Lingering value={adding}>{() => <ProviderDialog open onOpenChange={setAdding} />}</Lingering>

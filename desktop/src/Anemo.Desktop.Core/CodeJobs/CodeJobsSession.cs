@@ -45,6 +45,7 @@ public sealed class CodeJobsSession
     private readonly DateTimeOffset _startedAt;
     private DateTimeOffset? _lastScan;
     private bool _anyAck;
+    private int _runningCount;
 
     public CodeJobsSession(
         string folder,
@@ -67,6 +68,12 @@ public sealed class CodeJobsSession
 
     /// <summary>The jobs this session follows (not settled), by id: for tests and the tray.</summary>
     public IReadOnlyCollection<string> Following => _jobs.Keys.ToList();
+
+    /// <summary>
+    /// How many of the jobs it follows are still running (not those that ended and wait for the
+    /// server's ack: offline, that could be forever); safe to read from any thread.
+    /// </summary>
+    public int RunningCount => Volatile.Read(ref _runningCount);
 
     /// <summary>A <c>code.ack</c> from the server; any thread.</summary>
     public void OnAck(string jobId, long seq)
@@ -185,6 +192,8 @@ public sealed class CodeJobsSession
         {
             Refresh(job);
         }
+
+        Volatile.Write(ref _runningCount, _jobs.Values.Count(j => j.State == JobStates.Running));
     }
 
     private IEnumerable<string> ListFolders()
@@ -211,7 +220,10 @@ public sealed class CodeJobsSession
         var cancelled = JobFolder.IsCancelled(job.Folder);
         var alive = JobState.IsAlive(job.Folder, job.Meta, _probe, _time.GetUtcNow());
         ScanForResult(job); // after the liveness check: a job that just ended is read to its end once more
+        // A job that takes messages (§15) writes a result per answer and goes on while its
+        // process lives: only its last result, once it has ended, says how it ended.
         var state = cancelled ? JobStates.Cancelled
+            : job.Meta.Input && alive ? JobStates.Running
             : job.ResultFailed is { } failed ? (failed ? JobStates.Failed : JobStates.Done)
             : alive ? JobStates.Running
             : JobStates.ExitedWithoutResult;
@@ -279,7 +291,8 @@ public sealed class CodeJobsSession
         var atEnd = job.Announced && !JsonlTail.HasLineAfter(job.OutPath, job.Position);
         var snapshot = Snapshot(job, atEnd);
         var changed = job.LastSent is not { } last
-            || last.State != snapshot.State || last.Branch != snapshot.Branch || last.Pid != snapshot.Pid;
+            || last.State != snapshot.State || last.Branch != snapshot.Branch || last.Pid != snapshot.Pid
+            || last.Input != snapshot.Input;
         var final = JobStates.IsTerminal(snapshot.State) && snapshot.State == job.State && atEnd;
         if (!job.Announced || changed || (final && !job.FinalSent))
         {
@@ -344,7 +357,8 @@ public sealed class CodeJobsSession
             state,
             terminal ? job.Ended : null,
             job.Branch,
-            terminal ? job.StderrTail : null);
+            terminal ? job.StderrTail : null,
+            !terminal && job.Meta.Input && JobFeeder.IsOpen(job.Folder));
     }
 
     /// <summary>The next events after the acked position: ≤ 200 items and ≤ 256 KB of UTF-8 in all.</summary>
@@ -396,7 +410,7 @@ public sealed class CodeJobsSession
         _store.Put(job.Id, job.Record);
         if (settled)
         {
-            _jobs.Remove(job.Id);
+            _jobs.Remove(job.Id); // ended, so it wasn't counted as running
             _ignored.Add(job.Id);
         }
         else if (sent.Final)

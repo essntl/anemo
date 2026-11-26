@@ -8,10 +8,11 @@
  * Phase 2 (§12): the computers, their projects, and starting, following up and
  * cancelling jobs.
  */
-import { useEffect, useRef } from 'react'
-import { type InfiniteData, type QueryClient, keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback, useEffect, useRef } from 'react'
+import { type InfiniteData, type QueryClient, keepPreviousData, useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError, api, errorMessage, type Schemas, unwrap } from '@/api/client'
 import { t } from '@/lib/i18n'
+import { type CodeImage, imageIds } from './codeImages'
 import type { CodeJob, CodeJobState } from './threads'
 import { type CodeEvent, contiguousSeq, mergeEvents } from './timeline'
 
@@ -101,6 +102,22 @@ function eventsQuery(qc: QueryClient, jobId: string) {
 }
 
 /**
+ * The events of several jobs (a thread's), by job id, as far as they are loaded. The
+ * same queries as `useCodeEvents`, so nothing is fetched twice: each job's part of the
+ * thread keeps its own events live, and this only reads them (for the sub-agent list).
+ */
+export function useThreadEvents(jobIds: readonly string[]): Record<string, CodeEvent[]> {
+  const qc = useQueryClient()
+  const key = jobIds.join(',')
+  // A stable `combine`: the result is a new object only when some job's events changed.
+  const combine = useCallback(
+    (results: { data?: CodeEvent[] }[]) => Object.fromEntries(key.split(',').map((id, i) => [id, results[i]?.data ?? []])),
+    [key],
+  )
+  return useQueries({ queries: jobIds.map((id) => eventsQuery(qc, id)), combine })
+}
+
+/**
  * A job's new row, everywhere it is shown: its thread (a follow-up joins the thread it
  * belongs to) and the list.
  */
@@ -111,6 +128,7 @@ export function putJob(qc: QueryClient, job: CodeJob): void {
     const joins = !inThread && old.thread.some((j) => j.thread_id === job.thread_id)
     if (!inThread && !joins && old.job.id !== job.id) return old
     return {
+      ...old,
       job: old.job.id === job.id ? job : old.job,
       thread: inThread ? old.thread.map((j) => (j.id === job.id ? job : j)) : joins ? [...old.thread, job] : old.thread,
     }
@@ -154,12 +172,27 @@ export function useCodeProjects(deviceId: string | null) {
   })
 }
 
+/** Not under `codeKey`: refreshed by its own app-wide notice (`code.usage`), not by every job's. */
+export const codeUsageKey = ['code-usage'] as const
+
+/** The latest known usage of each computer's Claude subscription (§14), kept while no job runs. */
+export function useCodeUsage() {
+  return useQuery({
+    queryKey: codeUsageKey,
+    // The reset times pass by themselves: look again now and then.
+    refetchInterval: 5 * 60_000,
+    queryFn: async () => unwrap(await api.GET('/api/code/usage')).usage,
+  })
+}
+
 export interface StartJobInput {
   device_id: string
   project: string
   prompt: string
   new: boolean
   model: CodeModel | null
+  /** Uploaded images to send with the prompt (codeImages.ts). */
+  image_ids?: string[]
 }
 
 /** Starts a job on a computer. The new job is a thread of its own, followed live like any running job. */
@@ -168,7 +201,7 @@ export function useStartJob() {
   return useMutation({
     mutationFn: async (body: StartJobInput) => unwrap(await api.POST('/api/code/jobs', { body })),
     onSuccess: (job) => {
-      qc.setQueryData<CodeJobDetail>(codeJobKey(job.id), { job, thread: [job] })
+      qc.setQueryData<CodeJobDetail>(codeJobKey(job.id), { job, thread: [job], messages: [] })
       void qc.invalidateQueries({ queryKey: codeJobsKey })
     },
     onError: (err) => refreshIfStarted(qc, err),
@@ -196,12 +229,16 @@ function refreshIfStarted(qc: QueryClient, err: unknown): void {
 }
 
 /**
- * Resumes the thread of `jobId` with a new prompt: the new job joins the thread, live.
- * (Also called outside a component: the queue sends a message when its job has ended.)
+ * Resumes the thread of `jobId` with a new prompt (and its images): the new job joins the
+ * thread, live. (Also called outside a component: the queue sends a message when its job
+ * has ended.)
  */
-export async function sendFollowUp(qc: QueryClient, jobId: string, prompt: string): Promise<CodeJob> {
+export async function sendFollowUp(qc: QueryClient, jobId: string, prompt: string, images: readonly CodeImage[] = []): Promise<CodeJob> {
   try {
-    const job = unwrap(await api.POST('/api/code/jobs/{job_id}/follow-up', { params: { path: { job_id: jobId } }, body: { prompt } }))
+    const job = unwrap(await api.POST('/api/code/jobs/{job_id}/follow-up', {
+      params: { path: { job_id: jobId } },
+      body: { prompt, ...imageIds(images) },
+    }))
     putJob(qc, job)
     void qc.invalidateQueries({ queryKey: codeKey })
     return job
@@ -213,7 +250,77 @@ export async function sendFollowUp(qc: QueryClient, jobId: string, prompt: strin
 
 export function useFollowUp(jobId: string) {
   const qc = useQueryClient()
-  return useMutation({ mutationFn: (prompt: string) => sendFollowUp(qc, jobId, prompt) })
+  return useMutation({
+    mutationFn: ({ prompt, images = [] }: { prompt: string; images?: readonly CodeImage[] }) => sendFollowUp(qc, jobId, prompt, images),
+  })
+}
+
+export type CodeMessage = Schemas['CodeMessageOut']
+
+/** Not delivered yet: what the thread shows over its box (and what a cancel would send as a follow-up). */
+export const isWaiting = (m: CodeMessage) => m.state === 'queued' || m.state === 'sending' || m.state === 'sent' || m.state === 'held'
+
+/** The thread's messages (§15), from the thread's query (which the app-wide notices keep fresh). */
+export function useThreadMessages(jobId: string): CodeMessage[] {
+  return useCodeJob(jobId).data?.messages ?? NO_MESSAGES
+}
+const NO_MESSAGES: CodeMessage[] = []
+
+/** A message changed: the thread (with its messages) and the lists load again. */
+const messagesChanged = (qc: QueryClient) => void qc.invalidateQueries({ queryKey: codeKey })
+
+/**
+ * A message for the thread of `jobId` (§15): handed to its running job, which takes it in
+ * at its next step (`now`: after interrupting the current one), or the next follow-up.
+ * (Also called outside a component: an older browser queue is moved to the server.)
+ */
+export async function sendMessage(qc: QueryClient, jobId: string, prompt: string, images: readonly CodeImage[] = [], now = false): Promise<CodeMessage> {
+  try {
+    return unwrap(await api.POST('/api/code/jobs/{job_id}/messages', {
+      params: { path: { job_id: jobId } },
+      body: { prompt, ...imageIds(images), ...(now ? { now: true } : {}) },
+    }))
+  } finally {
+    messagesChanged(qc)
+  }
+}
+
+export function useSendMessage(jobId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ prompt, images = [], now = false }: { prompt: string; images?: readonly CodeImage[]; now?: boolean }) =>
+      sendMessage(qc, jobId, prompt, images, now),
+  })
+}
+
+/** Removes a message that wasn't delivered (the job gives back one it holds); 409 once Claude Code took it in. */
+export function useRemoveMessage() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (messageId: string) =>
+      unwrap(await api.DELETE('/api/code/messages/{message_id}', { params: { path: { message_id: messageId } } })),
+    onSettled: () => messagesChanged(qc),
+  })
+}
+
+/** Sends a waiting (or held) message now: interrupting the job's step, or as a follow-up when the job has ended. */
+export function useSendMessageNow() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (messageId: string) =>
+      unwrap(await api.POST('/api/code/messages/{message_id}/now', { params: { path: { message_id: messageId } } })),
+    onSettled: () => messagesChanged(qc),
+  })
+}
+
+/** Auto continue for a job that stopped at the usage limit (§16): on schedules its continue, off cancels it. */
+export function useAutoContinue() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ jobId, enabled }: { jobId: string; enabled: boolean }) =>
+      unwrap(await api.PUT('/api/code/jobs/{job_id}/auto-continue', { params: { path: { job_id: jobId } }, body: { enabled } })),
+    onSuccess: (job) => putJob(qc, job),
+  })
 }
 
 /** Cancels a running job (one that has ended comes back as it is). */

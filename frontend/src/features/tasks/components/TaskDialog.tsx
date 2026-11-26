@@ -11,14 +11,16 @@ import { cn } from '@/lib/cn'
 import { plural, t } from '@/lib/i18n'
 import { RichEditor } from '@/features/documents/components/RichEditor'
 import { tidyMarkdown } from '@/features/documents/markdown'
-import { focusOnTask } from '@/features/focus/focusOnTask'
+import { useFocusOnTask } from '@/features/focus/focusOnTask'
 import { LinksPanel } from '@/features/links/LinksPanel'
+import { PluginPanels } from '@/features/plugins/slots'
 import { TaskAttachments } from '@/features/links/TaskAttachments'
 import { droppedLabels } from '@/features/links/linkTypes'
 import { propertiesFor, propertyChanges, useProperties, valuesFor } from '@/features/properties/api'
 import { PropertyChips } from '@/features/properties/PropertyChips'
 import { type Synced } from '@/features/provenance/labels'
 import { ActorLine, SourceBadge, SourceDetails } from '@/features/provenance/Provenance'
+import { HistoryLink } from '@/features/activity/HistoryLink'
 import {
   PRIORITY_LABELS,
   STATUS_LABELS,
@@ -69,6 +71,7 @@ const withoutTags = (values: Record<string, unknown> | undefined) =>
 
 export function TaskDialog({ task, defaults, onClose, onOpenTask, panel }: TaskDialogProps) {
   const projects = useProjects()
+  const focusOnTask = useFocusOnTask()
   const all = useTasks().data ?? []
   const create = useCreateTask()
   const update = useUpdateTask()
@@ -254,11 +257,13 @@ export function TaskDialog({ task, defaults, onClose, onOpenTask, panel }: TaskD
           <BlockedByEditor task={task} all={all} blockedBy={blockedBy} onChange={setBlockedBy} onOpen={openTask} />
           <TaskAttachments taskId={task?.id ?? null} projectId={projectId || null} />
           {task && <LinksPanel type="task" id={task.id} editable onOpen={openLink} />}
+          {task && <PluginPanels type="task" id={task.id} revision={task.updated_at} />}
           {task && (
             <SourceDetails item={synced} detaching={detach.isPending}
               onDetach={() => detach.mutate(task.id, { onSuccess: (detached) => setSynced(detached) })} />
           )}
           {task && <ActorLine created={task.created_by_actor} updated={task.updated_by_actor} />}
+          {task && <HistoryLink type="task" id={task.id} className="self-start" />}
           {task && status !== 'done' && status !== 'cancelled' && (
             <Button variant="secondary" icon={<Timer className="h-4 w-4" />} onClick={() => focusOnTask(task)}>
               {t('Focus on this')}

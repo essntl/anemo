@@ -10,6 +10,7 @@ adapter), and searching inside workspace files that are not documents.
 - [Chat vs. Agent mode](#chat-vs-agent-mode)
 - [Projects and organising chats](#projects-and-organising-chats)
 - [Files in chats](#files-in-chats)
+- [Image generation](#image-generation)
 - [Share links](#share-links)
 - [Profiles, skills, plans and runs](#profiles-skills-plans-and-runs)
 - [Skills as slash commands](#skills-as-slash-commands)
@@ -17,11 +18,13 @@ adapter), and searching inside workspace files that are not documents.
 - [Sub-agents](#sub-agents)
 - [Documents](#documents)
 - [Tasks and calendar](#tasks-and-calendar)
+- [Appearance and profile](#appearance-and-profile)
 - [Home](#home)
 - [Focus](#focus)
 - [Music](#music)
 - [Dynamic Island](#dynamic-island)
 - [Stats](#stats)
+- [Activity](#activity)
 - [Notifications](#notifications)
 - [Automations](#automations)
 - [MCP servers](#mcp-servers)
@@ -37,7 +40,7 @@ adapter), and searching inside workspace files that are not documents.
 - [On your phone](#on-your-phone)
 - [Browser extension](#browser-extension)
 - [Voice from your phone](#voice-from-your-phone)
-- [Devices: your Windows computers](#devices-your-windows-computers)
+- [Devices: your computers (Windows and macOS)](#devices-your-computers-windows-and-macos)
 
 ## Chat vs. Agent mode
 
@@ -144,6 +147,53 @@ them over with `attach_file`: they appear as downloads under its answer (up to 1
 each, 20 per answer). An attached file is a copy of the workspace file as it was then.
 Each version of a regenerated answer keeps its own files, and a branched chat gets a
 copy of them.
+
+## Image generation
+
+Ask for a picture ("draw a lighthouse at dusk, as a watercolour") in Chat or Agent mode
+and the assistant calls the `generate_image` tool. Any chat model can do this, because
+it is ordinary tool calling: the picture itself is made by the **image model** you
+choose, through its provider's API. The pictures appear under the answer (click one for
+the full size; each has a download button and an **Open in Files** link), and in Agent
+mode the activity list shows the call with its pictures and paths.
+
+- **Where they go**: `files/generated/<date>/<words-from-the-prompt>.png`, or
+  `projects/<project>/generated/<date>/…` in a project's chat; the assistant can also be
+  told a folder or a file name. A name that is taken gets `-2`, `-3`, …. Next to each
+  picture is a `<picture>.json` file with the prompt, the model, the size, the time and
+  the chat it came from.
+- **Changing a picture**: the assistant passes a saved picture back as an input image
+  ("make the sky darker"). OpenAI and OpenRouter image models can do this; Google's
+  OpenAI-compatible endpoint cannot (the tool says so).
+- **Options the assistant can choose**: shape (1:1, 4:3, 3:2, 16:9 and their portrait
+  versions), how many (up to the limit below), quality (low, medium, high) and resolution
+  (1K, 2K, 4K where the provider has a choice), and another configured image model if you
+  ask for one by name.
+
+**Setting it up** (Settings → Providers & Models):
+
+1. A provider with image models: **OpenAI** (`gpt-image-1.5`, `gpt-image-2`; `gpt-image-1`
+   was shut down in October 2026), **OpenRouter** (its image models, e.g.
+   `google/gemini-2.5-flash-image`; *Discover* lists them), **Google Gemini** (new provider
+   type with a Google AI Studio key: `gemini-2.5-flash-image`,
+   `gemini-3-pro-image-preview`; it also gives you Gemini chat models), or an
+   OpenAI-compatible server with `/images/generations`. Image models are recognised by
+   name and marked **Image generation**; the switch is in each model's capabilities.
+2. **Default models → Image generation**: the model to use. It never falls back to the
+   chat model; without one, the assistant tells you to set it.
+3. The **Image generation** card: pictures per request (default 4, at most 10), the largest
+   resolution (default 2K), and whether automations ask first (default on). Changing it
+   asks for your password again, like the permissions.
+
+**Cost and permission**: every picture costs money at the provider, and each call is in
+Usage (the provider's own cost for OpenRouter, an estimate from the model's prices for
+OpenAI). The permission **Generate images** (Settings → Agent Permissions) is *Fully
+autonomous* by default, so a chat makes pictures without asking; *Always ask* makes the
+agent ask each time (in Chat mode, which cannot ask, the tool is then not offered), and
+*Never* takes the tool away. Automations ask before each picture unless you switch that
+off. A provider's refusal (content policy), a wrong key or no credit comes back as a
+message in the chat, not an error page. The design is in
+[specs/10-image-generation.md](specs/10-image-generation.md).
 
 ## Share links
 
@@ -394,6 +444,50 @@ subtasks and what a task waits on. Changes follow the
 *Manage tasks* and *Manage calendar* permissions; deleting counts as a risky
 action, so the default level asks you first.
 
+**Many at once.** An agent can change up to 100 tasks or events in one step ("move
+everything tagged *errands* to Friday", "finish these twelve", "cancel my standups next
+week"): their status, due date, project, tags or priority, an event's time, title or
+location, or moving them to the trash. When the change needs your approval you are asked
+once for the whole batch: the card says what it does ("Change 30 tasks: due → Fri
+2026-11-27") and **Show all 30 items** lists each one by title with what changes on it.
+Each item is changed on its own, with the same rules as a single change, and the agent is
+told which ones worked and which didn't (a task that's gone, an event that would end
+before it starts); one failing doesn't stop the others. The batch shows up in the
+activity log as one entry. See [spec 20](specs/20-bulk-changes.md).
+
+## Appearance and profile
+
+**Settings → Appearance** changes the look of the whole app at once, and the change is
+saved on the server, so it follows you to every device (or tick *Use a different
+appearance on this device* to keep one browser to itself):
+
+- **Theme** (light, dark, system), **accent color** (presets, a color picker or a hex
+  code; hover shades and the text on it are worked out from it) and an optional
+  **background tint** with a strength slider. When a choice makes text or buttons
+  hard to read, the page says so, with the WCAG contrast ratio.
+- **Fonts** for the interface and for code: the default, fonts that come with Anemo
+  (Inter, IBM Plex Sans, Nunito, Source Serif 4, JetBrains Mono, Fira Code, IBM Plex
+  Mono), system fonts, or a font file you upload (WOFF2, WOFF, TTF, OTF, up to 4 MB).
+  Nothing is loaded from Google Fonts or any other site.
+- **Background** behind the whole app: an animated gradient, or a picture (PNG, JPEG,
+  WebP, AVIF, GIF, up to 15 MB) or video (WebM, MP4, up to 40 MB), with blur, dim and
+  fit (fill, fit, tile). Photos lose their EXIF data (location, camera) when they are
+  saved. Anything that moves shows a still frame when your system asks for reduced
+  motion, and on phones unless you turn on *Animate on phones too*; it pauses while the
+  tab is hidden. Videos are muted and have no controls.
+- **Frosted glass**: the sidebar, cards, dialogs and the message box turn translucent
+  over the background. It stays solid when your system asks for less transparency or
+  the browser can't blur.
+- **Export / Import** the appearance as a small JSON file (uploads are referred to,
+  not included).
+
+**Settings → Profile** sets your **display name** and **avatar** (crop it to a square;
+the server makes small copies of it). They show in the sidebar, next to your messages
+in chats and next to your prompts on the Code page; without an avatar, your initials.
+
+These work in the browser and the installed app (PWA). The Android voice app and the
+Windows desktop client are native apps and look as they always do.
+
 ## Home
 
 **Home** is a page of widgets: the focus timer, the music player, today (what is due
@@ -467,6 +561,23 @@ the timer and music*, asks first). With no Anemo tab open anywhere they say so. 
 ready-made **Daily summary** automation (Automations → *Start from a template*)
 sums up your focus and tasks each evening; it does nothing until you save it.
 
+## Activity
+
+**Activity** lists what was changed, by whom, newest first: tasks, calendar events,
+documents, workspace files and projects, changed by you, the assistant in a chat, an
+automation, a script, a plugin or a run an event started. Each entry names the item (with
+a link while it exists), what changed (the fields) and when; a batch, such as one tool call
+that moved twelve tasks, is one row that opens. Filter by who, by kind of item and by time;
+**History** in a task, an event or a document's details opens the page for that item only.
+
+**Undo** puts a change back where it can: a task's, event's or project's fields return to
+what they were, a deleted task or event comes back from the trash, something created goes
+to the trash, a document gets its earlier text back from its revisions, a moved document or
+file goes back, an agent's file change is reverted. If the item was changed since, Anemo
+says what differs and asks before overwriting it. *Undo all* does a whole batch. Undo is
+yours only: agents have no tool for it. Entries are kept for 90 days. Details:
+[spec 19](specs/19-activity-log.md).
+
 ## Notifications
 
 Reminders, the results of automations and messages from agents are listed under
@@ -519,6 +630,51 @@ between its runs, so "tell me when this page changes" works. Failed runs can be
 retried. If the app was off when a run was due, that run is skipped rather than
 caught up later, and a run still going when the next one is due is not stacked.
 
+### Triggers
+
+An automation can also run **when something happens**, besides or instead of its
+schedule ("Only on events"): a task is created, changed, completed or deleted; a
+calendar event or a document is created, changed or deleted; a Claude Code job starts or
+ends; a computer or phone comes online or goes offline; a new file arrives in the
+workspace; an automation fails; a run waits for your approval; or another service calls
+the automation's **webhook** (a secret URL whose requests are signed). On the
+automation's card, **Add a trigger** picks the event and, optionally, which ones (a
+project, a tag, one job…), how long a burst is gathered into one run, how many runs an
+hour at most, once only, and until when. The run gets the event as data, never as
+instructions, and the run log says which event started each run. Every rail of a
+scheduled run applies: its tools, notifications, model, limits, state note, approvals,
+and never two runs at once (events that come while it runs start one more run after
+it). An automation's own changes never start it again, chains of triggers stop after
+three steps, and **Pause all** stops triggers too.
+
+In a chat, the assistant can be asked to **wake you when something happens** ("tell me
+when this Claude Code job is done"): when it does, the chat goes on by itself, with a
+card that shows the event (not as your message). Such a wait ends after one firing and
+after 24 hours unless the assistant asked for longer (at most 30 days); the Automations
+page lists the chats that wait, and **Stop waiting** cancels one. The assistant can
+propose an automation with its triggers in one step, which you confirm as you confirm a
+schedule.
+
+### Scripts
+
+The **Scripts** tab holds automations that run code instead of asking a model: cheap,
+the same every time, and mostly written by the assistant ("every morning, turn new
+bookings into tasks"). A script is an automation like the others: the same schedules
+(or "Only when started"), Run now, run log, notifications, retries, limits and "Pause
+all". Its TypeScript runs in a sandbox (Deno) without network or files, and acts only
+through Anemo's tools (`anemo.call("create_task", …)`, `anemo.tasks.create(…)`, an MCP
+server's tools), with your permissions and approvals, and only the tools, hosts and
+secrets its code declares. When it needs judgement it asks a model with
+`anemo.think(prompt, data)`; the data is handed over as data, never as instructions.
+
+Code an assistant writes or changes is saved **switched off**. The card says who wrote
+it (a link to the chat) and that a change waits for review; **Review change** shows the
+diff of the code and of what it may use, and only you can approve it (with your
+password) and switch it on. Only the approved version, exactly as you saw it, ever
+runs. What a script does shows in its run's timeline and change list, and what it
+creates is marked as made by "the script X". Secrets are set on the card, never shown
+again, and filled in only in request headers to the script's declared hosts.
+
 ## MCP servers
 
 MCP servers give agents extra tools (GitHub, a database, your smart home, …).
@@ -543,6 +699,63 @@ you have looked at it, and runs already in progress do not get the changed tool.
 Only add servers you trust: a server sees what agents send to its tools, and its
 answers can try to steer the agent.
 
+**MCP triggers.** An automation (or a chat that asked to be woken) can run when a
+connected server sends a notification: a resource changed (`notifications/resources/updated`,
+for the resource URI you name), its list of tools, prompts or resources changed, or (older
+servers) a log message. Add one on the Automations page with **Add a trigger** → *MCP server
+notification*: pick the server, the kind of notification and the resource URI (exact). While
+such a trigger is on, the worker keeps one connection open to that server (local ones through
+the MCP host), subscribes to the resources the triggers name, and reconnects when it drops.
+Bursts are coalesced (repeats within 5 seconds are one event, and a new trigger waits 30
+seconds for more by default), and a server that sends more than 120 notifications a minute is
+not listened to for 15 minutes; its triggers say why. What a server sends reaches the run as
+data, like its tool results.
+
+## Plugins
+
+Plugins extend Anemo: a panel on tasks, documents or events, a page of its own in the
+sidebar, a way to draw a kind of block in chat answers, commands in Ctrl+K, and ready-made
+things Anemo already has (properties, saved views, templates, automations, scripts, MCP
+servers, agent profiles, skills, themes). Manage them in **Settings → Plugins** (a shield
+section: installing and approving ask for your password again).
+
+- **Install** from a `.zip`, a public Git repository (https), or one of the examples
+  shipped with Anemo (*Word count*, *Today board*, *Weekly review*). An assistant can also
+  build one for you in a chat (below).
+- **Nothing runs until you approve it.** A new plugin waits for review. The review
+  lists what it may do, grouped by risk (read-only; writes your data; network,
+  notifications and tools; devices and shell, which ask every time) and what it adds.
+  Approving needs your password and grants those permissions to the plugin.
+- **Updates.** An update you install yourself that asks for nothing the plugin wasn't
+  already allowed (and adds or changes no MCP server) applies at once. One that asks for
+  more waits for review, with the differences in permissions, manifest and every file,
+  while the version you approved before keeps running. Changes an assistant makes always
+  wait for review.
+- **Its page** (click a card: it grows into the page) shows the readme, permissions,
+  contributions, versions, where it came from (the zip, the Git address and commit, or
+  the chat that built it), what it stores, and its own settings if it has any. Switch it
+  off, approve or reject an update, or uninstall it there; uninstalling asks whether to
+  keep what it made (its properties, views, automations, documents…) or remove it (things
+  it wrote go to the trash).
+- **Turn off all plugins**, at the top of the section, stops every plugin at once
+  without changing each one's own switch.
+- **Building with the assistant.** In Agent mode the assistant has plugin tools (an
+  authoring guide, create, change, validate, preview). What it builds lands switched off
+  and waiting for your review, marked *Made by the assistant* with a link to the chat; it
+  can never approve or switch on a plugin. *Continue building with the assistant* on the
+  plugin's page opens a chat linked to it. *Preview* tries a version before you approve
+  it: it can read what it asks to read, and everything else asks you first.
+
+What a plugin draws runs in a sealed frame: it can't see your login, can't reach any
+server, and asks Anemo for everything through a short list of methods, each checked
+against what you approved. What it writes is marked as made by "the plugin X". How a
+plugin is written: `docs/specs/CONTRACTS-plugins.md` and the authoring guide
+(`backend/app/features/plugins/guide.md`).
+
+A plugin acts on its own permissions wherever it runs, its scripts included: your agent
+permission levels are about what models may do, not plugins. Plugins work on a plain
+`localhost` install; they need no extra domain.
+
 ## Search
 
 Press **Ctrl+K** (⌘K on a Mac) anywhere, or the search button next to *New chat*,
@@ -556,6 +769,17 @@ resume the timer*, *Play or pause music*, *Next track*, *Paste a music link…*,
 type has to match. On that page documents and memories are also found by meaning
 when an embedding model is set (Settings → Providers & Models); the quick box
 matches words only, so typing never calls a model.
+
+**Chat recall.** In Agent mode the assistant can search your earlier chats and read
+them ("what did we decide about the website last week?"): it finds them by their
+words and titles, and by meaning when an embedding model is set, then reads the one it
+needs from the matching message on. In a project chat it looks at that project's chats
+unless the request needs more; it never sees the chat it is in or temporary chats, and
+archived chats are found too. What it reads is treated as data, not instructions.
+Settings → Agent Permissions → *Read earlier chats* (default: allowed); automations only
+get it when their tool list names `search_chats` or `read_chat`. With an embedding
+model, the text of your chats is sent to it for this, as documents and memories are
+(docs/specs/18-chat-recall.md).
 
 ## Keyboard shortcuts
 
@@ -761,6 +985,22 @@ agent request. When the run finishes, the phone reads the answer out.
   nothing starts.
 - **Follow-ups.** A request within 5 minutes of an answer continues that chat, so "and
   move it to Friday" knows what "it" is.
+- **A cue you can trust.** The moment the wake word is heard, music gets quiet, a short
+  rising sound plays and the phone buzzes; no cue means it wasn't heard. The request may
+  follow the wake word in one breath. A falling sound means the request was taken; a low
+  double sound means the wake word was heard but nothing after it. The sounds follow the
+  phone's system (ring) volume, not the media volume; "Vibrate with the sounds" is on by
+  default, so a phone on silent still buzzes.
+- **Voice mode** (a conversation without the wake word): turn it on with the **Voice
+  mode** quick-settings tile, the notification's **Voice mode** button, or by saying
+  **"start voice mode"** (also right after the wake word; it can be switched off in the
+  app). After each answer the phone plays the start sound and listens again, in the same
+  chat. It ends with the tile or the notification, by saying **"stop"** or **"end voice
+  mode"** on its own, when nobody speaks for 45 seconds (30 to 90 in the app), or when the
+  agent decides the conversation is over (the `voice_stop` tool, permission **Voice
+  mode**, allowed by default). The commands are recognised by the phone on what you said,
+  never by a model, and nothing the agent writes can turn voice mode on. Each on and off
+  is in **Settings → Audit log**, with its cause.
 - **What is spoken.** The final answer without Markdown, cut at a sentence end near 600
   characters, then "The rest is in the chat." A failed or stopped run says so in one
   sentence. The phone speaks with Android's own text-to-speech: the engine chosen in
@@ -793,16 +1033,21 @@ part of the app: it downloads them from openWakeWord's own release when you choo
 word. A wake word model you train yourself has no such limit. A spoken yes or no is
 recognised in English, Ukrainian and Russian; in another language it counts as unclear
 and the notification decides. Design:
-[docs/specs/05-voice-android.md](specs/05-voice-android.md).
+[docs/specs/05-voice-android.md](specs/05-voice-android.md) and, for the cue and voice
+mode, [docs/specs/07-voice-mode-android.md](specs/07-voice-mode-android.md).
 
-## Devices: your Windows computers
+<a id="devices-your-windows-computers"></a>
 
-**Anemo Desktop** is a small tray program for Windows 10 and 11 that lets the agent see
-and use a computer: take a screenshot, read the window in front, click, type, press keys,
-open programs and, where you allow it, run PowerShell. Put it on the agent's own VM, your
-main PC or your laptop; each one is a **device** with its own name, token and trust
-level. It only connects out to Anemo (one WebSocket, through the address the web app
-uses); no port is opened on the computer.
+## Devices: your computers (Windows and macOS)
+
+**Anemo Desktop** is a small tray program for Windows 10 and 11, and a menu bar app for
+macOS 14 or later (Apple Silicon), that lets the agent see and use a computer: take a
+screenshot, read the window in front, click, type, press keys, open programs and, where
+you allow it, run commands in its shell (PowerShell on Windows, zsh on a Mac). Put it on
+the agent's own VM, your main PC or your laptop; each one is a **device** with its own
+name, token and trust level. It only connects out to Anemo (one WebSocket, through the
+address the web app uses); no port is opened on the computer. The client tells Anemo
+which system and shell it has, and the agent sees it in its turn context.
 
 **Settings → Devices** lists your computers and phones, whether they are connected now,
 the client's version and, for a computer, whether *Allow control* is on. **Add a
@@ -815,7 +1060,7 @@ within a minute.)
 
 **Trust levels**, per computer:
 
-| Level | Looking (screenshot, window text) | Acting (click, type, keys, open) | PowerShell |
+| Level | Looking (screenshot, window text) | Acting (click, type, keys, open) | Shell (PowerShell, zsh) |
 |---|---|---|---|
 | **Watched** (the default; your own PC and laptop) | as the permission says | asked every time | not offered |
 | **Trusted** (the agent's own VM) | as the permission says | as the permission says | as the permission says |
@@ -833,14 +1078,22 @@ the agent sees which ones are, with their trust level, in its turn context.
 | Tool | Does |
 |---|---|
 | `computer_look` | A screenshot of the screen or of one window, and the window's controls as a numbered list (role, name, value); or the list of open windows |
-| `computer_act` | One action: click, double or right click (a control or a point), type, press keys, scroll, bring a window to the front, open a program by its Start menu name or a web address, put text on the clipboard. It answers with the new state |
-| `computer_shell` | One PowerShell command on a trusted computer with PowerShell switched on in the client, with a timeout (60 s by default, at most 10 minutes) |
+| `computer_act` | One action: click, double or right click (a control or a point), type, press keys (Cmd on a Mac), scroll, bring a window to the front, open a program by its Start menu name (on a Mac: its name in Applications) or a web address, put text on the clipboard. It answers with the new state |
+| `computer_shell` | One command in the computer's shell (PowerShell on Windows, zsh or bash on a Mac) on a trusted computer with the shell switched on in the client, with a timeout (60 s by default, at most 10 minutes) |
 | `computer_shared_screen` | What you shared last with *Share this screen with Anemo* |
+
+On a trusted computer that shares its Claude Code jobs, the agent starts and follows jobs
+with the `code_*` tools instead (`code_start`, `code_status`, `code_cancel`; the jobs are on
+the Code page). `code_status` with `wait_s` (up to 5 minutes) waits until the job ends and
+then answers, so the agent doesn't keep asking; stopping the run ends the wait at once
+([spec 21](specs/21-code-wait.md)).
 
 PowerShell commands are rated like shell commands: one that deletes, formats, changes
 users, services, the firewall or the registry, or downloads and runs something, is
-dangerous; one that uses the network counts as reaching people. Each action's
-screenshot is kept in the run's timeline.
+dangerous; one that uses the network counts as reaching people. A Mac's zsh commands are
+rated by the rules of the shell tool, plus macOS's own (AppleScript, `defaults write`,
+`launchctl`, erasing disks, the Keychain, users, system settings: dangerous). Each
+action's screenshot is kept in the run's timeline.
 
 **On the computer.** The tray icon is grey while not connected and red while the agent
 is acting, and a small border in the corner says "Anemo is using this computer" with a
@@ -859,13 +1112,76 @@ terminal from the Start menu or with Win+R and type into it, as an ordinary acti
 (asked every time on a watched computer, decided by *Use your computers* on a trusted
 one). The hard boundaries are a watched computer, *Allow control* off and Stop.
 
+**On a Mac** the client lives in the menu bar (the same menu as the Windows tray icon) and
+needs two permissions that only you can give, in System Settings → Privacy & Security:
+*Screen Recording* for screenshots and *Accessibility* for reading controls and acting. A
+**Permissions** window explains both and opens the right page; without them the agent is
+told to ask you. The client never acts on System Settings or on a password or permission
+prompt, and treats a field as a password field whenever macOS's secure keyboard entry is
+on. Stop is Ctrl+Option+Shift+S. The token is kept in the Keychain. Builds that aren't
+signed by a developer lose both permissions at every update (allow them again).
+
 **Share this screen** (tray menu or Ctrl+Alt+Shift+A) sends a screenshot and the text of
 the window in front once, like *Share this tab* in the browser extension. The agent reads
 it with `computer_shared_screen`; it is forgotten after 12 hours or when you stop
 sharing, and the API never returns its content.
 
+**Files between a computer and the workspace** (Anemo Desktop 1.7.0). With *Let Anemo read
+and write files* switched on in the client (off by default) on a **trusted** computer, the
+agent copies a file from it into the workspace (`device_file_get`) or a workspace file onto it
+(`device_file_put`); the computer's line in the turn context then says *files on*. Only the
+folders the client allows: your home folder, or the folders you list in its Settings, never
+hidden folders (`.ssh`, `.config`, …), `AppData` or `~/Library`, or the client's own folder.
+The permission is *Files on your computers* (asks by default); replacing a file that is
+already on the computer only happens when the agent asks for it, and counts as dangerous.
+A file copied into the workspace is in the run's file changes and can be reverted, and
+never replaces a workspace file unless asked. Each chunk and the whole file are checked by
+SHA-256 on both ends, and a copy onto the computer only gets its name once it is complete.
+The largest file is set in **Settings → Devices** (50 MB by default, up to 200 MB). Stop
+stops copies too. Design: [docs/specs/22-device-files.md](specs/22-device-files.md).
+
+**Anemo Desktop updates itself** (1.8.0, Windows and macOS). A minute after it starts and every
+6 hours, the client looks for a newer `desktop-v…` Release on GitHub (no Anemo server involved),
+downloads it, checks it (the SHA-256 from the release's checksum file, the release signature once
+the repository has a signing key, the exe's version and a test start on Windows, the code
+signature on the Mac) and installs it when you quit. The tray or menu bar then shows **Update to
+X ready: Restart to update**, which restarts as soon as the agent is done (no command in the last
+minute, no file copy, no Claude Code job running). In the client's Settings, *Update
+automatically* (on by default) turns it off and **Check now** looks at once. If the new version
+doesn't come up, the old one is put back and started again. An ad hoc signed Mac build has to be
+given Screen Recording and Accessibility again after each update. Design:
+[docs/specs/23-desktop-auto-update.md](specs/23-desktop-auto-update.md).
+
 Automations get the computer tools only when the automation lists them. What a screen
 shows is untrusted content for the model, like a web page. Installing the client:
 [deployment.md](deployment.md#anemo-desktop-and-anemo-voice). Design:
-[docs/specs/06-desktop-client.md](specs/06-desktop-client.md); the protocol both apps
-use: [docs/device-contracts.md](device-contracts.md).
+[docs/specs/06-desktop-client.md](specs/06-desktop-client.md) and, for macOS,
+[docs/specs/09-desktop-macos.md](specs/09-desktop-macos.md); the protocol the apps use:
+[docs/device-contracts.md](device-contracts.md).
+
+## Claude Code jobs (the Code page)
+
+A trusted computer with *Share Claude Code jobs with Anemo* on in Anemo Desktop shows the
+Claude Code jobs that run on it on the **Code** page, live: every tool call, the todo list,
+sub-agents, the result, turns, duration, tokens and API-equivalent cost, the branch and
+pull request ([spec](specs/code-sessions.md)). With *Let Anemo start Claude Code jobs* on,
+you start jobs there (in a local project or one cloned from GitHub), follow them up in the
+same session, cancel them, and the agent does the same with the `code_*` tools.
+
+- **Usage**: the top of the list and each thread's header show how much of your Claude
+  subscription's **5-hour and weekly limits** the computer's jobs have used, and when each
+  resets, as of the latest job (it stays when no job runs). The usage events themselves
+  are no longer steps in the job's timeline.
+- **Messages while a job runs**: write in the box while the job works and Claude Code
+  takes the message in **at its next step** (after the command it is running), in the same
+  session; **Send now** stops the current step and sends it at once. Waiting messages can
+  be sent now, edited or removed until Claude Code takes them in; the timeline shows where
+  each was delivered. A job that can't take messages (started by `cc.ps1`, an older
+  Anemo Desktop or a Mac) gets them as its next follow-up when it ends, sent by the
+  server, also with no browser open. Needs Anemo Desktop 1.9.0 on Windows.
+- **Auto continue after the usage limit**: a job that stopped at the limit shows *Limit
+  reached* with the reset time and an **Auto continue** switch: on, the job resumes its
+  session with "Continue where you left off." a few minutes after the reset (when the
+  computer is back, if it was away), at most three times in a row. A message or a
+  follow-up of your own, a cancel or turning it off cancels it. The default is in
+  Settings → Devices (*Auto continue Claude Code jobs*).

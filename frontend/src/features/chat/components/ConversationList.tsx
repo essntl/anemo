@@ -39,7 +39,7 @@ function QuickDelete({ conv }: { conv: Conversation }) {
           (err: unknown) => toast({ message: errorMessage(err) }),
         )
       }
-      className="absolute right-0 top-0 flex h-9 w-9 items-center justify-center rounded-control text-error opacity-0 hover:bg-error/12 focus:opacity-100 group-hover/list:opacity-100 disabled:opacity-40 pointer-coarse:h-11 pointer-coarse:w-11">
+      className="absolute right-0 top-0 flex h-[calc(var(--nav-row-h)+0.25rem)] w-9 items-center justify-center rounded-control text-error opacity-0 hover:bg-error/12 focus:opacity-100 group-hover/list:opacity-100 disabled:opacity-40 pointer-coarse:h-11 pointer-coarse:w-11">
       <Trash2 className="h-4 w-4" />
     </button>
   )
@@ -59,7 +59,7 @@ function Item({ conv, quickDelete }: { conv: Conversation; quickDelete: boolean 
         to={`/c/${conv.id}`}
         className={({ isActive }) =>
           cn(
-            'flex h-9 items-center gap-2 rounded-control pl-3 pr-9 text-[13px] pointer-coarse:h-11 pointer-coarse:pr-11 pointer-coarse:text-[15px]',
+            'flex h-[calc(var(--nav-row-h)+0.25rem)] items-center gap-2 rounded-control pl-3 pr-9 text-[13px] pointer-coarse:h-11 pointer-coarse:pr-11 pointer-coarse:text-[15px]',
             isActive ? 'bg-accent-soft font-medium text-text' : 'text-muted hover:bg-surface-hover hover:text-text',
           )
         }
@@ -73,7 +73,7 @@ function Item({ conv, quickDelete }: { conv: Conversation; quickDelete: boolean 
       ) : (
         // Hover (or keyboard focus) reveals the menu; touch screens always show it.
         <ActionMenu actions={actions} label={t('Actions for {title}', { title: conv.title })}
-          className="absolute right-0 top-0 h-9 w-9 opacity-0 focus:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100 pointer-coarse:h-11 pointer-coarse:w-11 pointer-coarse:opacity-100" />
+          className="absolute right-0 top-0 h-[calc(var(--nav-row-h)+0.25rem)] w-9 opacity-0 focus:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100 pointer-coarse:h-11 pointer-coarse:w-11 pointer-coarse:opacity-100" />
       )}
     </div>
   )
@@ -118,7 +118,7 @@ export function ConversationList() {
       <div aria-label={t('Chats')} className="group/list min-h-0 flex-1 overflow-y-auto">
         {groups.map((group) => (
           <section key={group.label}>
-            <div className="sticky top-0 z-10 flex h-7 items-center gap-1 bg-surface px-3 text-[11px] font-semibold uppercase tracking-wider text-text/75">
+            <div className="glass-sticky sticky top-0 z-10 flex h-7 items-center gap-1 bg-surface px-3 text-[11px] font-semibold uppercase tracking-wider text-text/75">
               {group.kind === 'favorites' && <Star className="h-3 w-3" />}
               {group.kind === 'temporary' && <Timer className="h-3 w-3 text-accent" />} {group.label}
             </div>

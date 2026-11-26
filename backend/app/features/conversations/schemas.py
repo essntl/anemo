@@ -60,6 +60,8 @@ class AttachmentSummary(BaseModel):
     kind: str
     mime: str
     size: int
+    # The workspace file an answer's attachment is a copy of (generate_image), if any.
+    path: str | None = None
 
 
 class ReferenceSummary(BaseModel):
@@ -128,6 +130,17 @@ class PageSummary(BaseModel):
     truncated: bool
 
 
+class EventSummary(BaseModel):
+    """The event a "wake me" trigger brought into the chat (features/triggers): the
+    message is the system's, not the user's, and is shown as an event card."""
+
+    event_type: str
+    summary: str
+    at: datetime
+    coalesced: int = 1
+    trigger_id: uuid.UUID | None = None
+
+
 class PageContentOut(PageSummary):
     content: str
 
@@ -146,6 +159,7 @@ class MessageOut(BaseModel):
     attachments: list[AttachmentSummary] = []
     references: list[ReferenceSummary] = []
     page: PageSummary | None = None  # a web page attached by the browser extension
+    event: EventSummary | None = None  # a turn an event trigger added (not the user's words)
     skill: SkillSummary | None = None  # user messages started with a /skill
     mode: str | None = None  # "chat" or "agent" for assistant messages
     questions: list[QuestionMark] = []

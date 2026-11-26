@@ -1,12 +1,23 @@
 # Publishes the native clients to GitHub Releases:
-#   desktop-v<version>  Anemo Desktop: single-file, self-contained exes for win-x64 and win-arm64
+#   desktop-v<version>  Anemo Desktop: single-file, self-contained exes for win-x64 and win-arm64,
+#                       and the macOS app (Apple Silicon) as a zip
 #   voice-v<version>    Anemo Voice: the APK, signed with the release key (repository secrets)
 # The server's Docker images use v<version> tags (images.yml); these prefixes keep them apart.
 # A tag must match the version in the source (desktop/Directory.Build.props, versionName in
 # android/app/build.gradle.kts) and be on main, or nothing is published.
-# Run by hand (Actions > Release > Run workflow) or on a pull request that touches this file
-# or a version, it is a dry run: the files are built and kept as workflow artifacts, and no
-# Release is made. How to cut a release: desktop/README.md and android/README.md.
+# Normally nobody pushes the tag: auto-release.yml creates it when main gets a version that
+# has no Release yet, and starts this workflow on the tag (workflow_dispatch with `app`).
+# A run on a tag publishes, however it was started. Run by hand on a branch (Actions >
+# Release > Run workflow) or on a pull request that touches this file or a version, it is a
+# dry run: the files are built and kept as workflow artifacts, and no Release is made.
+# More: desktop/README.md and android/README.md ("Cut a release").
+#
+# Anemo Desktop updates itself from these Releases (docs/specs/23-desktop-auto-update.md). The
+# builds get this repository and the update key compiled in (the DESKTOP_UPDATE_PUBLIC_KEY
+# repository variable); with the DESKTOP_UPDATE_SIGNING_KEY secret (in the desktop-release
+# environment, restricted to desktop-v* tags), the sign-desktop job signs the
+# checksum files (SHA256SUMS-desktop*.txt.sig) and clients built with the key accept only a
+# signed release. Making the key pair: desktop/README.md, "Signing updates".
 name: Release
 
 on:
@@ -17,6 +28,8 @@ on:
       - .github/workflows/release.yml
       - desktop/Directory.Build.props
       - desktop/src/Anemo.Desktop/Anemo.Desktop.csproj
+      - desktop/src/Anemo.Desktop.Mac/Anemo.Desktop.Mac.csproj
+      - desktop/mac/**
       - android/app/build.gradle.kts
   workflow_dispatch:
     inputs:
@@ -76,10 +89,13 @@ jobs:
           dotnet-version: 8.0.x
 
       - name: Publish the single-file exes
+        env:
+          ANEMO_UPDATE_PUBLIC_KEY: ${{ vars.DESKTOP_UPDATE_PUBLIC_KEY }}
         run: |
           mkdir -p dist
           for rid in win-x64 win-arm64; do
-            dotnet publish src/Anemo.Desktop/Anemo.Desktop.csproj -c Release -r "$rid" -o "publish/$rid"
+            dotnet publish src/Anemo.Desktop/Anemo.Desktop.csproj -c Release -r "$rid" -o "publish/$rid" \
+              -p:AnemoUpdateRepository="$GITHUB_REPOSITORY" -p:AnemoUpdatePublicKey="$ANEMO_UPDATE_PUBLIC_KEY"
             cp "publish/$rid/Anemo Desktop.exe" "dist/Anemo-Desktop-$rid.exe"
           done
           cd dist && sha256sum *.exe | tee SHA256SUMS-desktop.txt
@@ -104,8 +120,10 @@ jobs:
             echo "- \`Anemo-Desktop-win-arm64.exe\`: ARM PCs (Snapdragon)"
             echo
             echo "One self-contained exe (the .NET runtime included; no install, no admin rights)."
-            echo "Rename it to \`Anemo Desktop.exe\` and replace the old one in its folder (quit the"
-            echo "client from the tray first); the exe is not signed, so SmartScreen asks once."
+            echo "Anemo Desktop 1.8.0 and later update themselves from these Releases (Settings →"
+            echo "This computer → Updates). By hand: rename it to \`Anemo Desktop.exe\` and replace the"
+            echo "old one in its folder (quit the client from the tray first); the exe is not signed, so"
+            echo "SmartScreen asks once."
             echo "Setup: [desktop/README.md](https://github.com/$GITHUB_REPOSITORY/blob/$GITHUB_SHA/desktop/README.md)."
             echo
             echo "SHA-256:"
@@ -117,6 +135,138 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: anemo-desktop-${{ steps.version.outputs.version }}
+          path: desktop/dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  # The macOS app. Signed with Developer ID and notarized when the six MACOS_*/APPLE_* secrets
+  # are set (desktop/README.md, "macOS: signing"); without them it is signed ad hoc, the notes
+  # say so, and a tag release still goes out (users then allow it once in System Settings and
+  # grant the permissions again after every update).
+  desktop-macos:
+    name: Anemo Desktop (macOS, Apple Silicon)
+    if: >-
+      startsWith(github.ref, 'refs/tags/desktop-v') || github.event_name == 'pull_request' ||
+      (github.event_name == 'workflow_dispatch' && inputs.app != 'voice')
+    runs-on: macos-15
+    defaults:
+      run:
+        shell: bash
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Read the version, check it against the tag
+        id: version
+        run: |
+          version=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Directory.Build.props)
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::no x.y.z <Version> in desktop/Directory.Build.props (found '$version')"
+            exit 1
+          fi
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            if [ "$GITHUB_REF_NAME" != "desktop-v$version" ]; then
+              echo "::error::tag $GITHUB_REF_NAME does not match <Version>$version</Version> (expected desktop-v$version)"
+              exit 1
+            fi
+            if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+              echo "::error::tag $GITHUB_REF_NAME is not on main"
+              exit 1
+            fi
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      # The Developer ID certificate goes into a keychain of its own, deleted at the end.
+      - name: Signing certificate (when the secrets are set)
+        id: sign
+        env:
+          CERT_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+        run: |
+          if [ -n "$CERT_P12" ] && [ -n "$CERT_PASSWORD" ] && [ -n "$IDENTITY" ]; then
+            keychain="$RUNNER_TEMP/signing.keychain-db"
+            pass=$(openssl rand -hex 16)
+            printf '%s' "$CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+            security create-keychain -p "$pass" "$keychain"
+            security set-keychain-settings -lut 3600 "$keychain"
+            security unlock-keychain -p "$pass" "$keychain"
+            security import "$RUNNER_TEMP/cert.p12" -P "$CERT_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+            security set-key-partition-list -S apple-tool:,apple: -k "$pass" "$keychain" > /dev/null
+            security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+            rm -f "$RUNNER_TEMP/cert.p12"
+            echo "kind=developer-id" >> "$GITHUB_OUTPUT"
+            echo "Signing with Developer ID"
+          else
+            echo "kind=adhoc" >> "$GITHUB_OUTPUT"
+            echo "::warning::no Developer ID secrets (MACOS_CERTIFICATE_P12, MACOS_CERTIFICATE_PASSWORD, MACOS_SIGNING_IDENTITY): the macOS app is signed ad hoc"
+          fi
+
+      - name: Build the app
+        env:
+          MACOS_SIGNING_IDENTITY: ${{ steps.sign.outputs.kind == 'developer-id' && secrets.MACOS_SIGNING_IDENTITY || '' }}
+          ANEMO_UPDATE_REPOSITORY: ${{ github.repository }}
+          ANEMO_UPDATE_PUBLIC_KEY: ${{ vars.DESKTOP_UPDATE_PUBLIC_KEY }}
+        run: sh mac/build-app.sh osx-arm64
+
+      - name: Notarize (Developer ID builds with the Apple ID secrets)
+        id: notarize
+        if: steps.sign.outputs.kind == 'developer-id'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          if [ -z "$APPLE_ID" ] || [ -z "$APPLE_TEAM_ID" ] || [ -z "$APPLE_APP_PASSWORD" ]; then
+            echo "::warning::no APPLE_ID, APPLE_TEAM_ID or APPLE_APP_PASSWORD: signed but not notarized"
+            echo "done=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          zip=publish/Anemo-Desktop-macos-arm64.zip
+          xcrun notarytool submit "$zip" --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PASSWORD" --wait --timeout 30m
+          xcrun stapler staple "publish/osx-arm64/Anemo Desktop.app"
+          rm "$zip"
+          ditto -c -k --keepParent "publish/osx-arm64/Anemo Desktop.app" "$zip"
+          spctl --assess --type execute --verbose=2 "publish/osx-arm64/Anemo Desktop.app"
+          echo "done=true" >> "$GITHUB_OUTPUT"
+
+      - name: Remove the signing keychain
+        if: always() && steps.sign.outputs.kind == 'developer-id'
+        run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
+
+      - name: Checksums and release notes
+        run: |
+          mkdir -p dist
+          cp publish/Anemo-Desktop-macos-arm64.zip dist/
+          cd dist && shasum -a 256 Anemo-Desktop-macos-arm64.zip | tee SHA256SUMS-desktop-macos.txt
+          {
+            echo
+            echo "**macOS** (14 Sonoma or later, Apple Silicon): \`Anemo-Desktop-macos-arm64.zip\`."
+            echo "Unzip it and move \`Anemo Desktop.app\` to Applications; it lives in the menu bar."
+            if [ "${{ steps.sign.outputs.kind }}" = adhoc ]; then
+              echo "This build is **not signed by a developer** (ad hoc): the first start needs"
+              echo "System Settings → Privacy & Security → Open Anyway, and after every update macOS"
+              echo "forgets the Screen Recording and Accessibility permissions (remove Anemo Desktop"
+              echo "from both lists and allow it again)."
+            elif [ "${{ steps.notarize.outputs.done }}" != true ]; then
+              echo "Signed with Developer ID but **not notarized**: Gatekeeper asks once before the first start."
+            fi
+            echo
+            echo '```'
+            cat SHA256SUMS-desktop-macos.txt
+            echo '```'
+          } > notes-macos.md
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: anemo-desktop-macos-${{ steps.version.outputs.version }}
           path: desktop/dist/
           if-no-files-found: error
           retention-days: 14
@@ -240,11 +390,71 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  # Only for a tag: the build jobs above never get write access.
+  # The release key's own job, for a desktop tag only. It runs in the `desktop-release`
+  # environment, which is where the DESKTOP_UPDATE_SIGNING_KEY secret belongs: restricted to
+  # `desktop-v*` tags (desktop/README.md, "Signing updates"), so no workflow run on a branch or a
+  # pull request can read it. It has no write access; the release job below publishes the .sig
+  # files. A repository secret of the same name works too (an environment doesn't hide those),
+  # and with neither the step only warns.
+  sign-desktop:
+    name: Sign the desktop checksum files
+    needs: [desktop, desktop-macos]
+    if: startsWith(github.ref, 'refs/tags/desktop-v') && !cancelled() && !failure()
+    runs-on: ubuntu-latest
+    environment: desktop-release
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: anemo-desktop-*
+          merge-multiple: true
+
+      # Signs what the clients trust: "anemo-desktop-update <tag>\n" followed by each checksum
+      # file, ECDSA P-256 / SHA-256 (UpdateSignature.cs checks the same bytes).
+      - name: Sign the desktop checksum files (when the signing key is set)
+        env:
+          SIGNING_KEY: ${{ secrets.DESKTOP_UPDATE_SIGNING_KEY }}
+          PUBLIC_KEY: ${{ vars.DESKTOP_UPDATE_PUBLIC_KEY }}
+        run: |
+          if [ -z "$SIGNING_KEY" ]; then
+            if [ -n "$PUBLIC_KEY" ]; then
+              echo "::error::the DESKTOP_UPDATE_PUBLIC_KEY variable is set, so clients accept only signed releases, but the DESKTOP_UPDATE_SIGNING_KEY secret is missing"
+              exit 1
+            fi
+            echo "::warning::no DESKTOP_UPDATE_SIGNING_KEY secret: the checksum files are not signed (clients check the SHA-256 only)"
+            exit 0
+          fi
+          [ -n "$PUBLIC_KEY" ] || echo "::warning::no DESKTOP_UPDATE_PUBLIC_KEY variable: the clients of this release don't check signatures"
+          umask 077
+          key="$RUNNER_TEMP/update-key.pem"
+          printf '%s\n' "$SIGNING_KEY" > "$key"
+          if [ -n "$PUBLIC_KEY" ]; then
+            printf '%s' "$PUBLIC_KEY" | base64 -d > "$RUNNER_TEMP/update-key.pub.der"
+            openssl pkey -pubin -inform DER -in "$RUNNER_TEMP/update-key.pub.der" -out "$RUNNER_TEMP/update-key.pub.pem"
+          fi
+          for sums in dist/SHA256SUMS-desktop.txt dist/SHA256SUMS-desktop-macos.txt; do
+            { printf 'anemo-desktop-update %s\n' "$GITHUB_REF_NAME"; cat "$sums"; } > "$RUNNER_TEMP/message"
+            openssl dgst -sha256 -sign "$key" -out "$sums.sig" "$RUNNER_TEMP/message"
+            if [ -n "$PUBLIC_KEY" ]; then
+              # The pair must match, or every client would refuse this release.
+              openssl dgst -sha256 -verify "$RUNNER_TEMP/update-key.pub.pem" -signature "$sums.sig" "$RUNNER_TEMP/message"
+            fi
+          done
+          rm -f "$key"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: anemo-desktop-signatures
+          path: dist/*.sig
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # Only for a tag (pushed, or a run started on it by auto-release.yml): the build jobs above
+  # never get write access.
   release:
     name: GitHub Release
-    needs: [desktop, voice]
-    if: github.event_name == 'push' && !cancelled() && !failure()
+    needs: [desktop, desktop-macos, voice, sign-desktop]
+    if: startsWith(github.ref, 'refs/tags/') && !cancelled() && !failure()
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -253,13 +463,15 @@ jobs:
         with:
           path: dist
           pattern: ${{ startsWith(github.ref_name, 'desktop-v') && 'anemo-desktop-*' || 'anemo-voice-*' }}
-          merge-multiple: true
+          merge-multiple: true # with the .sig files of sign-desktop, when it signed
 
       - name: Create the Release (or add the files again on a re-run)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           mv dist/notes.md notes.md
+          # The macOS part of the desktop notes, after the Windows part.
+          if [ -f dist/notes-macos.md ]; then cat dist/notes-macos.md >> notes.md; rm dist/notes-macos.md; fi
           ls -l dist
           if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --clobber

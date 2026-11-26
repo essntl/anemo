@@ -92,5 +92,16 @@ const messages: Messages = {
   "Headers (JSON)": "Заголовки (JSON)",
   "Currently set: {names}. Entering a value replaces them.": "Зараз задано: {names}. Нове значення замінить їх.",
   "Stored encrypted.": "Зберігаються зашифрованими.",
+  "Image generation": "Створення зображень",
+  "Makes pictures (for the generate_image tool, chosen under Default models).": "Створює зображення (для інструмента generate_image; вибирається в «Типових моделях»).",
+  "Makes the pictures the assistant draws for you (gpt-image, Gemini image models, …). Any chat model can ask for one.": "Створює зображення, які асистент малює для вас (gpt-image, моделі зображень Gemini, …). Попросити про зображення може будь-яка модель чату.",
+  "Not set (no image generation)": "Не задано (без створення зображень)",
+  "Limits for the pictures the assistant makes with the image model chosen above. Each picture costs money at the provider.": "Обмеження для зображень, які асистент створює вибраною вище моделлю зображень. Кожне зображення коштує грошей у провайдера.",
+  "Pictures per request": "Зображень за запит",
+  "The most one request may make; asking for more makes this many.": "Найбільше, що може створити один запит; якщо попросити більше, буде створено стільки.",
+  "Largest resolution": "Найбільша роздільність",
+  "Where the model offers a choice (OpenRouter). Larger pictures cost more.": "Там, де модель дає вибір (OpenRouter). Більші зображення коштують дорожче.",
+  "Automations ask first": "Автоматизації спершу питають",
+  "A scheduled run waits for your approval before each picture, whatever the “Generate images” permission says.": "Запуск за розкладом чекає на ваше підтвердження перед кожним зображенням, хай що каже дозвіл «Створення зображень».",
 }
 export default messages

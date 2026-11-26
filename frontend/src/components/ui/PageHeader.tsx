@@ -9,14 +9,16 @@ import { getSlots, subscribe } from './topBarSlots'
  * children are the page's buttons, at the right end of the bar.
  *
  * Where there is no top bar (a page rendered on its own, as in a test), they are shown
- * in place instead.
+ * in place instead. `inline` shows them in place too: for a page whose content is one
+ * narrow column, so its title and buttons line up with that column (Automations).
  */
-export function PageHeader({ title, detail, before, after, children }: {
+export function PageHeader({ title, detail, before, after, inline = false, children }: {
   title: ReactNode
   detail?: ReactNode
   /** Controls right before and after the title (the calendar's previous and next). */
   before?: ReactNode
   after?: ReactNode
+  inline?: boolean
   children?: ReactNode
 }) {
   const { start, end } = useSyncExternalStore(subscribe, getSlots)
@@ -28,9 +30,10 @@ export function PageHeader({ title, detail, before, after, children }: {
       {detail && <span className="min-w-0 shrink truncate text-[13px] text-muted max-md:hidden">{detail}</span>}
     </>
   )
-  if (!start || !end) {
+  if (inline || !start || !end) {
     return (
-      <div className="mb-4 flex items-center gap-2.5">
+      // min-h: as tall with buttons as without, so the title doesn't move when they come and go.
+      <div className="mb-4 flex min-h-10 items-center gap-2.5">
         {heading}
         {children && <div className="ml-auto flex items-center gap-1.5">{children}</div>}
       </div>

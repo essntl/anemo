@@ -67,6 +67,13 @@ TURN_NOTE = (
     "tables, code or links. If the answer needs more, put it in a document or a task and "
     "say where. If the request is unclear, ask with ask_user."
 )
+# Added to the turn note while voice mode is on (docs/specs/07-voice-mode-android.md).
+VOICE_MODE_NOTE = (
+    " Voice mode is on: after your answer is read out, the phone listens again for the "
+    "user's next request. When the conversation is clearly over (the user says that's "
+    "all, thanks you and says goodbye), call voice_stop; never call it otherwise."
+)
+MAX_TEXT_CHARS = 4000  # a transcript sent back by the phone (`text`)
 
 
 class NeedsTap(Conflict):
@@ -105,8 +112,9 @@ def words(text: str) -> str:
     return " ".join(re.sub(r"[^\w\s]", " ", text).split())
 
 
-def turn_note(device_name: str | None) -> str:
-    return TURN_NOTE.format(device=f" ({device_name})" if device_name else "")
+def turn_note(device_name: str | None, voice_mode: bool = False) -> str:
+    note = TURN_NOTE.format(device=f" ({device_name})" if device_name else "")
+    return note + VOICE_MODE_NOTE if voice_mode else note
 
 
 def _check_audio(audio: bytes, content_type: str) -> None:
@@ -149,17 +157,24 @@ def _usable(conv: Conversation | None) -> bool:
 
 
 async def _follow_up(
-    db: AsyncSession, conversation_id: uuid.UUID | None, settings: VoiceSettings
+    db: AsyncSession,
+    conversation_id: uuid.UUID | None,
+    settings: VoiceSettings,
+    *,
+    keep_chat: bool = False,
 ) -> Conversation | None:
     """The chat a follow-up continues: the one the phone names, when its last message is
-    within the follow-up window and it isn't answering something else."""
-    if conversation_id is None or settings.follow_up_minutes == 0:
+    within the follow-up window and it isn't answering something else. `keep_chat` (voice
+    mode, after its first request): whatever the window says."""
+    if conversation_id is None or (settings.follow_up_minutes == 0 and not keep_chat):
         return None
     conv = await db.get(Conversation, conversation_id)
     if conv is None or not _usable(conv):
         return None
     window = timedelta(minutes=settings.follow_up_minutes)
-    if datetime.now(UTC) - conv.last_message_at > window or await _busy(db, conv.id):
+    if not keep_chat and datetime.now(UTC) - conv.last_message_at > window:
+        return None
+    if await _busy(db, conv.id):
         return None
     return conv
 
@@ -261,6 +276,15 @@ def _brief(request: str, limit: int = 80) -> str:
     return text[:limit].rsplit(" ", 1)[0] + "…"
 
 
+async def transcript(db: AsyncSession, audio: bytes, content_type: str) -> VoiceTurn:
+    """Only what was heard, for the phone to match its voice-mode commands on
+    (docs/specs/07-voice-mode-android.md): no clean-up, no run, nothing stored."""
+    heard, _ = await _heard(db, audio, content_type)
+    if not words(heard):
+        return VoiceTurn(heard="", say=NOT_HEARD)
+    return VoiceTurn(heard=heard)
+
+
 async def turn(
     db: AsyncSession,
     audio: bytes | None,
@@ -269,13 +293,24 @@ async def turn(
     conversation_id: uuid.UUID | None,
     status: bool,
     token_id: uuid.UUID | None,
+    text: str | None = None,
+    voice_mode: bool = False,
+    keep_chat: bool = False,
 ) -> VoiceTurn:
-    """A spoken request: transcribed, made a clear request, and started as an agent turn
-    in the Voice chat. "Cancel" on its own throws it away; "status" (or `status`) says
-    what is running. Commits."""
+    """A spoken request: transcribed (or `text`, a transcript the phone already got from
+    `transcript`), made a clear request, and started as an agent turn in the Voice chat.
+    "Cancel" on its own throws it away; "status" (or `status`) says what is running.
+    `voice_mode`: the phone listens again after the answer (the turn note says so);
+    `keep_chat`: continue `conversation_id` whatever the follow-up window says. Commits."""
     if status:
         return VoiceTurn(say=await status_text(db))
-    heard, vocabulary = await _heard(db, audio or b"", content_type)
+    if text is not None:
+        heard = text.strip()
+        vocabulary = (
+            await settings_service.get_section(db, DictationSettings, "dictation")
+        ).vocabulary
+    else:
+        heard, vocabulary = await _heard(db, audio or b"", content_type)
     said = words(heard)
     if not said:
         return VoiceTurn(say=NOT_HEARD)
@@ -289,12 +324,14 @@ async def turn(
     device = await devices.by_token_id(db, token_id) if token_id is not None else None
     options: dict[str, Any] = {
         "source": "voice",
-        "turn_note": turn_note(device.name if device else None),
+        "turn_note": turn_note(device.name if device else None, voice_mode),
     }
+    if voice_mode:
+        options["voice_mode"] = True  # voice_stop may end it (tools/builtin/voice.py)
     if device is not None:
         options["device_id"] = str(device.id)
         options["device_name"] = device.name  # for "Asked by voice from ‹phone›"
-    followed = await _follow_up(db, conversation_id, settings)
+    followed = await _follow_up(db, conversation_id, settings, keep_chat=keep_chat)
     conv = followed or await _voice_chat(db, settings)
     # The voice model is given to a Voice chat, which remembers it for its follow-ups. A
     # follow-up in another chat the phone named keeps that chat's own model.

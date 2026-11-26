@@ -104,5 +104,13 @@ const messages: Messages = {
   "Reopen “{title}”": "Открыть снова «{title}»",
   "Open {title}": "Открыть: {title}",
   "Overdue": "Просрочено",
+  "Task board": "Доска задач",
+  "Lanes": "Дорожки",
+  "One board": "Одна доска",
+  "A lane per project": "Дорожка на проект",
+  "Could not load the tasks.": "Не удалось загрузить задачи.",
+  "{project}: tasks by status": "{project}: задачи по статусу",
+  "No tasks match these filters.": "Нет задач, подходящих под эти фильтры.",
+  "{n} open | {n} open": "{n} открытая | {n} открытые | {n} открытых",
 }
 export default messages

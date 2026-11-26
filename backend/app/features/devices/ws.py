@@ -3,20 +3,25 @@
     GET /api/devices/ws   (WebSocket)
 
 The protocol is docs/device-contracts.md §2 (and §6 for versions). In short:
-  client → {"type": "hello", "token", "kind", "version", "last_id"}   first, within 10 s;
+  client → {"type": "hello", "token", "kind", "version", "last_id", "platform"?}   first,
+           within 10 s (platform: "windows" | "macos"; missing means windows);
            the token travels in the message, never the URL.
   server → {"type": "welcome", "device": {id, name, kind, trust}, "missed", "cursor"}
   server → {"type": "notice", "text"}   once, when the client is older than supported
   client → {"type": "ping"}  ← {"type": "pong"}
   server → {"type": "event", "id", "event", "data"}   phones only: events of runs this
            phone started (features/devices/phone_events.py)
-  client → {"type": "device.offer", "control", "shell", "code", "code_start"}   computers,
-           every 30 s
+  client → {"type": "device.offer", "control", "shell", "code", "code_start", "shell_kind"?,
+           "files"?}
+           computers, every 30 s (shell_kind: "powershell" | "pwsh" | "zsh" | "bash";
+           missing means powershell; files: the file actions of §8, missing means false)
   server → {"type": "device.command", "id", "action", …}   from features/devices/relay.py
   client → {"type": "device.result", "id", "ok", "state" | "error", "code"}
   client → {"type": "device.stopped"}
   client → {"type": "code.job" | "code.events", …}  ← {"type": "code.ack", "job_id", "seq"}
            trusted computers only (§7): handled by features/code_sessions/ingest.py
+  client → {"type": "voice.mode", "on", "cause"}   phones: voice mode switched on or off;
+           written to the audit log (features/voice/mode.py), nothing is answered
 
 Closes: 4400 bad first message (or none, or the wrong kind), 4401 bad or revoked token
 (checked again every minute; deleting the device closes it at once), 4403 an Origin
@@ -44,6 +49,8 @@ from app.features.code_sessions import ingest as code_ingest
 from app.features.devices import relay, service
 from app.features.devices.models import Device
 from app.features.devices.phone_events import PhoneFilter
+from app.features.triggers import events as trigger_events
+from app.features.voice import mode as voice_mode
 
 log = logging.getLogger(__name__)
 
@@ -148,8 +155,16 @@ _RESULT_ID = re.compile(r'"id"\s*:\s*"([^"\\]{1,100})"')
 
 
 class Connection:
-    def __init__(self, ws: WebSocket, device: Device, raw: str, ip: str | None) -> None:
+    def __init__(
+        self,
+        ws: WebSocket,
+        device: Device,
+        raw: str,
+        ip: str | None,
+        platform: relay.Platform = relay.DEFAULT_PLATFORM,
+    ) -> None:
         self.ws = ws
+        self.platform = platform  # from hello; written with every offer
         self.device_id = device.id
         self.kind = device.kind
         self.trust = device.trust
@@ -244,6 +259,13 @@ class Connection:
                 shell=bool(message.get("shell")),
                 code=bool(message.get("code")),  # older clients don't send these
                 code_start=bool(message.get("code_start")),
+                code_images=bool(message.get("code_images")),
+                code_git=bool(message.get("code_git")),
+                code_git_remote=bool(message.get("code_git_remote")),
+                files=bool(message.get("files")),  # Anemo Desktop 1.7.0 (§8)
+                code_input=bool(message.get("code_input")),  # Anemo Desktop 1.9.0
+                platform=self.platform,
+                shell_kind=relay.shell_kind_of(message.get("shell_kind")),
             )
             if not await relay.renew(self.device_id, self.conn, offer):
                 raise _Closed(CLOSE_REPLACED, "replaced by a newer connection")
@@ -254,6 +276,8 @@ class Connection:
             answer = await code_ingest.handle(self.device_id, message)
             if answer is not None:
                 await self.ws.send_json(answer)
+        elif kind == "voice.mode":
+            await self._voice_mode(message)
         elif kind == "device.stopped":
             await relay.stopped(self.device_id, self.conn)
         elif kind == "device.result":
@@ -269,6 +293,17 @@ class Connection:
             await relay.answer(
                 command_id, {"ok": ok, "state": state, "error": message.get("error"), "code": code}
             )
+
+    async def _voice_mode(self, message: dict[str, Any]) -> None:
+        """A phone switched voice mode on or off: into the audit log. Ignored from a
+        computer, or when it doesn't validate; never answered."""
+        if self.kind != "phone":
+            return
+        parsed = voice_mode.parse(message)
+        if parsed is None:
+            return
+        async with get_sessionmaker()() as db:
+            await voice_mode.record(db, self.device_id, parsed)
 
     async def commands(self, pubsub: PubSub | None) -> None:
         """Commands from the worker, passed on to the device; and being replaced, revoked
@@ -328,6 +363,11 @@ class Connection:
                 await service.seen(db, self.device_id)
 
 
+def _device_event(device: Device) -> dict[str, Any]:
+    """The data of a device.online / device.offline event (features/triggers)."""
+    return {"device_id": str(device.id), "name": device.name, "kind": device.kind}
+
+
 async def _close(ws: WebSocket, code: int, reason: str) -> None:
     with contextlib.suppress(Exception):
         await ws.close(code=code, reason=reason)
@@ -376,7 +416,7 @@ async def device_socket(ws: WebSocket) -> None:
     async with get_sessionmaker()() as db:
         await service.seen(db, device.id, str(version) if version is not None else "")
 
-    connection = Connection(ws, device, raw, ip)
+    connection = Connection(ws, device, raw, ip, relay.platform_of(hello.get("platform")))
     last_id = hello.get("last_id")
     if not isinstance(last_id, str) or not _STREAM_ID.match(last_id):
         last_id = None  # a malformed cursor counts as none
@@ -389,7 +429,12 @@ async def device_socket(ws: WebSocket) -> None:
         pubsub = None
     tasks: list[asyncio.Task[None]] = []
     try:
+        was_online = device.id in await relay.connected([device.id])
         await relay.connect(device.id, connection.conn)
+        if not was_online:  # not a new connection replacing one that was still open
+            await trigger_events.emit_now(
+                "device.online", _device_event(device), subject=str(device.id)
+            )
         if device.kind == "phone":
             cursor = last_id or await _head()
             missed = await _missed(last_id)
@@ -439,6 +484,11 @@ async def device_socket(ws: WebSocket) -> None:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
         await relay.disconnect(device.id, connection.conn)
-        if connection.sent_code and device.id not in await relay.connected([device.id]):
+        still_online = device.id in await relay.connected([device.id])
+        if connection.sent_code and not still_online:
             await code_ingest.device_offline(device.id)
+        if not still_online:
+            await trigger_events.emit_now(
+                "device.offline", _device_event(device), subject=str(device.id)
+            )
         log.info("device disconnected", extra={"ctx": {"device_id": str(device.id), "ip": ip}})

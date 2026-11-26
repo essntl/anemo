@@ -19,6 +19,8 @@ interface SliderProps {
   disabled?: boolean
   /** `island` draws light on the Dynamic Island's dark background. */
   tone?: 'accent' | 'island'
+  /** `always`: the handle shows at rest too (settings); `hover` (default): only while in use (players). */
+  thumb?: 'hover' | 'always'
   className?: string
 }
 
@@ -42,6 +44,7 @@ export function Slider({
   commit = 'live',
   disabled,
   tone = 'accent',
+  thumb = 'hover',
   className,
 }: SliderProps) {
   const ref = useRef<HTMLDivElement>(null)
@@ -141,12 +144,40 @@ export function Slider({
       <span
         aria-hidden
         className={cn(
-          'absolute h-3.5 w-3.5 -translate-x-1/2 rounded-full bg-white shadow-soft ring-1 ring-border-strong transition-transform duration-150',
-          // Always visible on touch screens and while in use; on hover otherwise.
-          dragValue !== null ? 'scale-100' : 'scale-0 group-hover:scale-100 group-focus-visible:scale-100 pointer-coarse:scale-100',
+          'absolute -translate-x-1/2 rounded-full bg-white shadow-soft ring-1 ring-border-strong transition-transform duration-150',
+          thumb === 'always' ? 'h-4 w-4 group-hover:scale-110 group-focus-visible:scale-110' : 'h-3.5 w-3.5',
+          // Always visible on touch screens and while in use; on hover otherwise (unless thumb="always").
+          thumb === 'always' || dragValue !== null ? 'scale-100' : 'scale-0 group-hover:scale-100 group-focus-visible:scale-100 pointer-coarse:scale-100',
         )}
         style={{ left: `${pct * 100}%` }}
       />
+    </div>
+  )
+}
+
+/**
+ * A slider with its name on the left and its value on the right, in fixed columns, so
+ * several of them line up (Settings > Appearance: blur, dim, tint strength…).
+ *
+ *   <SliderField label="Blur" value={blur} onChange={setBlur} min={0} max={40} step={1} format={(v) => `${v} px`} />
+ */
+export function SliderField({
+  label,
+  format,
+  ...slider
+}: Omit<SliderProps, 'valueText' | 'label'> & {
+  label: string
+  /** The value as shown and read out, e.g. "12 px". */
+  format: (value: number) => string
+}) {
+  return (
+    // Phones: the name and the value on one line, the slider full width under them.
+    // Wider: name, slider and value side by side in fixed columns.
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 sm:grid-cols-[5.5rem_minmax(0,1fr)_3.25rem] md:grid-cols-[7rem_minmax(0,1fr)_3.5rem]">
+      <span className="truncate text-[13px] text-muted">{label}</span>
+      <Slider label={label} valueText={(v) => format(Math.round(v))} thumb="always" {...slider}
+        className={cn('col-span-2 row-start-2 sm:col-span-1 sm:col-start-2 sm:row-start-1', slider.className)} />
+      <span className="text-right text-[12.5px] tabular-nums text-muted sm:col-start-3">{format(slider.value)}</span>
     </div>
   )
 }

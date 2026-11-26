@@ -11,6 +11,8 @@ import { Select } from '@/components/ui/Select'
 import { toast } from '@/components/ui/toast'
 import { formatWhen } from '@/lib/format'
 import { msg, t } from '@/lib/i18n'
+import { DeviceCodeCard } from './DeviceCodeCard'
+import { DeviceFilesCard } from './DeviceFilesCard'
 import { type Device, type DeviceKind, type DeviceTrust, useAddDevice, useDeleteDevice, useDevices, useRenameDevice, useSetTrust } from './api'
 
 const KINDS = [
@@ -178,7 +180,7 @@ export function DevicesSettingsPage() {
   const [made, setMade] = useState<{ name: string; kind: DeviceKind; token: string } | null>(null)
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-(--card-gap)">
       <Card>
         <CardHeader title={t('Devices')}
           description={t('Your Windows computers (Anemo Desktop) and phones (Anemo Voice). Each has its own token and, for computers, its own trust level. Changing the trust level asks for your password.')} />
@@ -194,6 +196,8 @@ export function DevicesSettingsPage() {
         </Card>
       )}
       {devices.isError && <p className="text-[13px] text-error">{errorMessage(devices.error)}</p>}
+      <DeviceFilesCard />
+      <DeviceCodeCard />
     </div>
   )
 }

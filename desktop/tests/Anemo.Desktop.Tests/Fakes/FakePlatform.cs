@@ -236,7 +236,7 @@ public sealed class FakeShell : IShellHost
             return Task.FromResult(0);
         };
 
-    public string? FindPowerShell() => Program;
+    public ShellProgram? FindShell() => Program is null ? null : ShellProgram.At(Program);
 
     public Task<int> RunAsync(ShellStart start, Action<string> onStdout, Action<string> onStderr, CancellationToken ct)
     {

@@ -16,6 +16,8 @@ from app.core.db import dispose_engine
 from app.core.logging import configure_logging
 from app.core.redis import close_redis, get_redis
 from app.features import parts
+from app.features.triggers import files_hook, mcp_listener
+from app.features.triggers import listener as trigger_listener
 from app.jobs import scheduler
 from app.jobs.runner import JobRunner
 
@@ -73,10 +75,14 @@ async def main() -> None:
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, stop.set)
 
+    trigger_listener.install()  # events about tasks, calendar events, documents, code jobs
+    files_hook.install(loop)  # file.created events
     log.info("worker starting", extra={"ctx": {"worker_id": wid}})
     beat = asyncio.create_task(heartbeat_loop(wid, stop))
     runner_status = asyncio.create_task(runner_status_loop(stop))
     periodic = asyncio.create_task(scheduler.run(stop))  # reminders, automations
+    # Sessions with the MCP servers that triggers wait on (mcp.notification events).
+    mcp_listening = asyncio.create_task(mcp_listener.McpListener(wid).run(stop))
     # Returns after `stop` is set and in-flight jobs have finished or been handed back.
     await JobRunner(wid, settings.worker_concurrency).run(stop)
     log.info("worker stopped")
@@ -84,6 +90,7 @@ async def main() -> None:
     periodic.cancel()
     runner_status.cancel()
     await asyncio.gather(beat, periodic, runner_status, return_exceptions=True)
+    await asyncio.gather(mcp_listening, return_exceptions=True)  # ends with `stop`
     await dispose_engine()
     await close_redis()
 

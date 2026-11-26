@@ -15,8 +15,10 @@ import { Select } from '@/components/ui/Select'
 import { cn } from '@/lib/cn'
 import { formatCost, formatDuration, formatWhen } from '@/lib/format'
 import { msg, plural, t } from '@/lib/i18n'
+import { withoutAgent } from './agents'
 import { type CodeFilters, useCodeJobs } from './api'
 import { NewJobDialog } from './NewJobDialog'
+import { CodeUsageBar } from './UsageMeter'
 import { StateBadge } from './parts'
 import { useCodeQueue } from './queueStore'
 import { type CodeJobState, type CodeThread, JOB_STATES, groupByProject, jobDurationMs, pullRequest, toThreads } from './threads'
@@ -120,7 +122,8 @@ export function CodeJobList({ jobId }: { jobId?: string }) {
     if (filters.project) names.add(filters.project)
     return [...names].sort((a, b) => a.localeCompare(b))
   }, [pages, filters.project])
-  const search = params.toString() ? `?${params.toString()}` : ''
+  // The open job's sub-agent (?agent=) is no part of the address of another job.
+  const search = withoutAgent(params)
   const filtered = Boolean(filters.project || filters.state)
 
   const setFilter = (name: 'project' | 'state', value: string) => {
@@ -136,14 +139,22 @@ export function CodeJobList({ jobId }: { jobId?: string }) {
           the top, the filters sharing the row under it), one row where there is room. */}
       <div className="@container shrink-0 border-b border-border px-3 py-2">
         <div className="grid grid-cols-2 gap-2 @md:flex @md:items-center">
-          <Button size="sm" variant="primary" className="col-span-2 justify-center @md:order-last @md:ml-auto" icon={<Plus className="h-3.5 w-3.5" />} onClick={() => setStarting(true)}>
-            {t('New job')}
-          </Button>
+          <div className="col-span-2 flex gap-2 @md:order-last @md:ml-auto">
+            {/* Narrow screens show the list or the right side: the Git view has its own address. */}
+            <Link to={`/code/git${search}`} title={t('Git: the branches and commits of a repository')}
+              className="inline-flex h-(--btn-sm-h) shrink-0 items-center gap-1.5 rounded-control bg-surface-2 px-3 text-[13px] font-medium hover:bg-surface-hover pointer-coarse:h-10 lg:hidden">
+              <GitBranch aria-hidden="true" className="h-3.5 w-3.5" />{t('Git')}
+            </Link>
+            <Button size="sm" variant="primary" className="flex-1 justify-center" icon={<Plus className="h-3.5 w-3.5" />} onClick={() => setStarting(true)}>
+              {t('New job')}
+            </Button>
+          </div>
           <Select variant="pill" className="w-full max-w-none @md:w-auto @md:max-w-[11rem]" aria-label={t('Project')} value={filters.project ?? ''} onValueChange={(v) => setFilter('project', v)}
             options={[{ value: '', label: t('All projects') }, ...projects.map((p) => ({ value: p, label: p }))]} />
           <Select variant="pill" className="w-full max-w-none @md:w-auto @md:max-w-[11rem]" aria-label={t('State')} value={filters.state ?? ''} onValueChange={(v) => setFilter('state', v)}
             options={[{ value: '', label: t('All states') }, ...JOB_STATES.map((s) => ({ value: s, label: t(STATE_FILTER[s]) }))]} />
         </div>
+        <CodeUsageBar />
         {/* Mounted only while open (and while it animates out): its queries run only then. */}
         <Lingering value={starting}>{() => <NewJobDialog open={starting} onOpenChange={setStarting} />}</Lingering>
       </div>

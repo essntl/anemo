@@ -166,7 +166,9 @@ internal sealed class StartMenuLauncher : IAppLauncher
 /// <summary>PowerShell: pwsh when installed, else Windows PowerShell 5.1, hidden, output read as UTF-8.</summary>
 internal sealed class PowerShellHost : IShellHost
 {
-    public string? FindPowerShell()
+    public ShellProgram? FindShell() => FindPowerShell() is { } path ? ShellProgram.At(path) : null;
+
+    private static string? FindPowerShell()
     {
         foreach (var dir in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator))
         {
