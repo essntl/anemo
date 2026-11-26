@@ -25,6 +25,7 @@ from contextvars import ContextVar
 from typing import Any
 
 from sqlalchemy import exists, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
@@ -133,14 +134,24 @@ def needs_dispatch_job(session: Session) -> bool:
 async def emit(
     db: AsyncSession, type: str, data: dict[str, Any], *, subject: str | None = None
 ) -> None:
-    """Add the event to the caller's transaction (see the module docstring)."""
+    """Add the event to the caller's transaction (see the module docstring).
+
+    A database error is raised, not logged: it leaves the caller's transaction unusable
+    anyway, and is most likely the caller's own (queuing the dispatch job flushes the
+    caller's pending rows). Hiding it would only turn it into a PendingRollbackError."""
     try:
         row = prepare(type, data, subject)
-        if row is None or not await db.scalar(listened_query({type})):
+        if row is None:
+            return
+        with db.no_autoflush:  # the caller's rows are flushed by the caller, not here
+            listened = await db.scalar(listened_query({type}))
+        if not listened:
             return
         db.add(row)
         if needs_dispatch_job(db.sync_session):
             await queue.enqueue(db, DISPATCH_JOB, {}, lane="background", max_attempts=1)
+    except SQLAlchemyError:
+        raise
     except Exception:  # noqa: BLE001 - an event never breaks the change it describes
         log.warning("event not emitted", extra={"ctx": {"type": type}}, exc_info=True)
 
