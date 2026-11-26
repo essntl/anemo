@@ -25,7 +25,15 @@ public sealed record MacSignature(string? Identifier, bool AdHoc, string? TeamId
             else if (line.StartsWith("TeamIdentifier=", StringComparison.Ordinal))
             {
                 var value = line["TeamIdentifier=".Length..];
-                team = value == "not set" || value.Length == 0 ? null : value;
+                if (value != "not set" && value.Length > 0)
+                {
+                    if (!IsTeamId(value))
+                    {
+                        return null; // not a signature this reads; it goes into a code requirement below
+                    }
+
+                    team = value;
+                }
             }
             else if (line.StartsWith("Authority=", StringComparison.Ordinal) || line.StartsWith("Signature size=", StringComparison.Ordinal))
             {
@@ -35,6 +43,24 @@ public sealed record MacSignature(string? Identifier, bool AdHoc, string? TeamId
 
         return signed && identifier is not null ? new MacSignature(identifier, adHoc && team is null, team) : null;
     }
+
+    /// <summary>
+    /// The code requirement (for <c>codesign --verify -R=…</c>) the downloaded app must meet when
+    /// the running app has a Developer ID, or null for an ad hoc running app. <c>codesign -dv</c>
+    /// only reports the Team ID a signature claims, and <c>--verify</c> alone only checks a bundle
+    /// against its own requirement, so anyone can make a bundle that claims any Team ID. This
+    /// requirement makes codesign check the certificate chain: issued by Apple, for this team.
+    /// </summary>
+    public static string? Requirement(MacSignature running) => running.TeamId switch
+    {
+        null => null,
+        var team when IsTeamId(team) => $"anchor apple generic and certificate leaf[subject.OU] = \"{team}\"",
+        _ => throw new ArgumentException("not a Team ID", nameof(running)), // Parse never makes one
+    };
+
+    /// <summary>Apple's Team IDs are ten capital letters and digits; nothing else goes into a requirement.</summary>
+    private static bool IsTeamId(string value) =>
+        value.Length == 10 && value.All(c => c is >= 'A' and <= 'Z' or >= '0' and <= '9');
 
     /// <summary>
     /// Why the downloaded app must not replace the running one, or null when it may: it must be

@@ -47,6 +47,24 @@ public sealed class MacSignatureTests
     }
 
     [Fact]
+    public void A_developer_id_app_asks_codesign_for_an_apple_issued_certificate_of_its_team()
+    {
+        Assert.Equal(
+            "anchor apple generic and certificate leaf[subject.OU] = \"ABCDE12345\"",
+            MacSignature.Requirement(MacSignature.Parse(DeveloperId)!));
+        Assert.Null(MacSignature.Requirement(MacSignature.Parse(AdHoc)!)); // ad hoc: nobody to anchor to
+    }
+
+    [Fact]
+    public void A_team_id_that_is_not_ten_letters_and_digits_is_not_read()
+    {
+        // It would go into the code requirement: `ABCDE12345" or anchor trusted` must not widen it.
+        Assert.Null(MacSignature.Parse(DeveloperId.Replace("TeamIdentifier=ABCDE12345", "TeamIdentifier=ABCDE12345\" or anchor trusted")));
+        Assert.Null(MacSignature.Parse(DeveloperId.Replace("TeamIdentifier=ABCDE12345", "TeamIdentifier=abcde12345")));
+        Assert.Throws<ArgumentException>(() => MacSignature.Requirement(new MacSignature("app.anemo.desktop", false, "X\" or anchor trusted")));
+    }
+
+    [Fact]
     public void An_ad_hoc_app_takes_any_signed_anemo_desktop_but_never_another_app()
     {
         var running = MacSignature.Parse(AdHoc);

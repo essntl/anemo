@@ -25,6 +25,12 @@ internal sealed class MacUpdatePlatform : IUpdatePlatform
     /// <param name="executable">The running binary (<see cref="Environment.ProcessPath"/>), inside <c>X.app/Contents/MacOS</c>.</param>
     /// <param name="updatesFolder">Anemo Desktop's <c>updates</c> folder in Application Support.</param>
     public MacUpdatePlatform(string? executable, string updatesFolder, Architecture architecture)
+        : this(executable, updatesFolder, architecture, bundle => Signature(bundle).GetAwaiter().GetResult())
+    {
+    }
+
+    /// <param name="runningSignature">Reads the running bundle's signature (tests give one that a real build would have).</param>
+    internal MacUpdatePlatform(string? executable, string updatesFolder, Architecture architecture, Func<string, MacSignature?> runningSignature)
     {
         _bundle = BundleOf(executable) ?? "";
         _parent = Path.GetDirectoryName(_bundle) ?? "";
@@ -42,7 +48,7 @@ internal sealed class MacUpdatePlatform : IUpdatePlatform
                     : null;
         if (Unavailable is null)
         {
-            _running = Signature(_bundle).GetAwaiter().GetResult();
+            _running = runningSignature(_bundle);
         }
     }
 
@@ -91,6 +97,14 @@ internal sealed class MacUpdatePlatform : IUpdatePlatform
             if ((await Run(Codesign, ["--verify", "--deep", "--strict", Staged], ct)).Code != 0)
             {
                 throw new UpdateRefusedException($"The signature of the downloaded {version} isn't intact, so it isn't installed.");
+            }
+
+            // What -dv reports below is only what the signature claims; with a Developer ID, codesign
+            // checks the certificate chain too: issued by Apple, to this app's team.
+            if (_running is not null && MacSignature.Requirement(_running) is { } requirement
+                && (await Run(Codesign, ["--verify", "--deep", "--strict", $"-R={requirement}", Staged], ct)).Code != 0)
+            {
+                throw new UpdateRefusedException($"The downloaded {version} isn't signed with this app's Apple Developer ID ({_running.TeamId}), so it isn't installed.");
             }
 
             if (MacSignature.Refusal(_running, await Signature(Staged, ct)) is { } refusal)
