@@ -132,9 +132,7 @@ async def list_activity(
 
 
 @router.post("/{entry_id}/undo", response_model=UndoOut)
-async def undo_entry(
-    entry_id: uuid.UUID, request: Request, db: Db, force: bool = False
-) -> UndoOut:
+async def undo_entry(entry_id: uuid.UUID, request: Request, db: Db, force: bool = False) -> UndoOut:
     """Undo one change. 409 `activity_conflict` (with `details.differs`) when the item
     was changed since; `force=true` undoes it anyway."""
     entry = await undo.get(db, entry_id)
