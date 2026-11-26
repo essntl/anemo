@@ -21,7 +21,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import ColumnElement, Select, and_, func, or_, select
+from sqlalchemy import ColumnElement, Select, and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_sessionmaker
@@ -314,16 +314,16 @@ async def page(
 # -- the index --------------------------------------------------------------------------
 
 
-async def index_chat(db: AsyncSession, conversation_id: uuid.UUID) -> None:
+async def index_chat(db: AsyncSession, conversation_id: uuid.UUID) -> bool:
     """Put the chat's messages into the knowledge index (only new or changed text is
-    embedded). Part of the caller's transaction."""
+    embedded). Part of the caller's transaction. False when embedding failed."""
     rows = await db.execute(
         select(ChatMessage.seq, ChatMessage.text_plain)
         .where(*_shown(conversation_id), ChatMessage.text_plain != "")
         .order_by(ChatMessage.seq)
     )
     messages = [(seq, text[:CHUNK_CHARS]) for seq, text in rows.all() if text.strip()]
-    await index.index_source(
+    return await index.index_source(
         db,
         SOURCE,
         conversation_id,
@@ -380,14 +380,34 @@ async def index_due(now: datetime | None = None) -> int:
     return len(due)
 
 
+class ChatNotEmbedded(RuntimeError):
+    """The embedding model failed (an outage): the job is tried again later."""
+
+
 async def index_job(conversation_id: uuid.UUID) -> None:
     """The `chats.index` job: index one claimed chat. Safe to run again (unchanged text
-    keeps its vector). A chat deleted meanwhile is left alone."""
+    keeps its vector). A chat deleted meanwhile is left alone. If the embedding model
+    fails, nothing is saved and the job fails, to be retried (`give_up_index` after the
+    last attempt), rather than leaving the chat marked indexed without its vectors."""
     async with get_sessionmaker()() as db:
         if await db.get(Conversation, conversation_id) is None:
             return
-        await index_chat(db, conversation_id)
+        if not await index_chat(db, conversation_id):
+            raise ChatNotEmbedded("embedding failed")
         await db.commit()
+
+
+async def give_up_index(conversation_id: uuid.UUID) -> None:
+    """The `chats.index` job failed for good: drop the chat's claim, so the scheduler
+    claims it again (a backfill during a provider outage catches up once it's back)."""
+    async with get_sessionmaker()() as db:
+        await db.execute(
+            update(Conversation)
+            .where(Conversation.id == conversation_id)
+            .values(recall_indexed_at=None, recall_index_model=None)
+        )
+        await db.commit()
+    log.info("chat indexing given up", extra={"ctx": {"conversation_id": str(conversation_id)}})
 
 
 async def forget(db: AsyncSession, conversation_ids: list[uuid.UUID]) -> None:

@@ -6,7 +6,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 
 from app.core.db import get_sessionmaker
 from app.features.automations.models import Automation
@@ -14,10 +14,11 @@ from app.features.conversations import recall
 from app.features.conversations.models import ChatMessage, Conversation
 from app.features.runs.models import Run, ToolCall
 from app.jobs.models import Job
-from app.jobs.runner import default_handlers
+from app.jobs.runner import default_give_ups, default_handlers
+from app.knowledge import index
 from app.knowledge.models import KnowledgeChunk
 from app.providers.adapters.fake import FakeAdapter
-from app.providers.base import Done, TextDelta
+from app.providers.base import Done, ProviderError, TextDelta
 from app.tools.base import ToolContext, ToolResult
 from app.tools.builtin.chats import ReadChat, ReadChatInput, SearchChats, SearchChatsInput
 from app.tools.untrusted import CLOSE, OPEN
@@ -360,9 +361,7 @@ async def chunks(cid: uuid.UUID) -> list[KnowledgeChunk]:
 async def queued_index_jobs() -> list[Job]:
     async with get_sessionmaker()() as db:
         return list(
-            await db.scalars(
-                select(Job).where(Job.type == "chats.index", Job.status == "queued")
-            )
+            await db.scalars(select(Job).where(Job.type == "chats.index", Job.status == "queued"))
         )
 
 
@@ -452,6 +451,54 @@ async def test_the_scheduler_only_claims_and_a_job_per_chat_embeds(authed):
     assert (await authed.delete(f"/api/conversations/{gone}")).status_code == 204
     await run_index_jobs()
     assert await chunks(gone) == []
+
+
+async def test_a_chat_whose_embedding_failed_is_embedded_once_the_provider_is_back(
+    authed, monkeypatch
+):
+    await setup(authed)
+    await use_embeddings(authed)
+    cid = await chat("Zoo visit", "We saw otters and seals.")
+    working = FakeAdapter.embed
+
+    async def down(self, model, texts):
+        raise ProviderError("embedding provider down", retryable=True)
+
+    monkeypatch.setattr(FakeAdapter, "embed", down)
+    assert await recall.index_due(LATER) == 2
+    job = next(j for j in await queued_index_jobs() if j.payload["conversation_id"] == str(cid))
+    # The job fails (and is retried) instead of leaving the chat indexed without vectors.
+    with pytest.raises(recall.ChatNotEmbedded):
+        await default_handlers()["chats.index"](job.payload)
+    assert await chunks(cid) == []
+    # Every attempt failed: the claim goes, so the next pass takes the chat again.
+    await default_give_ups()["chats.index"](job.payload)
+    async with get_sessionmaker()() as db:
+        await db.execute(delete(Job).where(Job.type == "chats.index"))
+        await db.commit()
+
+    monkeypatch.setattr(FakeAdapter, "embed", working)
+    assert await index_now() == 1  # setup()'s empty chat had nothing to embed: done
+    [chunk] = await chunks(cid)
+    assert chunk.embedding is not None
+
+
+async def test_a_document_is_still_indexed_by_its_words_when_embedding_fails(authed, monkeypatch):
+    await setup(authed)
+    await use_embeddings(authed)
+
+    async def down(self, model, texts):
+        raise ProviderError("embedding provider down", retryable=True)
+
+    monkeypatch.setattr(FakeAdapter, "embed", down)
+    source = uuid.uuid4()
+    async with get_sessionmaker()() as db:
+        assert await index.index_source(db, "document", source, ["otters and seals"]) is False
+        await db.commit()
+        [chunk] = await db.scalars(select(KnowledgeChunk).where(KnowledgeChunk.source_id == source))
+        assert chunk.content == "otters and seals" and chunk.embedding is None
+        await db.execute(delete(KnowledgeChunk).where(KnowledgeChunk.source_id == source))
+        await db.commit()
 
 
 async def test_automation_run_chats_are_not_indexed(authed):
