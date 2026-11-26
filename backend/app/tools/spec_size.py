@@ -18,12 +18,13 @@ def spec_json(tool_spec: dict[str, object]) -> str:
 
 
 def spec_sizes() -> list[tuple[str, int, int, int]]:
-    """(name, description chars, schema chars, total chars) of every offered built-in tool."""
+    """(name, description chars, schema chars, total chars) of every offered built-in tool,
+    all in one request (as a run that may use every tool gets them)."""
+    tools = [t for t in all_tools() if not t.hidden]
+    offered = frozenset(t.name for t in tools)
     rows = []
-    for tool in all_tools():
-        if tool.hidden:
-            continue
-        spec = tool.spec()
+    for tool in tools:
+        spec = tool.spec(offered)
         total = len(
             spec_json(
                 {

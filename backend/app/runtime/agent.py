@@ -414,15 +414,10 @@ class AgentRun:
     def _builder(self, rendered: dict[bool, list[Message]]) -> RequestBuilder:
         # Sorted by name, so the tool list (the start of every prompt) is the same
         # bytes on every request of a run and across runs: a prompt-cache prefix.
-        specs = (
-            []
-            if self.tools_off
-            else [
-                t.spec()
-                for t in sorted(self.tools.values(), key=lambda t: t.name)
-                if not t.hidden  # old names that are still executed, but never offered
-            ]
-        )
+        # Hidden tools: old names that are still executed, but never offered.
+        offered = sorted((t for t in self.tools.values() if not t.hidden), key=lambda t: t.name)
+        names = frozenset(t.name for t in offered)
+        specs = [] if self.tools_off else [t.spec(names) for t in offered]
 
         def build(model: ResolvedModel) -> ChatRequest:
             history = rendered[bool(model.capabilities.get("vision"))]

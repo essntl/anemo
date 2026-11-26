@@ -10,7 +10,7 @@ To add a tool: subclass Tool, then register it in tools/registry.py.
 
 import uuid
 from abc import ABC, abstractmethod
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Collection
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
 
@@ -131,6 +131,9 @@ class Tool(ABC):
     @abstractmethod
     async def run(self, args: Any, ctx: ToolContext) -> ToolResult: ...
 
-    def spec(self) -> ToolSpec:
+    def spec(self, offered: Collection[str] = ()) -> ToolSpec:
+        """What the model is told about the tool. `offered`: the names of the tools in
+        the same request, so a tool can point to another's text instead of repeating it
+        (the event types: tools/builtin/triggers.py). Empty: the tool stands alone."""
         schema = compact(self.Input.model_json_schema(), keep_null=self.null_clears)
         return ToolSpec(name=self.name, description=self.description, input_schema=schema)
