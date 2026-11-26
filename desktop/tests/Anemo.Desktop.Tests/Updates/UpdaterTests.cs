@@ -341,6 +341,49 @@ public sealed class UpdaterTests : IDisposable
         Assert.Equal(0, _platform.CleanUps);
     }
 
+    [Fact]
+    public async Task An_unexpected_error_fails_this_attempt_and_the_next_check_comes_later()
+    {
+        Release("desktop-v1.9.0");
+        _platform.Throws = new System.ComponentModel.Win32Exception(5, "Access is denied"); // the self-test blocked
+        var updater = Create();
+
+        await updater.CheckNowAsync(default);
+
+        Assert.Equal(UpdatePhase.Failed, updater.State.Phase); // not stuck at Downloading
+        Assert.Contains("tried again later", updater.State.Message);
+        Assert.Contains("update: unexpected error: Win32Exception", _log.Lines);
+        Assert.False(File.Exists(_platform.DownloadPath));
+
+        _platform.Throws = null;
+        _time.Now += TimeSpan.FromHours(1);
+        await updater.TickAsync(default);
+        Assert.Equal(UpdatePhase.Ready, updater.State.Phase);
+    }
+
+    [Fact]
+    public async Task The_loop_goes_on_after_an_unexpected_error()
+    {
+        Release("desktop-v1.9.0");
+        var calls = 0;
+        var updater = Create(
+            options: new UpdateOptions { FirstCheck = TimeSpan.Zero, Tick = TimeSpan.FromMilliseconds(10) },
+            settings: () => ++calls == 1 ? throw new InvalidOperationException("first look fails") : _settings);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        updater.Changed += () =>
+        {
+            if (updater.State.Phase == UpdatePhase.Ready)
+            {
+                cts.Cancel();
+            }
+        };
+
+        await updater.RunAsync(cts.Token);
+
+        Assert.Equal(UpdatePhase.Ready, updater.State.Phase);
+        Assert.Contains("update: unexpected error in the update loop: InvalidOperationException", _log.Lines);
+    }
+
     [Theory]
     [InlineData("1.8.0-dev")]
     [InlineData("1.8")]
@@ -374,13 +417,13 @@ public sealed class UpdaterTests : IDisposable
     private void Release(string tag, byte[]? exe = null, byte[]? sumsOf = null) =>
         _feed.Add(tag, files: [(Exe, exe ?? NewExe), (Sums, Text($"{Sha256(sumsOf ?? NewExe)} *{Exe}\n"))]);
 
-    private Updater Create(string? publicKey = null, string version = "1.8.0") => new(
-        () => _settings,
+    private Updater Create(string? publicKey = null, string version = "1.8.0", UpdateOptions? options = null, Func<DesktopSettings>? settings = null) => new(
+        settings ?? (() => _settings),
         _platform,
         _feed,
         new UpdateInstaller(DiskUpdateFiles.Instance, _platform.Launcher, _log, Path.Combine(_folder, "updates")),
         version,
-        new UpdateOptions { PublicKey = publicKey },
+        options ?? new UpdateOptions { PublicKey = publicKey },
         _time,
         _log,
         () => _busy);
