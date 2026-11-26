@@ -3972,6 +3972,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/jobs/{job_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Message
+         * @description A message for the thread: handed to its running job, which takes it in at its next
+         *     step (`now`: after interrupting the current one), or sent as the next follow-up when
+         *     the job can't take it or has ended.
+         */
+        post: operations["send_message_api_code_jobs__job_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/messages/{message_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Message
+         * @description Remove a message that wasn't delivered yet (withdrawn from the job when it holds it);
+         *     409 `message_delivered` when Claude Code took it in already.
+         */
+        delete: operations["remove_message_api_code_messages__message_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/messages/{message_id}/now": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Message Now
+         * @description Send a waiting (or held) message now: interrupting the job's current step, or as a
+         *     follow-up at once when the job has ended.
+         */
+        post: operations["send_message_now_api_code_messages__message_id__now_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/jobs/{job_id}/cancel": {
         parameters: {
             query?: never;
@@ -6811,6 +6875,11 @@ export interface components {
             job: components["schemas"]["CodeJobOut"];
             /** Thread */
             thread: components["schemas"]["CodeJobOut"][];
+            /**
+             * Messages
+             * @default []
+             */
+            messages: components["schemas"]["CodeMessageOut"][];
         };
         /** CodeJobIn */
         CodeJobIn: {
@@ -6934,6 +7003,74 @@ export interface components {
              */
             images: components["schemas"]["CodeImageOut"][];
             tokens?: components["schemas"]["CodeTokensOut"] | null;
+        };
+        /** CodeMessageIn */
+        CodeMessageIn: {
+            /** Prompt */
+            prompt: string;
+            /**
+             * Image Ids
+             * @description Uploaded images (POST /api/attachments) to send with the message
+             */
+            image_ids?: string[];
+            /**
+             * Now
+             * @description Interrupt the job's current step and send it at once (default: queue)
+             */
+            now?: boolean | null;
+        };
+        /**
+         * CodeMessageOut
+         * @description A message written for a thread while its job ran (§15).
+         */
+        CodeMessageOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Thread Id
+             * Format: uuid
+             */
+            thread_id: string;
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /** Prompt */
+            prompt: string;
+            /**
+             * Images
+             * @default []
+             */
+            images: components["schemas"]["CodeImageOut"][];
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "queue" | "now";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "queued" | "sending" | "sent" | "delivered" | "followed_up" | "held";
+            /** Note */
+            note: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Sent At */
+            sent_at: string | null;
+            /** Delivered At */
+            delivered_at: string | null;
+            /** Delivered Seq */
+            delivered_seq: number | null;
+            /** Follow Up Job Id */
+            follow_up_job_id: string | null;
         };
         /** CodeProjectOut */
         CodeProjectOut: {
@@ -22661,6 +22798,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CodeJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_message_api_code_jobs__job_id__messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeMessageIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeMessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_message_api_code_messages__message_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_message_now_api_code_messages__message_id__now_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeMessageOut"];
                 };
             };
             /** @description Validation Error */

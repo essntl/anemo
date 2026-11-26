@@ -58,6 +58,11 @@ public sealed class FakeCodeHost : ICodeHost
     /// <summary>Runs as the process tree is ended (e.g. the job writes its result just then).</summary>
     public Action<int>? OnKill { get; set; }
 
+    /// <summary>Windows PowerShell "in the system folder"; null: not there.</summary>
+    public string? PowerShell { get; set; } = @"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe";
+
+    public string? WindowsPowerShell() => PowerShell;
+
     public bool KillTree(int pid)
     {
         Killed.Enqueue(pid);

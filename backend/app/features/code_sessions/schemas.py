@@ -4,12 +4,12 @@ travel on the job's live stream (`code.job` {job}, `code.events` {job_id, events
 import re
 import uuid
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import AfterValidator, BaseModel, Field, StringConstraints
 
 from app.features.code_sessions.images import MAX_IMAGES
-from app.features.code_sessions.models import EventKind, State
+from app.features.code_sessions.models import EventKind, MessageState, State
 
 
 class CodeDeviceOut(BaseModel):
@@ -116,9 +116,31 @@ class CodeJobListOut(BaseModel):
     has_more: bool
 
 
+class CodeMessageOut(BaseModel):
+    """A message written for a thread while its job ran (§15)."""
+
+    id: uuid.UUID
+    thread_id: uuid.UUID
+    job_id: uuid.UUID  # the job it was written for (the thread's running job then)
+    prompt: str
+    images: list[CodeImageOut] = []
+    mode: Literal["queue", "now"]  # queue: at the job's next step; now: interrupting it
+    # queued | sending | sent (in the job's hands) | delivered (taken in) |
+    # followed_up (sent as a follow-up: follow_up_job_id) | held (note says why)
+    state: MessageState
+    note: str | None  # why it waits or is held
+    created_at: datetime
+    sent_at: datetime | None
+    delivered_at: datetime | None
+    delivered_seq: int | None  # the seq of its echo in the job's events
+    follow_up_job_id: uuid.UUID | None
+
+
 class CodeJobDetailOut(BaseModel):
     job: CodeJobOut
     thread: list[CodeJobOut]  # every job of its thread in start order, the job included
+    # The thread's messages (the newest 50), oldest first.
+    messages: list[CodeMessageOut] = []
 
 
 class CodeEventOut(BaseModel):
@@ -218,6 +240,18 @@ class CodeJobIn(BaseModel):
         default_factory=list,
         max_length=MAX_IMAGES,
         description="Uploaded images (POST /api/attachments) to send with the prompt",
+    )
+
+
+class CodeMessageIn(BaseModel):
+    prompt: str = Field(min_length=1, max_length=100_000)
+    image_ids: list[uuid.UUID] = Field(
+        default_factory=list,
+        max_length=MAX_IMAGES,
+        description="Uploaded images (POST /api/attachments) to send with the message",
+    )
+    now: bool | None = Field(
+        None, description="Interrupt the job's current step and send it at once (default: queue)"
     )
 
 

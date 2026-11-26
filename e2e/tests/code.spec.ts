@@ -153,3 +153,66 @@ test('a shared Claude Code job shows on the Code page and updates live', async (
     await watched?.remove()
   }
 })
+
+test('the usage indicator, and a message for a running job delivered at its next step', async ({ page, baseURL }) => {
+  await login(page)
+  const s = suffix()
+  const project = `e2e-queue-${s}`
+  const title = `Refactor the parser ${s}`
+  let computer: FakeComputer | undefined
+  try {
+    computer = await FakeComputer.connect(page.request, baseURL!, `E2E Queue PC ${s}`)
+    // Anemo Desktop 1.9.0: it lets Anemo start jobs, and they take messages while they run.
+    computer.offer({ control: true, code_start: true, code_input: true })
+    computer.answer = (command) => ({ job_id: command.job_id, message_id: command.message_id, state: 'sent' })
+    const id = jobId()
+    computer.job({ ...job(id, project, title), input: true })
+    expect(await computer.ackAtLeast(id, 0)).toBe(0)
+    const resetsAt = Math.floor(Date.now() / 1000) + 3 * 3600
+    const events = [
+      { type: 'system', subtype: 'init', session_id: SESSION, model: 'claude-opus-5-5' },
+      { type: 'user', message: { role: 'user', content: title }, isReplay: true, uuid: 'prompt-echo', session_id: SESSION },
+      {
+        type: 'rate_limit_event',
+        rate_limit_info: {
+          status: 'allowed', resetsAt, rateLimitType: 'five_hour',
+          unifiedWindows: {
+            five_hour: { utilization: 0.49, resetsAt, status: 'allowed' },
+            seven_day: { utilization: 0.25, resetsAt: resetsAt + 86400, status: 'allowed' },
+          },
+        },
+      },
+      {
+        type: 'assistant', session_id: SESSION, parent_tool_use_id: null,
+        message: { role: 'assistant', content: [{ type: 'tool_use', id: 'toolu_sleep', name: 'Bash', input: { command: 'npm test' } }] },
+      },
+    ]
+    computer.events(id, 1, events)
+    expect(await computer.ackAtLeast(id, events.length)).toBe(events.length)
+
+    await page.goto('/code')
+    await page.getByTestId('code-thread').filter({ hasText: title }).click()
+    // The usage shows in the thread's header (and the list's); the event isn't a step of the job.
+    await expect(page.getByTestId('code-usage').first()).toContainText('49%')
+    await expect(page.getByTestId('code-usage').first()).toContainText('25%')
+    await expect(page.getByText('Event: rate_limit_event')).toHaveCount(0)
+
+    // A message while it runs goes to the job at once; Claude Code takes it in at its next step.
+    await page.getByRole('textbox', { name: 'Message for this job' }).fill('Keep the old API working too.')
+    await page.getByRole('button', { name: 'Queue message' }).click()
+    const sent = await computer.command('code_input')
+    expect(sent).toMatchObject({ job_id: id, prompt: 'Keep the old API working too.', now: false })
+    await expect(page.getByTestId('queued-message')).toContainText('Queued: Claude Code takes it in after its current step')
+
+    computer.events(id, events.length + 1, [
+      { type: 'user', session_id: SESSION, parent_tool_use_id: null, message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_sleep', content: 'ok' }] } },
+      { type: 'user', message: { role: 'user', content: 'Keep the old API working too.' }, isReplay: true, uuid: sent.message_id, session_id: SESSION },
+    ])
+    await expect(page.getByTestId('delivered-message')).toContainText('Keep the old API working too.')
+    await expect(page.getByTestId('delivered-message')).toContainText('Delivered')
+    await expect(page.getByTestId('queued-message')).toHaveCount(0)
+  } finally {
+    await computer?.remove()
+  }
+})
+

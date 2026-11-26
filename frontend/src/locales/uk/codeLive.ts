@@ -15,6 +15,19 @@ const messages: Messages = {
   "Claude subscription usage as of {when}": "Використання підписки Claude станом на {when}",
   "Tokens": "Токени",
   "{input} input ({cached} read from the cache, {written} written to it) · {output} output": "{input} на вході ({cached} прочитано з кешу, {written} записано в нього) · {output} на виході",
+  "A queued message couldn’t be sent: it is back in its thread’s box.": "Повідомлення з черги не вдалося надіслати: воно знову в полі введення свого ланцюжка.",
+  "Delivered {when}": "Доставлено {when}",
+  "This message wasn’t sent.": "Це повідомлення не надіслано.",
+  "Sending…": "Надсилання…",
+  "Sending now: Claude Code stops its current step…": "Надсилається зараз: Claude Code зупиняє поточний крок…",
+  "Queued: Claude Code takes it in after its current step": "У черзі: Claude Code прочитає його після поточного кроку",
+  "Queued: sent after Claude Code’s current step": "У черзі: буде надіслано після поточного кроку Claude Code",
+  "Send it as a follow-up now": "Надіслати як продовження зараз",
+  "Stop Claude Code’s current step and send this now": "Зупинити поточний крок Claude Code і надіслати це зараз",
+  "Message for this job": "Повідомлення для цього запуску",
+  "Queue a message for this job…": "Додати повідомлення в чергу цього запуску…",
+  "Send now: stop Claude Code’s current step and send this at once": "Надіслати зараз: зупинити поточний крок Claude Code і одразу надіслати це",
+  "Queue: Claude Code takes it in after its current step": "У чергу: Claude Code прочитає його після поточного кроку",
 }
 
 export default messages

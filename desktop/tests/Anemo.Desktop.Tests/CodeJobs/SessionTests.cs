@@ -52,7 +52,8 @@ public sealed class SessionTests : IDisposable
         Assert.Null(sent["ended"]);
         Assert.Equal("feat/flaky-test", (string?)sent["branch"]);
         Assert.Null(sent["stderr_tail"]);
-        Assert.Equal(13, sent.Count);
+        Assert.False((bool)sent["input"]!); // a job of cc.ps1 takes no messages while it runs (§15)
+        Assert.Equal(14, sent.Count);
 
         // Nothing more before the ack.
         await _h.StepAsync();

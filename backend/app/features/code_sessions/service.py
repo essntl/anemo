@@ -19,7 +19,7 @@ from sqlalchemy.orm import aliased
 from app.core.db import get_sessionmaker
 from app.core.errors import NotFound
 from app.features.attachments import service as attachments
-from app.features.code_sessions import images
+from app.features.code_sessions import images, inbox
 from app.features.code_sessions.models import CodeJob, CodeJobEvent, State
 from app.features.code_sessions.schemas import (
     CodeDeviceOut,
@@ -266,10 +266,15 @@ async def list_jobs(
 
 async def thread(db: AsyncSession, job: CodeJob) -> list[CodeJob]:
     """Every job of the job's thread, in start order."""
+    return await thread_of(db, job.thread_id)
+
+
+async def thread_of(db: AsyncSession, thread_id: uuid.UUID) -> list[CodeJob]:
+    """Every job of the thread, in start order."""
     return list(
         await db.scalars(
             select(CodeJob)
-            .where(CodeJob.thread_id == job.thread_id)
+            .where(CodeJob.thread_id == thread_id)
             .order_by(CodeJob.started_at, CodeJob.id)
         )
     )
@@ -282,7 +287,9 @@ async def detail(db: AsyncSession, job_id: uuid.UUID) -> CodeJobDetailOut:
         jobs.append(job)
     shaped = await jobs_out(db, jobs)
     mine = next(j for j in shaped if j.id == job.id)
-    return CodeJobDetailOut(job=mine, thread=shaped)
+    return CodeJobDetailOut(
+        job=mine, thread=shaped, messages=await inbox.of_thread(db, job.thread_id)
+    )
 
 
 async def one_out(db: AsyncSession, job_id: uuid.UUID) -> CodeJobOut | None:

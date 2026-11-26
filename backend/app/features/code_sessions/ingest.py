@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_sessionmaker
 from app.core.ids import uuid7
 from app.events import bus
-from app.features.code_sessions import parse, service, trim, usage
+from app.features.code_sessions import inbox, parse, service, trim, usage
 from app.features.code_sessions.models import TERMINAL, CodeJob, CodeJobEvent, State
 from app.features.notifications import service as notifications
 
@@ -65,6 +65,8 @@ class JobIn(BaseModel):
     ended: datetime | None = None
     branch: str | None = Field(None, max_length=255)
     stderr_tail: str | None = Field(None, max_length=4000)
+    # It takes messages now (§15, Anemo Desktop 1.9.0; older clients don't send it).
+    input: bool = False
 
     @field_validator(
         "device_job_dir",
@@ -131,6 +133,8 @@ class _Changes:
     thread_changed: bool = False
     stored: list[CodeJobEvent] = field(default_factory=list)
     usage_changed: bool = False  # the computer's usage (code_usage) was updated
+    input_opened: bool = False  # the job takes messages now, and didn't before
+    messages_changed: bool = False  # messages for it were delivered
 
 
 async def _locked(db: AsyncSession, device_id: uuid.UUID, job_key: str) -> CodeJob | None:
@@ -167,6 +171,8 @@ def _client_state(job: CodeJob, state: State, ended: datetime | None) -> None:
 
 
 def _result_state(job: CodeJob, result: parse.Result) -> None:
+    if job.input_mode:
+        return  # it answers once per message and goes on: its client says when it ended (§15)
     if job.state in ("running", "exited_without_result"):
         _end(job, "failed" if result.failed else "done")
 
@@ -276,12 +282,17 @@ async def _job(db: AsyncSession, device_id: uuid.UUID, data: JobIn) -> tuple[Cod
         job.branch = data.branch
     if data.stderr_tail is not None:
         job.stderr_tail = data.stderr_tail
+    if data.input:
+        job.input_mode = True
+    was_open = job.input_open
     if changes.old_state is None:
         # A new row takes the client's state as it is. A job first seen finished is a
         # back-filled one: seen_running stays off, so it doesn't notify (D10).
         _end(job, data.state, data.ended)
     else:
         _client_state(job, data.state, data.ended)
+    job.input_open = data.input and job.state == "running"
+    changes.input_opened = job.input_open and not was_open
     changes.thread_changed = await _join_parent(db, job)
     return job, changes
 
@@ -448,6 +459,7 @@ async def _events(db: AsyncSession, job: CodeJob, frame: EventsFrame) -> _Change
     )
     session_known = False
     newest_limit: parse.RateLimit | None = None
+    replays: list[tuple[str, int]] = []
     for p in prepared:
         if p.seq not in inserted:
             continue
@@ -458,10 +470,14 @@ async def _events(db: AsyncSession, job: CodeJob, frame: EventsFrame) -> _Change
         session_known = _apply(job, p) or session_known
         if p.pulled.rate_limit is not None:
             newest_limit = p.pulled.rate_limit  # prepared is in seq order
+        if p.pulled.replay_uuid is not None:
+            replays.append((p.pulled.replay_uuid, p.seq))
     if not inserted:
         return changes
     if newest_limit is not None:
         changes.usage_changed = await usage.record(db, job, newest_limit)
+    if replays:
+        changes.messages_changed = await inbox.delivered(db, job, replays) > 0
     job.last_event_at = datetime.now(UTC)
     if min(inserted) <= job.last_seq + 1:
         job.last_seq = await _contiguous(db, job)
@@ -557,7 +573,9 @@ async def _publish(db: AsyncSession, job: CodeJob, changes: _Changes) -> None:
     if changes.usage_changed:
         await bus.publish_global("code.usage", {"device_id": str(job.device_id)})
     now = time.monotonic()
-    state_changed = changes.old_state != job.state or changes.thread_changed
+    state_changed = (
+        changes.old_state != job.state or changes.thread_changed or changes.messages_changed
+    )
     if state_changed or now - _last_global.get(job.id, 0.0) >= GLOBAL_EVERY_S:
         _last_global[job.id] = now
         if len(_last_global) > 1000:  # forget the jobs that went quiet
@@ -600,6 +618,7 @@ async def handle(device_id: uuid.UUID, message: dict[str, Any]) -> dict[str, Any
 async def _handle_job(device_id: uuid.UUID, frame: JobFrame) -> dict[str, Any]:
     async with get_sessionmaker()() as db:
         job, changes = await _job(db, device_id, frame.job)
+        await inbox.kick_if_due(db, job, old_state=changes.old_state, opened=changes.input_opened)
         await _finish(db, job)
         if changes.old_state is None:
             log.info(
@@ -616,6 +635,7 @@ async def _handle_events(device_id: uuid.UUID, frame: EventsFrame) -> dict[str, 
         if job is None:
             return None  # the client always sends code.job first
         changes = await _events(db, job, frame)
+        await inbox.kick_if_due(db, job, old_state=changes.old_state)
         await _finish(db, job)
         if changes.stored or changes.old_state != job.state or changes.usage_changed:
             await _publish(db, job, changes)
@@ -705,6 +725,9 @@ async def answered_state(job_id: uuid.UUID, state: State) -> CodeJob | None:
             return None
         changes = _Changes(old_state=job.state)
         _client_state(job, state, None)
+        if job.state != "running":
+            job.input_open = False
+        await inbox.kick_if_due(db, job, old_state=changes.old_state)
         await _finish(db, job)
         if job.state != changes.old_state:
             await _publish(db, job, changes)

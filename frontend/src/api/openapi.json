@@ -16499,6 +16499,189 @@
         }
       }
     },
+    "/api/code/jobs/{job_id}/messages": {
+      "post": {
+        "tags": [
+          "code"
+        ],
+        "summary": "Send Message",
+        "description": "A message for the thread: handed to its running job, which takes it in at its next\nstep (`now`: after interrupting the current one), or sent as the next follow-up when\nthe job can't take it or has ended.",
+        "operationId": "send_message_api_code_jobs__job_id__messages_post",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeMessageIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeMessageOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/messages/{message_id}": {
+      "delete": {
+        "tags": [
+          "code"
+        ],
+        "summary": "Remove Message",
+        "description": "Remove a message that wasn't delivered yet (withdrawn from the job when it holds it);\n409 `message_delivered` when Claude Code took it in already.",
+        "operationId": "remove_message_api_code_messages__message_id__delete",
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Message Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/messages/{message_id}/now": {
+      "post": {
+        "tags": [
+          "code"
+        ],
+        "summary": "Send Message Now",
+        "description": "Send a waiting (or held) message now: interrupting the job's current step, or as a\nfollow-up at once when the job has ended.",
+        "operationId": "send_message_now_api_code_messages__message_id__now_post",
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Message Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeMessageOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/code/jobs/{job_id}/cancel": {
       "post": {
         "tags": [
@@ -26488,6 +26671,14 @@
             },
             "type": "array",
             "title": "Thread"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/CodeMessageOut"
+            },
+            "type": "array",
+            "title": "Messages",
+            "default": []
           }
         },
         "type": "object",
@@ -26905,6 +27096,174 @@
           "truncated"
         ],
         "title": "CodeJobOut"
+      },
+      "CodeMessageIn": {
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "maxLength": 100000,
+            "minLength": 1,
+            "title": "Prompt"
+          },
+          "image_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Image Ids",
+            "description": "Uploaded images (POST /api/attachments) to send with the message"
+          },
+          "now": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Now",
+            "description": "Interrupt the job's current step and send it at once (default: queue)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "prompt"
+        ],
+        "title": "CodeMessageIn"
+      },
+      "CodeMessageOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "thread_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Thread Id"
+          },
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Job Id"
+          },
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/CodeImageOut"
+            },
+            "type": "array",
+            "title": "Images",
+            "default": []
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "queue",
+              "now"
+            ],
+            "title": "Mode"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "sending",
+              "sent",
+              "delivered",
+              "followed_up",
+              "held"
+            ],
+            "title": "State"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "sent_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent At"
+          },
+          "delivered_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivered At"
+          },
+          "delivered_seq": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivered Seq"
+          },
+          "follow_up_job_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Follow Up Job Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "thread_id",
+          "job_id",
+          "prompt",
+          "mode",
+          "state",
+          "note",
+          "created_at",
+          "sent_at",
+          "delivered_at",
+          "delivered_seq",
+          "follow_up_job_id"
+        ],
+        "title": "CodeMessageOut",
+        "description": "A message written for a thread while its job ran (\u00a715)."
       },
       "CodeProjectOut": {
         "properties": {

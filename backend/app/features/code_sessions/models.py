@@ -113,6 +113,11 @@ class CodeJob(Base, IdMixin, TimestampMixin):
     )
     # The last result's token counts ({input, output, cache_read, cache_creation}).
     tokens: Mapped[dict[str, int] | None] = mapped_column(JSONB)
+    # It takes messages while it runs (§15): started by Anemo with `input`, Claude Code
+    # reading stream-json from a feeder. A result then doesn't end it; its client's end does.
+    input_mode: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # It takes them now (the client's code.job `input`): running, its stdin still open.
+    input_open: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
 
 class CodeUsage(Base, IdMixin, TimestampMixin):
@@ -136,6 +141,61 @@ class CodeUsage(Base, IdMixin, TimestampMixin):
     # When it was true: when the event arrived for a running job, else when its job ended.
     observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     job_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("code_jobs.id", ondelete="SET NULL")
+    )
+
+
+MessageState = Literal["queued", "sending", "sent", "delivered", "followed_up", "held"]
+MESSAGE_STATES: tuple[str, ...] = ("queued", "sending", "sent", "delivered", "followed_up", "held")
+# Not yet in Claude Code's hands for good: what a job's end sends as a follow-up.
+PENDING_MESSAGES: tuple[str, ...] = ("queued", "sending", "sent", "held")
+
+
+class CodeMessage(Base, IdMixin, TimestampMixin):
+    """A message written on the Code page for a thread whose job runs
+    (docs/specs/code-sessions.md §15). It goes to the running job (Claude Code takes it in
+    at its next step), or, when the job can't take messages or ends first, as the next
+    follow-up.
+
+      queued       waiting in Anemo (the job doesn't take messages now, or the computer is away)
+      sending      being handed over (claimed, so only one worker sends it)
+      sent         in the job's inbox / Claude Code's queue, not taken in yet
+      delivered    Claude Code took it in (its echo, `isReplay` with `claude_uuid`, arrived)
+      followed_up  sent as (part of) a follow-up job (`follow_up_job_id`)
+      held         couldn't be sent by itself (`note` says why): the user sends or drops it
+    """
+
+    __tablename__ = "code_messages"
+    __table_args__ = (
+        CheckConstraint(
+            "state IN ('queued', 'sending', 'sent', 'delivered', 'followed_up', 'held')",
+            name="state",
+        ),
+        CheckConstraint("mode IN ('queue', 'now')", name="mode"),
+        Index("ix_code_messages_thread_id", "thread_id", "created_at"),
+        Index("ix_code_messages_job_id_claude_uuid", "job_id", "claude_uuid"),
+        Index("ix_code_messages_state", "state"),
+    )
+
+    thread_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    # The job it is for: the thread's running job when it was written (or sent to).
+    job_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("code_jobs.id", ondelete="CASCADE")
+    )
+    prompt: Mapped[str] = mapped_column(Text)
+    images: Mapped[list[dict[str, str]]] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb")
+    )
+    # queue: at the job's next step; now: interrupt the current one first.
+    mode: Mapped[str] = mapped_column(String(10), default="queue", server_default="queue")
+    state: Mapped[MessageState] = mapped_column(String(20), default="queued")
+    note: Mapped[str | None] = mapped_column(String(500))  # why it is held or waits
+    # The uuid Claude Code knows it by (a new one after a withdrawal and an edit).
+    claude_uuid: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    delivered_seq: Mapped[int | None] = mapped_column(Integer)  # its echo in the job's events
+    follow_up_job_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("code_jobs.id", ondelete="SET NULL")
     )
 

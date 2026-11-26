@@ -98,7 +98,8 @@ client → {"type": "device.offer", "control": bool, "shell": bool, "code": bool
           code_start, code_images, code_git or code_git_remote means false. shell_kind (1.4.0): the shell `shell` runs in; missing, or any other
           value, means "powershell". files (1.7.0): "Let Anemo read and write files" is
           on and the device is trusted: the file actions of §8 are there; missing means
-          false.
+          false. code_input (1.9.0): the jobs Anemo starts take messages while they run
+          (§7.4 `code_input`, `code_input_withdraw`); missing means false.
 server → {"type": "device.command", "id": "<uuid>", "action": "<action>", …fields}
 client → {"type": "device.result", "id": "<uuid>", "ok": true, "state": {…}}
 client → {"type": "device.result", "id": "<uuid>", "ok": false, "error": "<one sentence>",
@@ -261,7 +262,8 @@ messages from the server of up to 16 MB (4 MB before). 1.4.0 adds `hello.platfor
 result code. 1.6.0 adds remote repositories and fetching to the git actions (§7.6, the
 `code_git_remote` offer field, `code_git_cache_clear`, the `unauthenticated` result code).
 1.7.0 adds files between the computer and the workspace (§8, the `files` offer field, the
-`exists` result code).
+`exists` result code). 1.9.0 adds messages for a running job (§7.4: `code_start` `input`,
+`code_input`, `code_input_withdraw`, the `code_input` offer field, `code.job` `input`).
 The server still supports 1.0.0: an older client simply sends no `code.*`. The server sends
 `{"type": "notice", "text": "…"}` once per connection when a client is older than the
 oldest version it supports; it keeps working where it can. A client that gets an action it
@@ -398,6 +400,21 @@ to such a client and otherwise answers the user with `images_unsupported` (409).
   (with the list), and the server keeps the prompt as it sent it for such a job.
 - A port (macOS, Linux) does the same with its own folder separators; nothing else
   depends on the platform. `cc.ps1` doesn't take images.
+
+**Messages while a job runs (Anemo Desktop 1.9.0, Windows).** A client that has them says
+`"code_input": true` in its offer. `code_start` then takes `"input": true`: the job runs
+Claude Code with `--input-format stream-json --replay-user-messages`, its stdin fed by
+`feed.ps1` in the job folder from the files of `<job>\inbox\` (the prompt first;
+`meta.json` `"input": "stream-json"`; see `docs/specs/code-sessions.md` §15). Such a job is
+`running` while its process lives (it writes a `result` per answer); its last result
+decides how it ended. `code.job` gains `"input": bool` (it takes messages now).
+
+| action | fields | `state` |
+|---|---|---|
+| `code_input` | `job_id`, `message_id` (a UUID: the `uuid` Claude Code echoes with `isReplay: true` when it takes the message in), `prompt` (1–100 000), `now` (bool: interrupt the current step first), `images?` (as `code_start`'s) | `{"job_id", "message_id", "state": "sent"}`; `failed` "The job no longer takes messages." when it doesn't (any more) |
+| `code_input_withdraw` | `job_id`, `message_id` | `{"job_id", "message_id", "withdrawn": bool}`: false when Claude Code took it in already or the job no longer takes messages |
+
+Both are refused like `code_start` (trusted, "Let Anemo start Claude Code jobs" on).
 
 **Only the projects folder (Anemo Desktop 1.5.0).** `code_projects` with
 `"local_only": true` lists the folders without asking `gh` for the repositories (`remote`

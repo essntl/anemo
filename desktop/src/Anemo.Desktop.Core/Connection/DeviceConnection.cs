@@ -378,7 +378,7 @@ public sealed class DeviceConnection
                 var code = Device is { } device && _owner._codeJobs?.Offered(device) == true;
                 var codeStart = Device is { } d && _owner._codeJobs?.OfferedStart(d) == true;
                 var files = Device is { } f && _owner._filesOffered(f);
-                await SendAsync(Wire.Offer(_owner._control.Effective, _owner._shellSwitchedOn(), code, codeStart, _owner._shellKind(), files));
+                await SendAsync(Wire.Offer(_owner._control.Effective, _owner._shellSwitchedOn(), code, codeStart, _owner._shellKind(), files, codeInput: _owner._platform == "windows"));
             }
             catch (Exception e) when (e is WebSocketException or OperationCanceledException or ObjectDisposedException)
             {

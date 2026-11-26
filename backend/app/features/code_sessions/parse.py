@@ -119,6 +119,9 @@ class PullOuts:
     branch: str | None = None
     result: Result | None = None
     rate_limit: RateLimit | None = None
+    # A message Claude Code took in, echoed with `isReplay` and the uuid it was sent with
+    # (§15: --replay-user-messages): the proof it was delivered.
+    replay_uuid: str | None = None
 
 
 def kind(event: dict[str, Any]) -> Kind:
@@ -410,6 +413,8 @@ def pull_outs(event: dict[str, Any]) -> PullOuts:
         ]
         out.branch = _last_branch(commands, BRANCH_COMMANDS)
     elif kind_ == "user":
+        if event.get("isReplay") is True:
+            out.replay_uuid = _text(event.get("uuid"), MAX_ID)
         texts = _tool_result_texts(event)
         out.branch = _last_branch(texts, (NEW_BRANCH,))
     elif kind_ == "other":

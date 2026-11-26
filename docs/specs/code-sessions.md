@@ -1,6 +1,7 @@
 # Code: live view of Claude Code jobs
 
-Status: phase 1 (watch) and phase 2 (control). This file is the contract between the
+Status: phase 1 (watch), phase 2 (control), the usage indicator (§14), messages while a job
+runs (§15) and auto continue after the usage limit (§16). This file is the contract between the
 desktop client, the backend and the frontend for this feature. The wire part is also in
 `docs/device-contracts.md` §7; when the two disagree, `device-contracts.md` wins and this
 file is fixed.
@@ -38,6 +39,7 @@ claude_code.py`, `claude-runner/`) is unrelated and is not used.
 | D13 | `total_cost_usd` is shown as **API-equivalent cost**, never as money spent. | Artem uses a Claude subscription. |
 | D14 | Phase 2 commands are `device.command` actions (`code_projects`, `code_start`, `code_cancel`) and need a second desktop setting, "Let Anemo start Claude Code jobs" (off by default), advertised in `device.offer`. | Starting a job with `bypassPermissions` is as strong as PowerShell; it gets its own switch. |
 | D15 | Images with a prompt are files in the job's folder whose paths the prompt lists (§13), not `--input-format stream-json` image blocks. | Works for a new job and `--resume` alike with the `claude -p` command line, `prompt.txt` and the folder format unchanged; easy to port. |
+| D16 | Messages for a running job go through Claude Code's stream-json stdin, fed by a PowerShell script in the job's folder that forwards the files of its `inbox` (§15). D15 stays for prompts: a message's images are files too. | Claude Code itself takes them in at its next step, and can withdraw one or interrupt; the job and its input outlive Anemo Desktop. |
 
 ## 3. Protocol (phase 1)
 
@@ -718,3 +720,128 @@ Claude Code writes a `rate_limit_event` before most API calls (dozens per job). 
 - **Tokens**: a `result`'s `usage` gives `code_jobs.tokens` (`{input, output, cache_read,
   cache_creation}`, `CodeJobOut.tokens`); the result card shows them next to turns,
   duration and API-equivalent cost.
+
+## 15. Messages while a job runs
+
+A message written while a thread's job runs used to wait in the browser until the whole
+job ended and then went out as a follow-up. Now Claude Code takes it in at its **next
+step** (after the tool call that runs), in the same process and session, and "Send now"
+stops the current step first.
+
+### 15.1 The mechanism (decision D16)
+
+Checked with Claude Code 2.1.330 on the Windows VM (`--input-format stream-json
+--output-format stream-json --verbose --replay-user-messages`, stdin a pipe):
+
+- A user message written to stdin while a tool call runs is taken in right after that
+  tool call's result, in the same turn: `{"type":"user","message":{…},"isReplay":true,
+  "uuid":"<the uuid it was sent with>"}` appears on stdout there. Several messages
+  queued together go in together. Written after the `result`, a message starts a new turn.
+- `{"type":"control_request","request_id","request":{"subtype":"interrupt"}}` stops the
+  running step (a `result` with `subtype: "error_during_execution"`); a message written
+  right after it then starts the next turn: "send now".
+- `{"subtype":"cancel_async_message","message_uuid"}` withdraws a queued message Claude
+  Code hasn't taken in: `control_response … {"cancelled": true}`; `false` once taken in.
+- With stdin open Claude Code waits for more; when stdin closes it finishes and exits.
+- Each answer ends with its own `result` (`num_turns`, `total_cost_usd` count the whole
+  process).
+
+The job must stay detached and outlive Anemo Desktop (an update restarts it), so its stdin
+can't be a pipe Anemo Desktop holds. **Chosen**: a small PowerShell script in the job's
+folder (`feed.ps1`, written by Anemo Desktop 1.9.0, `JobFeeder.Script`) is the job's stdin:
+
+```
+cmd.exe /d /v:off /s /c ""<powershell.exe>" -NoProfile -NonInteractive -ExecutionPolicy Bypass
+  -File "<job>\feed.ps1" "<job>" | "<claude>" -p --input-format stream-json
+  --output-format stream-json --verbose --replay-user-messages --permission-mode
+  bypassPermissions [--resume …] [--model …] [--max-turns …] > "<job>\out.jsonl" 2> "<job>\err.txt""
+```
+
+The script forwards the files of `<job>\inbox\` in name order (each claimed by renaming
+`*.jsonl` → `*.sending` → `*.sent`) and never builds JSON itself. It ends, closing Claude
+Code's stdin, when Claude Code wrote a `result` followed by 4 s with nothing new
+(bookkeeping lines don't count) and no message waits, when the job was cancelled, when the
+pipe breaks, or when Claude Code is no longer a child of the job's `cmd.exe` (checked every
+15 s); then it writes `inbox\closed`. Anemo Desktop only writes files into `inbox`, so a
+restart of Anemo Desktop changes nothing for a running job. Windows PowerShell is taken
+from the system folder only (never from PATH or a project folder).
+
+Rejected: Anemo Desktop holding the pipe (a restart, e.g. an update, would end every job's
+input); killing the job and resuming its session for each message (loses the running
+step); Claude Code hooks (a Stop hook can't take a message in mid-turn, and hooks are the
+user's configuration); `claude --bg` background sessions (interactive, no stream-json log
+in the job folder).
+
+The first message, the prompt, is `inbox\00000000000000000000-prompt.jsonl`; `prompt.txt`
+still holds the prompt as text (for `cc.ps1`, agents and the page); `meta.json` gets
+`"input": "stream-json"`. Jobs of `cc.ps1` and `bridge/cc.mjs`, jobs of an older Anemo
+Desktop and jobs on a Mac take no messages: theirs go as the next follow-up, as before.
+
+### 15.2 Desktop (Anemo Desktop 1.9.0, Windows)
+
+- Offer `code_input: true` (with `code_start`, on Windows).
+- `code_start` with `"input": true` starts the job as above when Windows PowerShell is in
+  the system folder (else as before).
+- `code_input {job_id, message_id (uuid), prompt (1–100 000), now?, images?}`: the job
+  must take messages (meta `input`, process alive, no `cancelled`, no `inbox\closed`;
+  else `failed` "The job no longer takes messages."). Writes `inbox\<ticks>-m-<message
+  id>.jsonl` (a temporary name first) with the user line (`uuid` = message id), after an
+  `interrupt` control line when `now`. Images go to `messages\<message id>\images\` and
+  are listed after the text as with a prompt (§13). Answers `{job_id, message_id, state:
+  "sent"}`.
+- `code_input_withdraw {job_id, message_id}`: a file still in the inbox is renamed to
+  `.withdrawn` (the script claims by renaming too, so only one wins) → `withdrawn: true`;
+  else a `cancel_async_message` control line is written and its `control_response` waited
+  for (8 s) → `withdrawn: <cancelled>`; `false` when the job no longer takes messages.
+- `code.job` gains `"input": bool`: the job takes messages now (running, meta `input`, no
+  `inbox\closed`). A job with meta `input` is `running` while its process lives, whatever
+  its results say; once it has ended, its last result decides (`done` / `failed`). A
+  cancel doesn't look at its results.
+
+### 15.3 Backend
+
+- `code_jobs.input_mode` (it said `input: true` once: results don't end it, its client's
+  end does) and `input_open` (the latest `code.job`'s `input`, while running); migration
+  0085. `code_start` sends `input: true` when the offer has `code_input`.
+- `code_messages` (`messages.py`, `inbox.py`): `thread_id`, `job_id` (the thread's running
+  job when written), `prompt`, `images`, `mode` (`queue` | `now`), `state` (`queued` →
+  `sending` → `sent` → `delivered`, or `followed_up`, or `held` with `note`),
+  `claude_uuid` (the uuid Claude Code knows it by; a new one after a withdrawal),
+  `sent_at`, `delivered_at`, `delivered_seq`, `follow_up_job_id`.
+- **Delivery**: an event `user` with `isReplay: true` whose `uuid` is a message's
+  `claude_uuid` marks it `delivered` (with that seq) and notifies the lists.
+- **Settling** (`messages.settle(thread)`, after every change in the API, and in the
+  worker for the `code.messages` job): when the thread's last job runs and takes messages
+  (its offer has `code_input`, `input_open`), each `queued` message is claimed
+  (`sending`, committed) and sent with `code_input`; on `failed` it goes back to `queued`
+  ("sent as a follow-up when it ends"). A `now` message for a job that can't take it
+  cancels the job, which makes it the next follow-up at once. When the last job has ended,
+  every `queued` / `sent` message goes as **one** follow-up (texts joined by a blank line,
+  images in order, at most 8), unless the job failed or exited without a result, or left
+  no session (`held`, with why); a computer that is away or can't start jobs leaves them
+  `queued` with a note.
+- **Kicks**: ingestion enqueues `code.messages {thread_id}` when a job with waiting
+  messages ends or starts taking messages; the scheduler (`code.messages`, every 30 s)
+  gives back claims older than 5 minutes and kicks threads whose computer is online and
+  whose job ended or takes messages. So messages go out with no browser open.
+- **API**: `POST /api/code/jobs/{id}/messages {prompt, image_ids?, now?}` → 201
+  `CodeMessageOut`; `DELETE /api/code/messages/{id}` → 204 (a `sent` one is withdrawn
+  first; 409 `message_delivered` once Claude Code took it in, 409 `message_sending` while
+  it is being sent); `POST /api/code/messages/{id}/now` → `CodeMessageOut` (withdraws a
+  `sent` one and sends it again with an interrupt; for an ended job, a follow-up at once,
+  also for a `held` one). `CodeJobDetailOut.messages`: the thread's newest 50, oldest first.
+
+### 15.4 Page
+
+- While the job runs the box queues (the button and Enter), and **Send now** next to it
+  (shown when the computer lets Anemo stop jobs) sends with `now`.
+- Waiting messages (`queued`, `sending`, `sent`, `held`) are cards over the box, each
+  saying where it is ("Queued: Claude Code takes it in after its current step", the
+  server's note, "Sending now…"), with Send now, Edit (withdraws it and puts the text and
+  images back in the box) and Remove. A message Claude Code took in meanwhile can't be
+  taken back: the page says so.
+- The timeline shows each delivered message where Claude Code took it in, as the user's
+  bubble with "Delivered <time>" (the first echo is the prompt's and isn't shown);
+  `command_lifecycle`, `control_request` and `control_response` are left out.
+- What an older page queued in the browser (`anemo.codeQueue` `byThread`) is sent to the
+  server once (`CodeQueueRunner`); one the server refuses goes back into its thread's box.

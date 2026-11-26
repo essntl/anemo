@@ -36,6 +36,12 @@ public sealed record DesktopPlatform
     /// </summary>
     public bool JobsThroughCmdExe { get; init; }
 
+    /// <summary>
+    /// A job Anemo starts can take messages while it runs (code-sessions.md §15): its stdin is
+    /// fed by a Windows PowerShell script. Not on macOS yet.
+    /// </summary>
+    public bool JobsTakeInput { get; init; }
+
     /// <summary><c>press</c> takes <c>Cmd</c> as a modifier and the Mac's own keys rules apply.</summary>
     public bool IsMac { get; init; }
 
@@ -73,6 +79,7 @@ public sealed record DesktopPlatform
         DefaultJobsFolder = CodeJobLimits.DefaultFolder,
         DefaultProjectsFolder = CodeJobLimits.DefaultProjectsFolder,
         JobsThroughCmdExe = true,
+        JobsTakeInput = true,
     };
 
     /// <summary>macOS, for the user whose home folder is <paramref name="home"/>.</summary>

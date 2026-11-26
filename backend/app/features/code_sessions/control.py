@@ -242,6 +242,9 @@ async def start_job(
         fields["follow_job_id"] = follow_job_id
     if ready:
         fields["images"] = [image.command() for image in ready]
+    if offer.code_input:
+        # It takes messages while it runs (§15): Anemo Desktop 1.9.0 on Windows.
+        fields["input"] = True
     await db.close()  # nothing is held while the computer answers
     state = await send_command(device, "code_start", fields, START_TIMEOUT_S)
     job_key = state.get("job_id")
@@ -271,7 +274,7 @@ async def start_job(
     return shaped
 
 
-async def _last_of_thread(db: AsyncSession, job: CodeJob) -> CodeJob:
+async def last_of_thread(db: AsyncSession, job: CodeJob) -> CodeJob:
     jobs = await service.thread(db, job)
     return jobs[-1] if jobs else job
 
@@ -289,7 +292,7 @@ async def follow_up(
 ) -> CodeJobOut:
     """Resume the session of the thread's last job, in its project on its computer: the
     new job joins the thread."""
-    last = await _last_of_thread(db, await service.get(db, job_id))
+    last = await last_of_thread(db, await service.get(db, job_id))
     if last.state not in TERMINAL:
         raise JobRunning("The thread's last job is still running.")
     if not last.session_id:

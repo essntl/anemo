@@ -30,7 +30,7 @@ from app.api.deps import Db
 from app.api.sse import comment, frame, sse_response
 from app.core.db import get_sessionmaker
 from app.events import bus
-from app.features.code_sessions import control, git, service, usage
+from app.features.code_sessions import control, git, messages, service, usage
 from app.features.code_sessions.models import State
 from app.features.code_sessions.schemas import (
     CodeDeviceOut,
@@ -40,6 +40,8 @@ from app.features.code_sessions.schemas import (
     CodeJobIn,
     CodeJobListOut,
     CodeJobOut,
+    CodeMessageIn,
+    CodeMessageOut,
     CodeProjectsOut,
     CodeUsageListOut,
 )
@@ -200,6 +202,30 @@ async def follow_up(job_id: uuid.UUID, body: CodeFollowUpIn, db: Db) -> CodeJobO
         max_turns=body.max_turns,
         image_ids=body.image_ids,
     )
+
+
+@router.post("/jobs/{job_id}/messages", response_model=CodeMessageOut, status_code=201)
+async def send_message(job_id: uuid.UUID, body: CodeMessageIn, db: Db) -> CodeMessageOut:
+    """A message for the thread: handed to its running job, which takes it in at its next
+    step (`now`: after interrupting the current one), or sent as the next follow-up when
+    the job can't take it or has ended."""
+    return await messages.create(
+        db, job_id, prompt=body.prompt, image_ids=body.image_ids, now=bool(body.now)
+    )
+
+
+@router.delete("/messages/{message_id}", status_code=204)
+async def remove_message(message_id: uuid.UUID, db: Db) -> None:
+    """Remove a message that wasn't delivered yet (withdrawn from the job when it holds it);
+    409 `message_delivered` when Claude Code took it in already."""
+    await messages.remove(db, message_id)
+
+
+@router.post("/messages/{message_id}/now", response_model=CodeMessageOut)
+async def send_message_now(message_id: uuid.UUID, db: Db) -> CodeMessageOut:
+    """Send a waiting (or held) message now: interrupting the job's current step, or as a
+    follow-up at once when the job has ended."""
+    return await messages.send_now(db, message_id)
 
 
 @router.post("/jobs/{job_id}/cancel", response_model=CodeJobOut)

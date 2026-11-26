@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -25,15 +25,30 @@ vi.mock('./api', async (importOriginal) => ({
       else cb.onSuccess?.({})
     },
   }),
-  // The queue's own way to send (CodeQueueRunner).
-  sendFollowUp: async (_qc: unknown, jobId: string, prompt: string, images: { id: string }[] = []) => {
-    followUp(jobId, prompt)
-    sentImages.push(images.map((i) => i.id))
-    if (fail) throw fail
-    return {}
-  },
-  useCodeJob: () => ({ data: undefined, isError: false }),
+  // Messages for a running job (§15): the thread's, and sending, removing, sending now.
+  isWaiting: (await importOriginal<typeof import('./api')>()).isWaiting,
+  useThreadMessages: () => messages,
+  useSendMessage: (jobId: string) => ({
+    isPending: false,
+    mutate: ({ prompt, images = [], now = false }: { prompt: string; images?: { id: string }[]; now?: boolean }, cb: Callbacks) => {
+      sendMessage(jobId, prompt, now)
+      sentImages.push(images.map((i) => i.id))
+      if (fail) cb.onError?.(fail)
+      else cb.onSuccess?.({})
+    },
+  }),
+  useRemoveMessage: () => ({ isPending: false, variables: null, mutate: (id: string, cb: Callbacks) => { removeMessage(id); if (fail) cb.onError?.(fail); else cb.onSuccess?.(undefined) } }),
+  useSendMessageNow: () => ({ isPending: false, variables: null, mutate: (id: string, cb: Callbacks) => { sendNow(id); if (fail) cb.onError?.(fail); else cb.onSuccess?.({}) } }),
 }))
+const sendMessage = vi.fn()
+const removeMessage = vi.fn()
+const sendNow = vi.fn()
+type Message = import('./api').CodeMessage
+let messages: Message[] = []
+const msg = (more: Partial<Message> = {}): Message => ({
+  id: 'm1', thread_id: 't1', job_id: 'r1', prompt: 'Then run the tests', images: [], mode: 'queue', state: 'sent', note: null,
+  created_at: '2026-11-26T10:00:00Z', sent_at: null, delivered_at: null, delivered_seq: null, follow_up_job_id: null, ...more,
+})
 const toasts = vi.hoisted(() => [] as string[])
 const undo = vi.hoisted(() => [] as (() => void)[])
 vi.mock('@/components/ui/toast', () => ({ toast: (o: { message: string; action?: { onClick: () => void } }) => { toasts.push(o.message); if (o.action) undo.push(o.action.onClick) } }))
@@ -57,7 +72,7 @@ const media = vi.hoisted(() => ({ coarse: false }))
 vi.mock('@/hooks/useMediaQuery', () => ({ useMediaQuery: () => media.coarse }))
 
 const { CancelJobButton, FollowUpBox, FromChat } = await import('./controls')
-const { codeQueue, useCodeQueue } = await import('./queueStore')
+const { useCodeQueue } = await import('./queueStore')
 
 const device = (more: object = {}) => ({ id: 'dev-1', name: 'Desk PC', online: true, last_seen_at: null, share: true, start: true, cancel: true, ...more })
 const client = new QueryClient()
@@ -71,6 +86,7 @@ beforeEach(() => {
   media.coarse = false
   localStorage.clear()
   useCodeQueue.setState({ byThread: {}, drafts: {}, draftImages: {} })
+  messages = []
   sentImages.length = 0
   uploads.n = 0
   uploads.hold = false
@@ -90,7 +106,7 @@ describe('Cancel', () => {
 
   it('says that a queued message goes out when the job is cancelled', async () => {
     confirm.mockResolvedValue(false)
-    codeQueue.add('r1', 'r1', 'Do this instead')
+    messages = [msg({ prompt: 'Do this instead' })]
     show(<CancelJobButton job={codeJob({ id: 'r1', state: 'running' })} />)
     await userEvent.click(screen.getByRole('button', { name: 'Cancel job' }))
     expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ cancelLabel: 'Keep running', focusCancel: true, message: expect.stringContaining('Your queued message is then sent as a follow-up') }))
@@ -226,82 +242,106 @@ describe('Follow-up', () => {
   })
 })
 
-describe('Queue (while the job runs)', () => {
+describe('Messages while the job runs (§15)', () => {
   const running = (more = {}) => codeJob({ id: 'r1', thread_id: 't1', state: 'running', session_id: 'sess-1', ...more })
-  const queued = () => useCodeQueue.getState().byThread.t1
 
-  it('queues the message instead of sending it, and shows it', async () => {
+  it('queues a message for the running job and clears the box', async () => {
     show(<FollowUpBox job={running()} />)
-    const box = screen.getByRole('textbox', { name: 'Message for when this job ends' })
+    const box = screen.getByRole('textbox', { name: 'Message for this job' })
     expect(screen.getByRole('button', { name: 'Queue message' })).toBeDisabled()
     await userEvent.type(box, 'Then run the tests')
     await userEvent.click(screen.getByRole('button', { name: 'Queue message' }))
     expect(followUp).not.toHaveBeenCalled()
-    expect(queued()).toEqual({ jobId: 'r1', text: 'Then run the tests' })
+    expect(sendMessage).toHaveBeenCalledWith('r1', 'Then run the tests', false)
     expect(box).toHaveValue('')
-    expect(screen.getByTestId('queued-message')).toHaveTextContent('Queued: sent when this job ends')
-    expect(screen.getByTestId('queued-message')).toHaveTextContent('Then run the tests')
   })
 
-  it('adds a second message to the first, with Ctrl+Enter too', async () => {
+  it('Send now sends it at once, interrupting the current step', async () => {
     show(<FollowUpBox job={running()} />)
+    await userEvent.type(screen.getByRole('textbox'), 'Stop, do this first')
+    await userEvent.click(screen.getByRole('button', { name: 'Send now' }))
+    expect(sendMessage).toHaveBeenCalledWith('r1', 'Stop, do this first', true)
+  })
+
+  it('Enter queues (as the chat sends); Send now needs a computer that lets Anemo stop the job', async () => {
+    show(<FollowUpBox job={running({ device: device({ cancel: false }) })} />)
     await userEvent.type(screen.getByRole('textbox'), 'One')
     await userEvent.keyboard('{Control>}{Enter}{/Control}')
-    await userEvent.type(screen.getByRole('textbox'), 'Two')
-    await userEvent.keyboard('{Control>}{Enter}{/Control}')
-    expect(queued()?.text).toBe('One\n\nTwo')
+    expect(sendMessage).toHaveBeenCalledWith('r1', 'One', false)
+    expect(screen.queryByRole('button', { name: 'Send now' })).not.toBeInTheDocument()
   })
 
-  it('Edit puts the message back in the box; Remove drops it', async () => {
-    codeQueue.add('t1', 'r1', 'Draft')
+  it('keeps the text and says why when the server refuses', async () => {
+    fail = new ApiError(409, 'device_busy', 'Desk PC is busy.')
+    show(<FollowUpBox job={running()} />)
+    await userEvent.type(screen.getByRole('textbox'), 'Later')
+    await userEvent.click(screen.getByRole('button', { name: 'Queue message' }))
+    expect(screen.getByRole('textbox')).toHaveValue('Later')
+    expect(toasts).toEqual(['Desk PC is busy.'])
+  })
+
+  it('shows each waiting message with where it is', () => {
+    messages = [
+      msg({ id: 'a', state: 'sent', prompt: 'In Claude Code’s hands' }),
+      msg({ id: 'b', state: 'queued', note: 'This job can’t take messages while it runs: sent as a follow-up when it ends.', prompt: 'Waits' }),
+      msg({ id: 'c', state: 'sent', mode: 'now', prompt: 'Urgent' }),
+      msg({ id: 'd', state: 'delivered', prompt: 'Taken in already' }),
+    ]
+    show(<FollowUpBox job={running()} />)
+    const cards = screen.getAllByTestId('queued-message')
+    expect(cards).toHaveLength(3) // a delivered one is in the timeline, not here
+    expect(cards[0]).toHaveTextContent('Queued: Claude Code takes it in after its current step')
+    expect(cards[1]).toHaveTextContent('sent as a follow-up when it ends')
+    expect(cards[2]).toHaveTextContent('Sending now: Claude Code stops its current step…')
+  })
+
+  it('Edit takes the message back into the box; Remove drops it', async () => {
+    messages = [msg({ prompt: 'Draft' })]
     show(<FollowUpBox job={running()} />)
     await userEvent.click(screen.getByRole('button', { name: 'Edit' }))
-    expect(queued()).toBeUndefined()
+    expect(removeMessage).toHaveBeenCalledWith('m1')
     expect(screen.getByRole('textbox')).toHaveValue('Draft')
     // Kept as the thread's draft: leaving the thread doesn't lose it.
     expect(useCodeQueue.getState().drafts.t1).toBe('Draft')
-    act(() => codeQueue.add('t1', 'r1', 'Again'))
     await userEvent.click(screen.getByRole('button', { name: 'Remove' }))
-    expect(queued()).toBeUndefined()
-    expect(screen.queryByTestId('queued-message')).not.toBeInTheDocument()
+    expect(removeMessage).toHaveBeenCalledTimes(2)
     expect(toasts).toEqual(['Queued message removed'])
-    act(() => undo.at(-1)!())
-    expect(queued()).toEqual({ jobId: 'r1', text: 'Again' })
   })
 
-  it('a held message says why, and Send now sends it', async () => {
-    codeQueue.hold('t1', { jobId: 'r1', text: 'Try again' }, 'The job didn’t finish, so this message wasn’t sent.')
-    show(<FollowUpBox job={running({ id: 'r2', state: 'failed' })} />)
-    expect(screen.getByTestId('queued-message')).toHaveTextContent('The job didn’t finish, so this message wasn’t sent.')
-    await userEvent.click(screen.getByRole('button', { name: 'Send now' }))
-    await waitFor(() => expect(followUp).toHaveBeenCalledWith('r2', 'Try again'))
-    await waitFor(() => expect(queued()).toBeUndefined())
-  })
-
-  it('a held message that fails again stays, with the new reason', async () => {
-    fail = new ApiError(409, 'device_busy', 'Desk PC is busy.')
-    codeQueue.hold('t1', { jobId: 'r1', text: 'Try again' }, 'Before')
-    show(<FollowUpBox job={running({ state: 'done' })} title="Job title" />)
-    await userEvent.click(screen.getByRole('button', { name: 'Send now' }))
-    await waitFor(() => expect(queued()).toEqual({ jobId: 'r1', text: 'Try again', held: 'Desk PC is busy.' }))
-    expect(toasts).toEqual(['“Job title”: Desk PC is busy.'])
-  })
-
-  it('the button says a second message is added to the first', async () => {
-    codeQueue.add('t1', 'r1', 'One')
+  it('a message Claude Code took in meanwhile can’t be taken back: the box stays as it was', async () => {
+    fail = new ApiError(409, 'message_delivered', 'Claude Code took this message in already.')
+    messages = [msg({ prompt: 'Too late' })]
     show(<FollowUpBox job={running()} />)
-    await userEvent.type(screen.getByRole('textbox'), 'Two')
-    await userEvent.click(screen.getByRole('button', { name: 'Add to queue' }))
-    expect(queued()?.text).toBe('One\n\nTwo')
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    expect(screen.getByRole('textbox')).toHaveValue('')
+    expect(toasts).toEqual(['Claude Code took this message in already.'])
+  })
+
+  it('a queued message can be sent now', async () => {
+    messages = [msg({ state: 'queued' })]
+    show(<FollowUpBox job={running()} />)
+    const card = screen.getByTestId('queued-message')
+    await userEvent.click(within(card).getByRole('button', { name: 'Send now' }))
+    expect(sendNow).toHaveBeenCalledWith('m1')
+  })
+
+  it('a held message says why, and Send now sends it as a follow-up', async () => {
+    messages = [msg({ state: 'held', note: 'The job didn’t finish, so this message wasn’t sent.' })]
+    show(<FollowUpBox job={running({ id: 'r2', state: 'failed' })} />)
+    const card = screen.getByTestId('queued-message')
+    expect(card).toHaveTextContent('The job didn’t finish, so this message wasn’t sent.')
+    await userEvent.click(within(card).getByRole('button', { name: 'Send now' }))
+    expect(sendNow).toHaveBeenCalledWith('m1')
   })
 
   it('a held message can’t be sent where follow-ups can’t: it can still be edited or discarded', async () => {
-    codeQueue.hold('t1', { jobId: 'r1', text: 'Later' }, 'Desk PC went offline, so this message wasn’t sent.')
+    messages = [msg({ state: 'held', note: 'Waiting.' })]
     show(<FollowUpBox job={running({ state: 'done', device: device({ online: false }) })} />)
     expect(screen.queryByRole('button', { name: 'Send now' })).not.toBeInTheDocument()
     expect(screen.getByTestId('follow-up-off')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Discard message' }))
-    expect(queued()).toBeUndefined()
+    expect(removeMessage).toHaveBeenCalledWith('m1')
+    expect(toasts).toEqual(['Message discarded'])
   })
 })
 
@@ -380,28 +420,25 @@ describe('Images in the follow-up box', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled())
   })
 
-  it('keeps images with a queued message until it is sent, and Edit puts them back', async () => {
+  it('sends images with a message for the running job, and Edit puts them back in the box', async () => {
     show(<FollowUpBox job={running()} />)
     await pick(png('shot.png'))
     await screen.findByText('shot.png')
     await userEvent.type(screen.getByRole('textbox'), 'Then this')
     await userEvent.click(screen.getByRole('button', { name: 'Queue message' }))
-    expect(useCodeQueue.getState().byThread.t1).toEqual({ jobId: 'r1', text: 'Then this', images: [{ id: 'att-1', name: 'shot.png', size: 100 }] })
-    // The queued message shows its image; the box is empty.
-    const card = screen.getByTestId('queued-message')
-    expect(card.querySelector('img')).toHaveAttribute('src', '/api/attachments/att-1/content')
+    expect(sendMessage).toHaveBeenCalledWith('r1', 'Then this', false)
+    expect(sentImages).toEqual([['att-1']])
     expect(screen.queryByTestId('code-images')).not.toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Edit' }))
-    expect(screen.getByText('shot.png')).toBeInTheDocument()
-    expect(useCodeQueue.getState().draftImages?.t1?.map((i) => i.id)).toEqual(['att-1'])
   })
 
-  it('the queue sends a message with its images when the job ends', async () => {
-    codeQueue.add('t1', 'r1', 'Then this', [{ id: 'att-7', name: 'a.png', size: 1 }])
-    const { sendQueued } = await import('./sendQueued')
-    await sendQueued(client, 't1', ended(), 'Title')
-    expect(followUp).toHaveBeenCalledWith('j9', 'Then this')
-    expect(sentImages).toEqual([['att-7']])
-    expect(useCodeQueue.getState().byThread.t1).toBeUndefined()
+  it('a waiting message shows its images; Edit puts them back as the draft', async () => {
+    messages = [msg({ prompt: 'Like this', images: [{ id: 'att-7', name: 'a.png' }] })]
+    show(<FollowUpBox job={running()} />)
+    const card = screen.getByTestId('queued-message')
+    expect(card.querySelector('img')).toHaveAttribute('src', '/api/attachments/att-7/content')
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    expect(removeMessage).toHaveBeenCalledWith('m1')
+    expect(useCodeQueue.getState().draftImages?.t1?.map((i) => i.id)).toEqual(['att-7'])
+    expect(screen.getByRole('textbox')).toHaveValue('Like this')
   })
 })

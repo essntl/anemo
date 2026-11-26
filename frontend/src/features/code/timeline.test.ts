@@ -260,3 +260,22 @@ describe('bookkeeping events', () => {
   })
 })
 
+describe('messages sent while the job ran (§15)', () => {
+  it('shows each message where Claude Code took it in, but not the prompt’s own echo', () => {
+    at = 0
+    const replay = (text: string, uuid: string) => ev({ type: 'user', message: { role: 'user', content: text }, isReplay: true, uuid }, { created_at: '2026-11-26T10:05:00Z' })
+    const items = buildTimeline([
+      ev({ type: 'command_lifecycle', command_uuid: 'x', state: 'queued' }),
+      replay('Fix the login bug', 'p'),
+      toolUse('toolu_1', 'Bash', { command: 'sleep 15' }),
+      ev({ type: 'control_response', response: { subtype: 'success', request_id: 'interrupt-1' } }),
+      toolResult('toolu_1', 'done'),
+      replay('Also update the docs.', '0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b'),
+      assistant([{ type: 'text', text: 'Updating the docs.' }]),
+    ])
+    expect(items.map((i) => i.kind)).toEqual(['tool', 'message', 'text'])
+    const message = items[1]
+    expect(message.kind === 'message' && [message.text, message.at]).toEqual(['Also update the docs.', '2026-11-26T10:05:00Z'])
+  })
+})
+

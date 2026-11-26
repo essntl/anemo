@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { Markdown } from '@/components/ui/Markdown'
 import { cn } from '@/lib/cn'
+import { formatWhen } from '@/lib/format'
 import { plural, t } from '@/lib/i18n'
 import { AgentNavContext } from './agentNav'
 import { AgentFacts, AgentStatusIcon } from './AgentSidebar'
@@ -304,6 +305,14 @@ function Item({ item, depth }: { item: TimelineItem; depth: number }) {
       return <Thinking text={item.text} />
     case 'user':
       return <div className="px-2 py-1"><p className="whitespace-pre-wrap break-words rounded-lg bg-surface-2 px-2.5 py-1.5 text-[12.5px] text-muted">{item.text}</p>{mark}</div>
+    case 'message':
+      return (
+        // The user's own message, on the right as in a chat, with when Claude Code took it in.
+        <div data-testid="delivered-message" className="flex flex-col items-end gap-0.5 px-2 py-1.5">
+          <p className="max-w-[min(42rem,92%)] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-accent-soft px-3.5 py-2 text-[13.5px]">{item.text}</p>
+          <span className="text-[11px] text-subtle">{t('Delivered {when}', { when: formatWhen(item.at) })}</span>
+        </div>
+      )
     case 'tool':
       return <ToolRow call={item.call} depth={depth} />
     case 'raw':
