@@ -103,6 +103,11 @@ def default_handlers() -> dict[str, Handler]:
 
         await research_writeup.run(uuid.UUID(payload["session_id"]), str(payload["format"]))
 
+    async def chats_index(payload: dict[str, Any]) -> None:
+        from app.features.conversations import recall
+
+        await recall.index_job(uuid.UUID(payload["conversation_id"]))
+
     async def triggers_dispatch(payload: dict[str, Any]) -> None:
         from app.features.triggers import dispatch
 
@@ -118,6 +123,7 @@ def default_handlers() -> dict[str, Handler]:
         "mcp.refresh": mcp_refresh,
         "notify.deliver": notify_deliver,
         "document.index": document_index,
+        "chats.index": chats_index,
         "sketch.transcribe": sketch_transcribe,
         "run.execute": run_execute,
         "conversation.title": conversation_title,

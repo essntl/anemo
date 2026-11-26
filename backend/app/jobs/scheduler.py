@@ -38,7 +38,7 @@ def periodic_tasks() -> list[tuple[str, Callable[[], Awaitable[object]]]]:
         ("notifications.prune", notifications.prune),
         ("approvals.expire", runs.expire_stale_approvals),
         ("chats.temporary", conversations.delete_expired_temporary),
-        ("chats.index", chat_recall.index_due),  # chats quiet for a while, by meaning
+        ("chats.index", chat_recall.index_due),  # claims quiet chats; a job embeds each
         ("code.prune", code_sessions.prune_if_due),  # at most every 10 minutes
         ("updates.check", updates.check_if_due),  # about once a day
         ("activity.prune", activity.prune_if_due),  # entries past 90 days, once an hour

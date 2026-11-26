@@ -32,13 +32,15 @@ from app.features.conversations.models import ChatMessage, Conversation
 from app.features.runs.models import TERMINAL_STATUSES, Run, ToolCall
 from app.features.search.service import contains_all, snippet, words_of
 from app.features.tasks.models import Project
+from app.jobs import queue
 from app.knowledge import index
 
 log = logging.getLogger(__name__)
 
 SOURCE = "chat"  # source_type in knowledge_chunks
 IDLE = timedelta(minutes=2)  # a chat is indexed once it has been quiet this long
-INDEX_BATCH = 10  # chats indexed per scheduler pass
+INDEX_BATCH = 10  # chats claimed (one job each) per scheduler pass
+INDEX_JOB = "chats.index"
 CHUNK_CHARS = 2_000  # of each message's text, for its vector
 MIN_SIMILARITY = 0.3
 SNIPPETS_PER_CHAT = 3
@@ -331,17 +333,20 @@ async def index_chat(db: AsyncSession, conversation_id: uuid.UUID) -> None:
 
 
 async def index_due(now: datetime | None = None) -> int:
-    """Periodic: index the ordinary chats that have been quiet a while and have new
-    messages since they were last indexed (or were indexed with another embedding
-    model). Nothing without an embedding model. Returns how many chats."""
+    """Periodic (the scheduler): claim the ordinary chats that have been quiet a while and
+    have new messages since they were last indexed (or were indexed with another
+    embedding model), and queue one `chats.index` job for each. Nothing without an
+    embedding model. Only the claim happens here: calling the embedding model is the
+    job's, so a slow provider never holds up reminders and automations. Returns how many
+    chats were claimed."""
     now = now or datetime.now(UTC)
     async with get_sessionmaker()() as db:
         model = await index.embedding_model(db)
         if model is None:
             return 0
         key = str(model.model_id)
-        # Claimed by marking them first (skip_locked: another worker takes others), so
-        # no row stays locked while the embedding model is called.
+        # Claimed by marking them (skip_locked: another worker takes others); the jobs
+        # are queued in the same transaction, so a claim always has its job.
         due = list(
             await db.scalars(
                 select(Conversation)
@@ -360,20 +365,29 @@ async def index_due(now: datetime | None = None) -> int:
                 .with_for_update(skip_locked=True)
             )
         )
+        claimed = datetime.now(UTC).isoformat()
         for conv in due:
             conv.recall_indexed_at, conv.recall_index_model = conv.last_message_at, key
-        ids = [conv.id for conv in due]
+            # One job per claim: a chat claimed again later gets a job of its own.
+            await queue.enqueue(
+                db,
+                INDEX_JOB,
+                {"conversation_id": str(conv.id)},
+                lane="background",
+                dedupe_key=f"{INDEX_JOB}:{conv.id}:{claimed}",
+            )
         await db.commit()
-    for conversation_id in ids:
-        try:
-            async with get_sessionmaker()() as db:
-                await index_chat(db, conversation_id)
-                await db.commit()
-        except Exception:  # noqa: BLE001 - one chat must not stop the others
-            # Found by its words meanwhile; indexed again with its next message.
-            ctx = {"conversation_id": str(conversation_id)}
-            log.warning("chat indexing failed", extra={"ctx": ctx}, exc_info=True)
-    return len(ids)
+    return len(due)
+
+
+async def index_job(conversation_id: uuid.UUID) -> None:
+    """The `chats.index` job: index one claimed chat. Safe to run again (unchanged text
+    keeps its vector). A chat deleted meanwhile is left alone."""
+    async with get_sessionmaker()() as db:
+        if await db.get(Conversation, conversation_id) is None:
+            return
+        await index_chat(db, conversation_id)
+        await db.commit()
 
 
 async def forget(db: AsyncSession, conversation_ids: list[uuid.UUID]) -> None:

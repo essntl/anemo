@@ -13,6 +13,8 @@ from app.features.automations.models import Automation
 from app.features.conversations import recall
 from app.features.conversations.models import ChatMessage, Conversation
 from app.features.runs.models import Run, ToolCall
+from app.jobs.models import Job
+from app.jobs.runner import default_handlers
 from app.knowledge.models import KnowledgeChunk
 from app.providers.adapters.fake import FakeAdapter
 from app.providers.base import Done, TextDelta
@@ -355,10 +357,36 @@ async def chunks(cid: uuid.UUID) -> list[KnowledgeChunk]:
         )
 
 
+async def queued_index_jobs() -> list[Job]:
+    async with get_sessionmaker()() as db:
+        return list(
+            await db.scalars(
+                select(Job).where(Job.type == "chats.index", Job.status == "queued")
+            )
+        )
+
+
+async def run_index_jobs() -> None:
+    """What the worker does with the jobs the scheduler queued (then they are gone)."""
+    handler = default_handlers()["chats.index"]
+    for job in await queued_index_jobs():
+        await handler(job.payload)
+        async with get_sessionmaker()() as db:
+            await db.delete(await db.get(Job, job.id))
+            await db.commit()
+
+
+async def index_now(now: datetime = LATER) -> int:
+    """The scheduler's pass, then its jobs. Returns how many chats it claimed."""
+    claimed = await recall.index_due(now)
+    await run_index_jobs()
+    return claimed
+
+
 async def test_nothing_is_indexed_without_an_embedding_model(authed):
     await setup(authed)
     cid = await chat("Plain", "otters and seals")
-    assert await recall.index_due(LATER) == 0
+    assert await index_now() == 0
     assert await chunks(cid) == []
 
 
@@ -368,7 +396,7 @@ async def test_found_by_meaning_with_an_embedding_model(authed):
     cid = await chat("Zoo visit", "We saw otters and seals.", "Lovely animals.")
     temporary = await chat("Temporary", "otters and seals", temporary=True)
     # The zoo chat and setup()'s empty one; never the temporary chat.
-    assert await recall.index_due(LATER) == 2
+    assert await index_now() == 2
     assert await chunks(temporary) == []
     assert [c.chunk_index for c in await chunks(cid)] == [1, 2]
 
@@ -379,7 +407,7 @@ async def test_found_by_meaning_with_an_embedding_model(authed):
     assert "seq 1, the user" in result.content and result.data["by_meaning"] is True
 
     # Indexed once until the chat has new messages; then only the new text is embedded.
-    assert await recall.index_due(LATER) == 0
+    assert await index_now() == 0
     async with get_sessionmaker()() as db:
         db.add(
             ChatMessage(
@@ -395,7 +423,7 @@ async def test_found_by_meaning_with_an_embedding_model(authed):
         conv.last_message_at = datetime.now(UTC)
         await db.commit()
     FakeAdapter.embedded = []
-    assert await recall.index_due(LATER) == 1
+    assert await index_now() == 1
     assert FakeAdapter.embedded == ["And the penguins?"]
     assert len(await chunks(cid)) == 3
 
@@ -404,11 +432,33 @@ async def test_found_by_meaning_with_an_embedding_model(authed):
     assert await chunks(cid) == []
 
 
+async def test_the_scheduler_only_claims_and_a_job_per_chat_embeds(authed):
+    await setup(authed)
+    await use_embeddings(authed)
+    cid = await chat("Zoo visit", "We saw otters and seals.")
+    FakeAdapter.embedded = []
+    assert await recall.index_due(LATER) == 2  # this chat and setup()'s empty one
+    assert FakeAdapter.embedded == []  # the embedding model isn't called in the scheduler
+    jobs = await queued_index_jobs()
+    assert {j.payload["conversation_id"] for j in jobs} >= {str(cid)}
+    assert all(j.lane == "background" and j.dedupe_key for j in jobs)
+    assert await chunks(cid) == []
+    await run_index_jobs()
+    assert FakeAdapter.embedded == ["We saw otters and seals."]
+    assert [c.chunk_index for c in await chunks(cid)] == [1]
+    # A chat deleted before its job ran is left alone.
+    gone = await chat("Gone", "a deleted chat")
+    assert await recall.index_due(LATER) == 1
+    assert (await authed.delete(f"/api/conversations/{gone}")).status_code == 204
+    await run_index_jobs()
+    assert await chunks(gone) == []
+
+
 async def test_automation_run_chats_are_not_indexed(authed):
     await setup(authed)
     await use_embeddings(authed)
     cid = await expired_run_chat("Run", ended_days_ago=0, retention_days=30)
-    await recall.index_due(LATER)
+    await index_now()
     assert await chunks(cid) == []
     async with get_sessionmaker()() as db:
         indexed = await db.scalar(
