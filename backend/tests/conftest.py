@@ -11,6 +11,7 @@ as `make test-backend` and CI run it) every worker process has its own of both.
 
 import asyncio
 import os
+import shutil
 import tempfile
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -71,34 +72,70 @@ if _base_db_url:
     os.environ["DATABASE_URL"] = _base_db_url
 
 HAS_DB = bool(_base_db_url)
-requires_db = pytest.mark.skipif(not HAS_DB, reason="needs DATABASE_URL (run in dev container)")
+# A test (or module, `pytestmark = requires_db`) that touches the database. It gets a migrated,
+# empty database whatever ran before it: many such tests reach the database only through the
+# code they call (a tool opening its own session), not through a fixture, and without this
+# they passed only when an earlier test on the same xdist worker had created that worker's
+# database. With no database configured, `migrated_db` skips the test.
+requires_db = pytest.mark.usefixtures("db_clean")
+
+# The folders every test in this process shares, as set above.
+_PROCESS_FOLDERS = (Path(os.environ["WORKSPACE_PATH"]), Path(os.environ["DATA_PATH"]))
 
 
-async def _recreate_database(url: str) -> None:
-    import asyncpg
+def _empty(folder: Path) -> None:
+    """Delete what is in a folder but keep the folder (which may not exist yet)."""
+    if not folder.is_dir():
+        return
+    for entry in folder.iterdir():
+        if entry.is_dir() and not entry.is_symlink():
+            shutil.rmtree(entry)
+        else:
+            entry.unlink()
 
-    dsn = url.replace("postgresql+asyncpg://", "postgresql://")
-    admin_dsn, name = dsn.rsplit("/", 1)
-    conn = await asyncpg.connect(admin_dsn + "/postgres")
-    try:
-        await conn.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
-        await conn.execute(f'CREATE DATABASE "{name}"')
-    finally:
-        await conn.close()
+
+@pytest.fixture(autouse=True)
+def _empty_workspace_and_data() -> None:
+    """Every test starts with an empty workspace and data folder, as db_clean gives it an
+    empty database: a file left by an earlier test on the same worker (documents/thesis/
+    plan.md) made the next one get "plan (1).md". Autouse and in this conftest, so it runs
+    before the fixtures of a test module that put files into the workspace."""
+    for folder in _PROCESS_FOLDERS:
+        _empty(folder)
+
+
+# The key of a Postgres advisory lock, the same in every worker (any constant would do).
+_MIGRATION_LOCK = 7_301_001
 
 
 @pytest.fixture(scope="session")
 async def migrated_db() -> AsyncIterator[None]:
+    """Each worker's database, dropped, created and migrated once per test session.
+
+    One worker at a time: the whole migration is one transaction that locks every table and
+    index it creates, and with many workers migrating at once (all start together) those
+    locks overflowed Postgres's shared lock table ("out of shared memory", 15 workers). A
+    migration takes about a second, so waiting for the others costs little.
+    """
     if not HAS_DB:
         pytest.skip("no database configured")
+    import asyncpg
     from alembic import command
     from alembic.config import Config
 
-    await _recreate_database(os.environ["DATABASE_URL"])
     cfg = Config(str(Path(__file__).parents[1] / "alembic.ini"))
     cfg.set_main_option("script_location", str(Path(__file__).parents[1] / "migrations"))
-    # Alembic's env.py runs its own event loop, so run it in a thread.
-    await asyncio.to_thread(command.upgrade, cfg, "head")
+    dsn = os.environ["DATABASE_URL"].replace("postgresql+asyncpg://", "postgresql://")
+    admin_dsn, name = dsn.rsplit("/", 1)
+    conn = await asyncpg.connect(admin_dsn + "/postgres")
+    try:
+        await conn.execute("SELECT pg_advisory_lock($1)", _MIGRATION_LOCK)
+        await conn.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+        await conn.execute(f'CREATE DATABASE "{name}"')
+        # Alembic's env.py runs its own event loop, so run it in a thread.
+        await asyncio.to_thread(command.upgrade, cfg, "head")
+    finally:
+        await conn.close()  # which also releases the lock
     yield
 
 
