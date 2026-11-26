@@ -133,7 +133,12 @@ Local servers run in the MCP host. hostd already kept one process and session pe
 subscriptions above (the same logic, copied: the container can't import the backend), and
 answers a long poll: `{server, uris, logging, epoch, after, wait_s ≤ 30}` →
 `{epoch, next, notifications: [{seq, method, params}], missed, era, subscribed, note}`.
-`epoch` changes when the process was started again (then everything kept is new). Tool
+`epoch` changes when the process was started again. A call whose `epoch` isn't the
+current one (a new watch: the first call after a reconnect or a lock take-over, or a
+process started again) is answered at once with the current `next` and no notifications:
+a watch starts from now. Handing over the buffer instead would replay up to 200 old
+notifications, some from before the trigger existed, as new events on every reconnect,
+and could trip the ceiling. Tool
 calls and the listener share the process, and the long poll keeps it from being stopped
 as idle.
 
@@ -169,7 +174,8 @@ as idle.
   publish it (as the claude-runner status is) and an API field.
 - A connection that hangs without closing on a 2026-07-28 server with nothing to listen
   for is not noticed (nothing could arrive on it anyway).
-- Reconnecting misses what a server sent while the connection was down (MCP has no replay).
+- Reconnecting misses what a server sent while the connection was down (MCP has no replay);
+  for a local server too, hostd's buffer is not handed to a new watch (§5).
 - The hostd part is tested in-process (the real hostd app, a real stdio server); not tested
   here: the Docker container itself (CI's e2e stack doesn't start the MCP host).
 - e2e: `e2e/tests/mcp-triggers.spec.ts` adds an MCP trigger in the dialog; the e2e stack has
@@ -191,8 +197,8 @@ as idle.
   it; a trigger must name its server, and the catalogue says so; params cut; reconnect with
   backoff, and to a server that came back; a chatty server is paused and its triggers say
   why, and is listened to again after the pause; a wake-me on it is moderate; a local server
-  listened to through the real hostd (`/listen`), sharing the process with tool calls; hostd
-  wants its token.
+  listened to through the real hostd (`/listen`), sharing the process with tool calls; a new
+  watch through hostd starts from now (no backlog); hostd wants its token.
 - Frontend: `TriggerDialog.mcp.test.tsx` (the server picker, required, the URI, the 30 s
   default; the form rules).
 - e2e: `e2e/tests/mcp-triggers.spec.ts`.

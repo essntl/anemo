@@ -7,7 +7,7 @@ import uuid
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
-from app.api.deps import Db
+from app.api.deps import Db, client_ip
 from app.core.errors import NotFound
 from app.features.triggers import webhooks
 
@@ -41,5 +41,5 @@ async def receive_hook(trigger_id: str, request: Request, db: Db) -> HookAccepte
         raise NotFound("Not found") from None  # the same answer as for an unknown id
     body = await _read(request)
     headers = {k.lower(): v for k, v in request.headers.items()}
-    await webhooks.receive(db, parsed, body, headers)
+    await webhooks.receive(db, parsed, body, headers, ip=client_ip(request))
     return HookAccepted()

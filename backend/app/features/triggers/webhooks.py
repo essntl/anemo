@@ -12,8 +12,11 @@ A request is accepted only when
 
 Anything else that a caller without the secret could try gets the same 404, so the
 endpoint says nothing about which triggers exist. A caller with the secret can be
-rate-limited (429). The body becomes a `webhook.received` event: data, never
-instructions, for the run it starts (render.py).
+rate-limited (429). Failed attempts are limited too, per client address and per trigger
+id (known or not): past the limit every request gets that same 404 at once, before the
+database lookup and the secret's decryption that each attempt would otherwise cost.
+The body becomes a `webhook.received` event: data, never instructions, for the run it
+starts (render.py).
 """
 
 import hashlib
@@ -42,6 +45,9 @@ MAX_BODY = 64 * 1024
 MAX_SKEW_S = 5 * 60
 SEEN_FOR_S = 10 * 60  # longer than the window, so a replay inside it is always caught
 PER_MINUTE = 30  # accepted requests per trigger
+FAIL_WINDOW_S = 60
+FAILS_PER_IP = 20  # failed attempts in the window, from one client address
+FAILS_PER_TRIGGER = 60  # failed attempts in the window, at one trigger id
 SIGNATURE_HEADER = "x-anemo-signature"
 TIMESTAMP_HEADER = "x-anemo-timestamp"
 
@@ -78,14 +84,29 @@ def _parse(body: bytes, content_type: str) -> Any:
     return text
 
 
+def _seen_key(trigger_id: uuid.UUID, signature: str) -> str:
+    return f"hooks:seen:{trigger_id}:{hashlib.sha256(signature.encode()).hexdigest()}"
+
+
 async def _first_time(trigger_id: uuid.UUID, signature: str) -> bool:
-    """Not seen before (a replay is). Without Valkey only the time window protects."""
-    key = f"hooks:seen:{trigger_id}:{hashlib.sha256(signature.encode()).hexdigest()}"
+    """Not seen before (a replay is), and now marked as seen. Without Valkey only the
+    time window protects."""
     try:
-        return bool(await get_redis().set(key, "1", nx=True, ex=SEEN_FOR_S))
+        return bool(
+            await get_redis().set(_seen_key(trigger_id, signature), "1", nx=True, ex=SEEN_FOR_S)
+        )
     except (RedisError, OSError):
         log.warning("webhook replay check skipped: valkey unavailable")
         return True
+
+
+async def _forget(trigger_id: uuid.UUID, signature: str) -> None:
+    """Unmark a request that was refused with 429, so the sender's retry of it (the same
+    signed request) is taken instead of being refused as a replay."""
+    try:
+        await get_redis().delete(_seen_key(trigger_id, signature))
+    except (RedisError, OSError):
+        pass
 
 
 async def _within_rate(trigger_id: uuid.UUID) -> bool:
@@ -100,19 +121,36 @@ async def _within_rate(trigger_id: uuid.UUID) -> bool:
         return True
 
 
-async def receive(
-    db: AsyncSession,
-    trigger_id: uuid.UUID,
-    body: bytes,
-    headers: dict[str, str],
-    *,
-    now: float | None = None,
-) -> None:
-    """Check a webhook request and turn it into an event. Raises NotFound (anything the
-    caller got wrong), TooManyRequests or BodyTooLarge. Commits."""
-    now = time.time() if now is None else now
-    if len(body) > MAX_BODY:
-        raise BodyTooLarge("The body is larger than 64 KB")
+def _fail_keys(ip: str, trigger_id: uuid.UUID) -> tuple[str, str]:
+    return f"hooks:fail:ip:{ip}", f"hooks:fail:id:{trigger_id}"
+
+
+async def _too_many_failures(ip: str, trigger_id: uuid.UUID) -> bool:
+    """Whether this address or this trigger id failed too often lately. A sender with the
+    secret is refused too while that lasts (it can't be told apart before the lookup);
+    it gets in again once the window has passed. Without Valkey: not limited."""
+    try:
+        by_ip, by_id = await get_redis().mget(_fail_keys(ip, trigger_id))
+    except (RedisError, OSError):
+        return False
+    return int(by_ip or 0) >= FAILS_PER_IP or int(by_id or 0) >= FAILS_PER_TRIGGER
+
+
+async def _count_failure(ip: str, trigger_id: uuid.UUID) -> None:
+    try:
+        redis = get_redis()
+        for key in _fail_keys(ip, trigger_id):
+            if await redis.incr(key) == 1:
+                await redis.expire(key, FAIL_WINDOW_S)
+    except (RedisError, OSError):
+        pass
+
+
+async def _verified(
+    db: AsyncSession, trigger_id: uuid.UUID, body: bytes, headers: dict[str, str], now: float
+) -> tuple[Trigger, str]:
+    """The trigger and the request's (checked) signature. Raises NotFound for anything
+    the caller got wrong, a replay included."""
     trigger = await db.get(Trigger, trigger_id)
     if (
         trigger is None
@@ -135,7 +173,34 @@ async def receive(
         raise _refused()
     if not await _first_time(trigger.id, expected):
         raise _refused()
+    return trigger, expected
+
+
+async def receive(
+    db: AsyncSession,
+    trigger_id: uuid.UUID,
+    body: bytes,
+    headers: dict[str, str],
+    *,
+    ip: str = "unknown",
+    now: float | None = None,
+) -> None:
+    """Check a webhook request and turn it into an event. `ip`: the caller's address (for
+    the limit on failed attempts). Raises NotFound (anything the caller got wrong, or too
+    many failed attempts), TooManyRequests or BodyTooLarge. Commits."""
+    now = time.time() if now is None else now
+    if len(body) > MAX_BODY:
+        raise BodyTooLarge("The body is larger than 64 KB")
+    if await _too_many_failures(ip, trigger_id):
+        raise _refused()
+    try:
+        trigger, expected = await _verified(db, trigger_id, body, headers, now)
+    except NotFound:
+        await _count_failure(ip, trigger_id)
+        raise
+    # The replay check comes first, so a replay doesn't use up the sender's rate.
     if not await _within_rate(trigger.id):
+        await _forget(trigger.id, expected)
         raise TooManyRequests("Too many requests for this webhook", code="rate_limited")
     content_type = headers.get("content-type", "")[:100]
     with acting_as(EXTERNAL):  # another system, not the user
