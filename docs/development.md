@@ -15,6 +15,18 @@ make revision m="describe change"   # new Alembic migration
 make gen-api        # regenerate frontend API types after backend changes
 ```
 
+Backend tests run in parallel ([pytest-xdist](https://pytest-xdist.readthedocs.io)):
+`make test-backend` and CI pass `-n auto`, one process per CPU. Each process ("worker",
+`gw0`, `gw1`, …) has its own test database (`aiw_test_gw0`, …) and its own Redis database
+(15, 14, …; with `TEST_REDIS_URL`, that database + 0, + 1, …), so tests never share data;
+see `backend/tests/conftest.py`. Tests run in no fixed order across workers, so a test must
+not depend on what another one left behind (each starts from `db_clean`).
+
+```bash
+make test-backend n=4      # 4 workers
+make test-backend n=0      # one process, in file order (plain `pytest` does the same)
+```
+
 End-to-end tests run against a throwaway copy of the app (its own containers,
 port 8090, volumes and passwords) with a scripted "fake" model, so nothing real
 is touched and no model is called:
