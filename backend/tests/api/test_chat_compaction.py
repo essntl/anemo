@@ -100,7 +100,9 @@ async def test_compact_keeps_the_decisions_and_the_last_turn(authed, mode):
 
 async def test_auto_compact_at_the_threshold_before_the_new_message(authed):
     cid = await setup(authed)
-    r = await authed.put("/api/settings/chat", json={"auto_compact": True, "compact_at_tokens": 20_000})
+    r = await authed.put(
+        "/api/settings/chat", json={"auto_compact": True, "compact_at_tokens": 20_000}
+    )
     assert r.status_code == 200, r.text
     await turn(authed, cid, "Decision: blue logo")
     await turn(authed, cid, "x" * 45_000)  # with its echo: ~22k tokens
@@ -120,12 +122,18 @@ async def test_auto_compact_at_the_threshold_before_the_new_message(authed):
     assert "What colour was the logo?" in sent
     # Below the threshold now: the next turn doesn't compact again.
     await turn(authed, cid, "Thanks")
-    assert [m["role"] for m in (await messages(authed, cid))[-3:]] == ["assistant", "user", "assistant"]
+    assert [m["role"] for m in (await messages(authed, cid))[-3:]] == [
+        "assistant",
+        "user",
+        "assistant",
+    ]
 
 
 async def test_no_auto_compact_when_it_is_off(authed):
     cid = await setup(authed)
-    await authed.put("/api/settings/chat", json={"auto_compact": False, "compact_at_tokens": 20_000})
+    await authed.put(
+        "/api/settings/chat", json={"auto_compact": False, "compact_at_tokens": 20_000}
+    )
     await turn(authed, cid, "x" * 90_000)
     await turn(authed, cid, "and now")
     assert all(m["role"] != "compaction" for m in await messages(authed, cid))
