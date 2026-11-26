@@ -274,3 +274,34 @@ async def test_code_status_tells_the_agent_where_a_limited_job_stands(authed, de
         "It continues by itself at 2030-01-01T17:02+00:00."
     )
     await ws.disconnect()
+
+
+async def test_messages_written_before_the_stop_go_with_the_continue(authed, device_side):
+    from tests.api.test_code_messages import running_job, stored
+
+    assert (await authed.put("/api/settings/code", json={"auto_continue": True})).status_code == 200
+    _, ws = await computer(authed)
+    await running_job(ws)  # takes messages
+    job = await row()
+    sent = (
+        await authed.post(f"/api/code/jobs/{job.id}/messages", json={"prompt": "And X."})
+    ).json()
+    assert sent["state"] == "sent"
+    # Claude Code stops at the limit before it took the message in.
+    await send(ws, (3, rejected()), (4, limit_result()), key=KEY)
+    await announce(ws, KEY, state="failed", input=False)
+    from app.features.code_sessions import messages
+
+    await messages.run_job(job.thread_id)  # the kick of the job's end
+    waiting = await stored(sent["id"])
+    assert waiting.state == "sent" and "continue" in (waiting.note or "")
+    assert [a for a, _, _ in device_side.sent].count("code_start") == 0
+
+    await make_due()
+    await autocontinue.run(job.id)
+    (action, fields, _) = device_side.sent[-1]
+    assert action == "code_start"
+    assert fields["prompt"] == f"{autocontinue.PROMPT}\n\nAnd X."
+    message = await stored(sent["id"])
+    assert (message.state, message.follow_up_job_id) == ("followed_up", (await row(NEXT)).id)
+    await ws.disconnect()

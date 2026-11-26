@@ -878,7 +878,9 @@ off.") shortly after the limit resets, so its context and prompt cache are reuse
   computer is away waits, and goes as soon as it is back (as long as the switch is on).
   The job claims it (`scheduled` → `starting`), starts the follow-up, and on a busy or
   away computer puts it back for the next round; another error makes it `failed`. A claim
-  older than 10 minutes is given back.
+  older than 10 minutes is given back. Messages written *before* the job stopped (§15:
+  `queued` or `sent`, not taken in) wait for the continue ("Sent with the job's continue
+  once the usage limit resets") and go with it, after the continue prompt.
 - **Cancelled cleanly** (`resume_note` says why) when the switch is turned off, the job is
   cancelled (`POST …/cancel`, also the `code_cancel` tool), the user follows the thread up
   by hand or sends a message (§15: a message for a job that stopped at the limit isn't

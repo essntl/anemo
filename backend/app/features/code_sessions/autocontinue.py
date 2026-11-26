@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, Conflict
 from app.features.code_sessions import control, ingest, resume, service
-from app.features.code_sessions.models import TERMINAL, CodeJob
+from app.features.code_sessions.models import TERMINAL, CodeJob, CodeMessage
 from app.features.code_sessions.schemas import CodeJobOut
 from app.features.devices import relay
 from app.jobs import queue
@@ -105,7 +105,8 @@ async def due() -> None:
 
 
 async def run(job_id: uuid.UUID) -> None:
-    """The `code.continue` job: resume the session, once."""
+    """The `code.continue` job: resume the session, once. Messages written before the job
+    stopped (§15) go with it, after the continue prompt."""
     from app.core.db import get_sessionmaker
 
     async with get_sessionmaker()() as db:
@@ -122,15 +123,36 @@ async def run(job_id: uuid.UUID) -> None:
         if job is None:
             return
         attempt = job.resume_attempt + 1
+        waiting = (
+            await db.execute(
+                update(CodeMessage)
+                .where(
+                    CodeMessage.thread_id == job.thread_id,
+                    CodeMessage.state.in_(("queued", "sent")),
+                )
+                .values(state="sending", updated_at=datetime.now(UTC))
+                .returning(CodeMessage.id, CodeMessage.prompt, CodeMessage.created_at)
+                .execution_options(synchronize_session=False)
+            )
+        ).all()
+        await db.commit()
+        taken = sorted(waiting, key=lambda row: row.created_at)
+        prompt = "\n\n".join([PROMPT, *(row.prompt for row in taken)])[:100_000]
+        taken_ids = [row.id for row in taken]
         try:
-            started = await control.follow_up(db, job.id, prompt=PROMPT)
+            started = await control.follow_up(db, job.id, prompt=prompt)
         except _TRY_AGAIN:
             await _set(db, job_id, resume_state="scheduled")
+            await _set_messages(db, taken_ids, state="queued")
             return
         except AppError as exc:
             await _set(db, job_id, resume_state="failed", resume_note=exc.message[:300])
+            await _set_messages(db, taken_ids, state="held", note=exc.message[:500])
             await ingest.publish_job(job_id)
             return
+        await _set_messages(
+            db, taken_ids, state="followed_up", follow_up_job_id=started.id, note=None
+        )
         await db.execute(
             update(CodeJob)
             .where(CodeJob.id == started.id)
@@ -142,6 +164,17 @@ async def run(job_id: uuid.UUID) -> None:
     log.info("code job continued", extra={"ctx": {"job_id": str(job_id), "attempt": attempt}})
     await ingest.publish_job(job_id)
     await ingest.publish_job(started.id)
+
+
+async def _set_messages(db: AsyncSession, ids: list[uuid.UUID], **values: object) -> None:
+    if ids:
+        await db.execute(
+            update(CodeMessage)
+            .where(CodeMessage.id.in_(ids))
+            .values(updated_at=datetime.now(UTC), **values)
+            .execution_options(synchronize_session=False)
+        )
+        await db.commit()
 
 
 async def _set(db: AsyncSession, job_id: uuid.UUID, **values: object) -> None:

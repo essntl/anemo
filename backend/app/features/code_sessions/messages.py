@@ -98,7 +98,7 @@ async def create(
     db.add(message)
     await db.commit()
     log.info("code message queued", extra={"ctx": {"job_id": str(last.id), "now": now}})
-    await settle(db, last.thread_id, user=True)
+    await settle(db, last.thread_id)
     return message_out(await _get(db, message.id))
 
 
@@ -148,7 +148,7 @@ async def send_now(db: AsyncSession, message_id: uuid.UUID) -> CodeMessageOut:
     message.state = "queued"
     message.note = None
     await db.commit()
-    await settle(db, message.thread_id, user=True, force=True)
+    await settle(db, message.thread_id, force=True)
     return message_out(await _get(db, message_id))
 
 
@@ -209,11 +209,9 @@ def hold_reason(job: CodeJob, *, force: bool = False) -> str | None:
     return None
 
 
-async def settle(
-    db: AsyncSession, thread_id: uuid.UUID, *, user: bool = False, force: bool = False
-) -> None:
-    """Send the thread's waiting messages where that can be done now. `user`: the user is
-    waiting for the answer (errors of the computer are kept on the message, not raised)."""
+async def settle(db: AsyncSession, thread_id: uuid.UUID, *, force: bool = False) -> None:
+    """Send the thread's waiting messages where that can be done now (errors of the
+    computer are kept on the message, as its note). `force`: the user pressed Send now."""
     db.expire_all()  # what ingestion or another worker changed meanwhile
     jobs = await service.thread_of(db, thread_id)
     if not jobs:
@@ -300,6 +298,11 @@ async def _follow_up(db: AsyncSession, last: CodeJob, *, force: bool) -> None:
         db, last.thread_id, ("queued", "sent", "held") if force else ("queued", "sent")
     )
     if not pending:
+        return
+    if last.limit_hit and last.resume_state in ("scheduled", "starting") and not force:
+        # Written before the job stopped at the limit: they go with its continue (§16).
+        note = "Sent with the job’s continue once the usage limit resets."
+        await _set(db, [m.id for m in pending if m.note != note], note=note)
         return
     reason = hold_reason(last, force=force)
     if reason is not None:
