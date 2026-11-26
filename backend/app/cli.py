@@ -6,6 +6,7 @@ export-openapi    print the OpenAPI schema (used to generate frontend API types)
 claude-code-check run a short agent conversation on the Claude subscription provider
                   and print the prompt-cache use of every model request (uses some
                   subscription quota; `claude-code-check --help` for options)
+tool-spec-sizes   print the size of every built-in tool spec as the model receives it
 """
 
 import asyncio
@@ -50,6 +51,11 @@ def main(argv: list[str]) -> int:
         from app.claude_code_check import main as check
 
         return check(argv[2:])
+    if cmd == "tool-spec-sizes":
+        from app.tools.spec_size import report
+
+        print(report())
+        return 0
     if cmd == "export-openapi":
         import json
 
