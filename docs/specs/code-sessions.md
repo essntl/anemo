@@ -543,7 +543,7 @@ makes those exact.
 |---|---|---|
 | `code_projects(device)` | `code.see` | the device's projects and not-cloned repositories |
 | `code_start(device, project, prompt, new?, resume_session?, model?, max_turns?)` | `code.run` | starts a job; answers the job's Anemo id, the device's job id and the folder, and that progress is on the Code page and through `code_status` |
-| `code_status(job_id)` | `code.see` | state, todo list, the last 8 activities as one-line summaries (tool name + subject, or the first 200 characters of text), branch, PR, turns, duration, API-equivalent cost and, when ended, the result (≤ 4000 characters); all job content inside the untrusted-content marking the web tools use (`UNTRUSTED`) |
+| `code_status(job_id, wait_s?)` | `code.see` | with `wait_s` (≤ 300), first waits until the job ends ([21](21-code-wait.md)); state, todo list, the last 8 activities as one-line summaries (tool name + subject, or the first 200 characters of text), branch, PR, turns, duration, API-equivalent cost and, when ended, the result (≤ 4000 characters); all job content inside the untrusted-content marking the web tools use (`UNTRUSTED`) |
 | `code_cancel(job_id)` | `code.run` | cancels |
 
 - `job_id` accepts the Anemo id (uuid) or the device's job id (`yyyyMMdd-HHmmss-xxxx`).

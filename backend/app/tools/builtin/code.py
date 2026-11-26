@@ -3,7 +3,8 @@ computers that run Anemo Desktop (docs/specs/code-sessions.md §8, §12.3).
 
   code_projects(device)   the computer's projects and its owner's repositories not cloned
   code_start(device, project, prompt, …)   starts a job (`claude -p` in the project)
-  code_status(job_id)     state, todo list, last activities, result
+  code_status(job_id, wait_s?)   state, todo list, last activities, result; with wait_s,
+                          first waits for the job to end (features/code_sessions/wait.py)
   code_cancel(job_id)     cancels a running job
   code_git_graph(device, project | repo)   branches, ahead/behind, pull requests, recent
                           commits, dirty state; also of a GitHub repository not cloned
@@ -18,6 +19,7 @@ What a job wrote is untrusted content for the model, marked as written by a Clau
 job (tools/untrusted.py); code_status shows a summary, never the whole log.
 """
 
+import time
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -25,7 +27,7 @@ from sqlalchemy import select
 
 from app.core.db import get_sessionmaker
 from app.core.errors import AppError
-from app.features.code_sessions import control, git, ingest, service
+from app.features.code_sessions import control, git, ingest, service, wait
 from app.features.code_sessions.models import TERMINAL, CodeJob, CodeJobEvent
 from app.features.code_sessions.schemas import MODEL, CodeJobOut, ProjectName, RepoName
 from app.features.devices import service as devices
@@ -190,8 +192,9 @@ class CodeStart(Tool):
     description = (
         "Start a Claude Code job (claude -p, with bypassPermissions) in a project on a trusted "
         "computer that lets Anemo start jobs (Anemo Desktop). It runs on its own: follow it "
-        "with code_status, the user sees it live on the Code page. Use this instead of "
-        "computer_shell with a script."
+        "with code_status (wait_s waits for it to end), the user sees it live on the Code "
+        "page. For a long job, if a create_trigger tool is offered, ask to be woken in this "
+        "chat by code_job.ended instead. Use this instead of computer_shell with a script."
     )
     capability = RUN
     Input = StartInput
@@ -245,6 +248,19 @@ class CodeStart(Tool):
 
 class JobInput(BaseModel):
     job_id: str = Field(min_length=1, max_length=60, description=JOB_DESCRIPTION)
+
+
+MAX_WAIT_S = 300
+
+
+class StatusInput(JobInput):
+    wait_s: int = Field(
+        0,
+        ge=0,
+        le=MAX_WAIT_S,
+        description="Wait up to this many seconds for the job to end before answering "
+        "(0: answer now)",
+    )
 
 
 def _subject(name: str, params: Any) -> str:
@@ -344,6 +360,18 @@ def _status_text(job: CodeJobOut, recent: list[str]) -> str:
     return "\n".join(head) + f"\n\n{FROM_JOB}\n{marked}"
 
 
+def wait_note(before: str, after: str, waited_s: float) -> str:
+    """The first line of a status the agent waited for: why the wait ended."""
+    if before in TERMINAL:
+        return "Wait: none, the job had already ended."
+    seconds = round(waited_s)
+    if after in TERMINAL:
+        return f"Wait: ended after {seconds} s, the job ended."
+    if after != before:
+        return f"Wait: ended after {seconds} s, the job's state changed."
+    return f"Wait: still running after {seconds} s."
+
+
 async def _job(ref: str) -> CodeJob | ToolResult:
     async with get_sessionmaker()() as db:
         job = await service.find(db, ref)
@@ -356,12 +384,17 @@ class CodeStatus(Tool):
     name = "code_status"
     description = (
         "How a Claude Code job is doing: its state, todo list, its last activities, branch, "
-        "pull request, turns, duration, API-equivalent cost and, once it ended, its result."
+        "pull request, turns, duration, API-equivalent cost and, once it ended, its result. "
+        "With wait_s it first waits (up to 300 s) until the job ends: better than asking "
+        "again and again."
     )
     capability = SEE
-    Input = JobInput
+    Input = StatusInput
+    # The longest wait, then the reads. The worker's heartbeat keeps the run's lease
+    # meanwhile (it runs beside the handler); the wait counts toward the run's time limit.
+    timeout_s = MAX_WAIT_S + 30
 
-    def actions(self, args: JobInput, ctx: ToolContext) -> list[Action]:
+    def actions(self, args: StatusInput, ctx: ToolContext) -> list[Action]:
         return [
             Action(
                 capability=SEE,
@@ -371,10 +404,14 @@ class CodeStatus(Tool):
             )
         ]
 
-    async def run(self, args: JobInput, ctx: ToolContext) -> ToolResult:
+    async def run(self, args: StatusInput, ctx: ToolContext) -> ToolResult:
         found = await _job(args.job_id)
         if isinstance(found, ToolResult):
             return found
+        began = time.monotonic()
+        if args.wait_s and found.state not in TERMINAL:
+            await wait.until_state_changes(found.id, found.state, args.wait_s)
+        waited = time.monotonic() - began
         async with get_sessionmaker()() as db:
             job = await service.one_out(db, found.id)
             rows: list[dict[str, Any]] = list(
@@ -390,7 +427,10 @@ class CodeStatus(Tool):
                 content=f"There is no Claude Code job “{args.job_id}”.", is_error=True
             )
         recent = activities(list(reversed(rows)))[-ACTIVITIES:]
-        return ToolResult(content=_status_text(job, recent), data=_data(job.id))
+        content = _status_text(job, recent)
+        if args.wait_s:
+            content = f"{wait_note(found.state, job.state, waited)}\n{content}"
+        return ToolResult(content=content, data=_data(job.id))
 
 
 # -- code_cancel -----------------------------------------------------------------------------
