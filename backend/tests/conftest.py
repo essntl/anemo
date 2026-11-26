@@ -38,7 +38,8 @@ def _redis_for_worker() -> str:
     its own); worker N uses that database + N, so leave room above it. Without it: database
     15 on the REDIS_URL server, and worker N uses 15 - N (database 0 is the dev app's)."""
     explicit = os.environ.get("TEST_REDIS_URL")
-    server, db = (explicit or os.environ.get("REDIS_URL", "redis://localhost:6379/0")).rsplit("/", 1)
+    url = explicit or os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+    server, db = url.rsplit("/", 1)
     number = int(db) + _worker_n if explicit else 15 - _worker_n
     if number < 1 and not explicit:
         raise pytest.UsageError("at most 15 test workers share the default Redis (16 databases)")
