@@ -32,6 +32,15 @@ class GeneralSettings(BaseModel):
     language: Literal["system", "en", "uk", "ru"] = "system"
 
 
+class ChatSettings(BaseModel):
+    """Long chats (docs/specs/24-chat-compaction.md): at the start of a turn, a chat whose
+    context reaches `compact_at_tokens` is summarized first (API providers; the Claude
+    subscription gets the number as Claude Code's own auto-compact window)."""
+
+    auto_compact: bool = True
+    compact_at_tokens: int = Field(250_000, ge=20_000, le=2_000_000)
+
+
 SetupStep = Literal["provider", "models", "you", "parts", "notifications"]
 
 
@@ -390,6 +399,7 @@ class SectionSpec:
 
 SECTIONS: dict[str, SectionSpec] = {
     "general": SectionSpec(GeneralSettings),
+    "chat": SectionSpec(ChatSettings),
     "appearance": SectionSpec(AppearanceSettings),
     "profile": SectionSpec(ProfileSettings),
     "models": SectionSpec(ModelDefaults),

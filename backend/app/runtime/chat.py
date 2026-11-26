@@ -11,6 +11,7 @@ streaming task, and partial output is saved with status "cancelled".
 
 import logging
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
 
 from sqlalchemy import select, update
@@ -18,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_sessionmaker
 from app.events import bus
+from app.features.conversations import compaction
 from app.features.conversations.models import ChatMessage, Conversation
 from app.features.memory import service as memory
 from app.features.projects import service as projects
@@ -30,6 +32,7 @@ from app.features.usage import service as usage
 from app.providers.base import (
     ChatRequest,
     Message,
+    ProviderError,
     ReasoningBlock,
     ReasoningEffort,
     TextBlock,
@@ -38,7 +41,7 @@ from app.providers.base import (
 )
 from app.providers.registry import make_adapter
 from app.providers.router import NoModelAvailable, ResolvedModel, RouteRequest, resolve
-from app.runtime import citations, memory_context, turn_context
+from app.runtime import chat_compaction, citations, memory_context, turn_context
 from app.runtime.history import (
     latest_user_attachment_kinds,
     load_history,
@@ -46,7 +49,12 @@ from app.runtime.history import (
     trim_to_budget,
 )
 from app.runtime.lifecycle import drive_until_stopped, effort_for, follow_up_answer
-from app.runtime.streaming import StreamProgress, StreamResult, stream_with_fallback
+from app.runtime.streaming import (
+    RequestBuilder,
+    StreamProgress,
+    StreamResult,
+    stream_with_fallback,
+)
 
 log = logging.getLogger(__name__)
 
@@ -85,6 +93,7 @@ def build_request(
     session_key: str | None = None,
     turn_context: str | None = None,
     reasoning_effort: ReasoningEffort | None = None,
+    compact_window: int | None = None,
 ) -> ChatRequest:
     context = model.context_window or DEFAULT_CONTEXT_TOKENS
     reserve = min(model.max_output or 8_000, context // 4)
@@ -101,6 +110,7 @@ def build_request(
         provider_options=model.provider_options,
         session_key=session_key,
         turn_context=turn_context,
+        compact_window=compact_window,
     )
 
 
@@ -112,6 +122,7 @@ async def _finish(
     *,
     status: str,
     error: str | None = None,
+    kind: str = "chat",
 ) -> None:
     blocks: list[dict[str, object]] = []
     # Chat mode has no sources: citation markup some models emit anyway is removed.
@@ -139,7 +150,7 @@ async def _finish(
             run.totals["api_equivalent_cost_usd"] = u.equivalent_cost_usd
         for part in result.usage_parts or [u]:  # one record per model request
             usage.record(
-                db, result.model, part, "chat", run_id=run.id, conversation_id=run.conversation_id
+                db, result.model, part, kind, run_id=run.id, conversation_id=run.conversation_id
             )
     await db.execute(
         update(Conversation)
@@ -190,6 +201,7 @@ async def execute_chat_run(run_id: uuid.UUID) -> None:
             # A previous worker died mid-stream: tell clients to discard partial output.
             await runs.emit(db, run, "run.restarted", {"attempt": run.attempt})
         await runs.set_status(db, run, "running")
+        run_options = dict(run.options)
 
         history = await load_history(db, run.conversation_id, before_seq=message.seq)
         # Images in the new message need a model that can see them.
@@ -263,21 +275,36 @@ async def execute_chat_run(run_id: uuid.UUID) -> None:
         )
         session_key = f"conv:{run.conversation_id}:chat"
         effort = await effort_for(db, run)
+        compact_window = (await compaction.settings(db)).compact_at_tokens
         await db.commit()
+
+    def build_for(messages: dict[bool, list[Message]]) -> RequestBuilder:
+        return lambda m: build_request(
+            m,
+            messages[bool(m.capabilities.get("vision"))],
+            system,
+            session_key=session_key,
+            turn_context=context_text,
+            reasoning_effort=effort,
+            compact_window=compact_window,
+        )
+
+    if run_options.get("compact"):
+        await _compact_only(run_id, message.id, candidates, rendered, build_for)
+        return
+    if run_options.get("compact_first"):
+        compacted = await _compact_first(
+            run_id, uuid.UUID(run_options["compact_first"]), candidates, build_for, message.seq
+        )
+        if compacted is not None:
+            rendered = compacted
     progress = StreamProgress()
     driven = await drive_until_stopped(
         run_id,
         stream_with_fallback(
             run_id,
             candidates,
-            lambda m: build_request(
-                m,
-                rendered[bool(m.capabilities.get("vision"))],
-                system,
-                session_key=session_key,
-                turn_context=context_text,
-                reasoning_effort=effort,
-            ),
+            build_for(rendered),
             progress,
         ),
     )
@@ -298,6 +325,110 @@ async def execute_chat_run(run_id: uuid.UUID) -> None:
         await _finish(db, run, message, result or progress.current, status=status, error=error)
         if status == "completed":
             await follow_up_answer(db, run.conversation_id, message.seq)
+
+
+async def _rendered(
+    db: AsyncSession, history: list[Message], candidates: list[ResolvedModel]
+) -> dict[bool, list[Message]]:
+    return {
+        vision: await resolve_attachments(db, history, {"vision": vision})
+        for vision in {bool(m.capabilities.get("vision")) for m in candidates}
+    }
+
+
+def _instructed(
+    rendered: dict[bool, list[Message]], focus: str | None
+) -> dict[bool, list[Message]]:
+    return {v: chat_compaction.with_instruction(h, focus) for v, h in rendered.items()}
+
+
+async def _compact_only(
+    run_id: uuid.UUID,
+    row_id: uuid.UUID,
+    candidates: list[ResolvedModel],
+    rendered: dict[bool, list[Message]],
+    build_for: Callable[[dict[bool, list[Message]]], RequestBuilder],
+) -> None:
+    """A `/compact` run: summarize the chat into its row (the run's message)."""
+    sessionmaker = get_sessionmaker()
+    async with sessionmaker() as db:
+        row = await db.get(ChatMessage, row_id)
+        assert row is not None
+        before = await compaction.context_tokens(db, row.conversation_id, row.seq)
+        focus = (row.compaction or {}).get("focus")
+    driven = await drive_until_stopped(
+        run_id,
+        chat_compaction.summarize(run_id, candidates, build_for(_instructed(rendered, focus))),
+    )
+    async with sessionmaker() as db:
+        run = await db.get(Run, run_id)
+        row = await db.get(ChatMessage, row_id)
+        assert run is not None and row is not None
+        if driven.value is None:
+            status = "cancelled" if driven.cancelled else "failed"
+            await _finish(db, run, row, None, status=status, error=driven.error)
+            return
+        await _finish(
+            db, run, row, driven.value, status="completed", kind=chat_compaction.USAGE_KIND
+        )
+        await chat_compaction.save(db, row, driven.value, before)
+        await db.commit()
+
+
+async def _compact_first(
+    run_id: uuid.UUID,
+    row_id: uuid.UUID,
+    candidates: list[ResolvedModel],
+    build_for: Callable[[dict[bool, list[Message]]], RequestBuilder],
+    message_seq: int,
+) -> dict[bool, list[Message]] | None:
+    """A turn that reached the auto-compact threshold: summarize the chat before its new
+    message, then return the history to answer from (None: not compacted, answer from the
+    full history)."""
+    sessionmaker = get_sessionmaker()
+    async with sessionmaker() as db:
+        row = await db.get(ChatMessage, row_id)
+        if row is None or row.status != "streaming":
+            return None  # already done (or given up) before a restart
+        if candidates[0].provider_type == "claude_code":
+            await db.delete(row)  # Claude Code compacts the chat itself
+            await db.commit()
+            return None
+        before = await compaction.context_tokens(db, row.conversation_id, row.seq)
+        old = await _rendered(
+            db, await load_history(db, row.conversation_id, before_seq=row.seq), candidates
+        )
+    try:
+        # Its live text goes to the row's own stream, not into the answer.
+        result = await chat_compaction.summarize(
+            row_id, candidates, build_for(_instructed(old, None))
+        )
+    except ProviderError as exc:
+        async with sessionmaker() as db:
+            row = await db.get(ChatMessage, row_id)
+            if row is not None:
+                chat_compaction.fail(row, str(exc))
+                await db.commit()
+        return None
+    async with sessionmaker() as db:
+        row = await db.get(ChatMessage, row_id)
+        run = await db.get(Run, run_id)
+        assert row is not None and run is not None
+        await chat_compaction.save(db, row, result, before)
+        for part in result.usage_parts or [result.usage]:
+            usage.record(
+                db,
+                result.model,
+                part,
+                chat_compaction.USAGE_KIND,
+                run_id=run_id,
+                conversation_id=row.conversation_id,
+            )
+        await runs.emit(db, run, "chat.compacted", {"message_id": str(row_id)})
+        history = await load_history(db, row.conversation_id, before_seq=message_seq)
+        rendered = await _rendered(db, history, candidates)
+        await db.commit()
+    return rendered
 
 
 TITLE_PROMPT = (

@@ -37,6 +37,7 @@ from app.events import bus
 from app.features.attachments import service as attachments
 from app.features.attachments.images import PreparedImage
 from app.features.automations import service as automations
+from app.features.conversations import compaction as conv_compaction
 from app.features.conversations.models import ChatMessage
 from app.features.providers import service as providers_service
 from app.features.runs import service as runs
@@ -59,7 +60,14 @@ from app.providers.base import (
 )
 from app.providers.catalog import rejects_tools
 from app.providers.router import NoModelAvailable, ResolvedModel
-from app.runtime import citations, compaction, outputs, subagents, tool_calls
+from app.runtime import (
+    chat_compaction,
+    citations,
+    compaction,
+    outputs,
+    subagents,
+    tool_calls,
+)
 from app.runtime.agent_finalize import after_answer, finalize, notify_question, save_progress
 from app.runtime.agent_prompt import build_system_prompt
 from app.runtime.agent_snapshot import resolve_models, session_key_for, snapshot_run
@@ -168,6 +176,8 @@ class AgentRun:
         self.session_key = session_key
         self.turn_context = turn_context
         self.reasoning_effort = reasoning_effort
+        # Claude Code's own auto-compact window (Settings > Chat behaviour), set in drive().
+        self.compact_window: int | None = None
         # For a sub-agent: the policies of the agents above it (it may do no more).
         self.ancestors = ancestors or []
         self.run_id = run_id
@@ -308,7 +318,16 @@ class AgentRun:
     # -- main loop ---------------------------------------------------------------
 
     async def drive(self) -> str:
-        """Runs the loop; when a limit stops it, the model writes a short wrap-up."""
+        """Runs the loop; when a limit stops it, the model writes a short wrap-up. A
+        `/compact` run only writes the chat's summary; a turn that reached the
+        auto-compact threshold writes it first (docs/specs/24-chat-compaction.md)."""
+        options = await self._options()
+        async with get_sessionmaker()() as db:
+            self.compact_window = (await conv_compaction.settings(db)).compact_at_tokens
+        if options.get("compact"):
+            return await self._compact_only()
+        if options.get("compact_first"):
+            await self._compact_first(uuid.UUID(options["compact_first"]))
         outcome = await self.run()
         if outcome.startswith("limit:") and outcome != "limit:cost":
             await self._wrap_up(outcome.removeprefix("limit:"))
@@ -394,6 +413,107 @@ class AgentRun:
             if not result.tool_calls:
                 return "completed"
 
+    # -- chat compaction -----------------------------------------------------------
+
+    async def _options(self) -> dict[str, Any]:
+        async with get_sessionmaker()() as db:
+            return dict((await _get_run(db, self.run_id)).options)
+
+    async def _rendered(
+        self, db: AsyncSession, history: list[Message]
+    ) -> dict[bool, list[Message]]:
+        return {
+            vision: await resolve_attachments(db, history, self._render_caps(vision))
+            for vision in {bool(m.capabilities.get("vision")) for m in self.candidates}
+        }
+
+    @staticmethod
+    def _instructed(
+        rendered: dict[bool, list[Message]], focus: str | None
+    ) -> dict[bool, list[Message]]:
+        return {v: chat_compaction.with_instruction(h, focus) for v, h in rendered.items()}
+
+    async def _compact_only(self) -> str:
+        """A `/compact` run: the chat's summary goes into the run's message (its
+        compaction row), read with this chat's system prompt and tools (cached prefix)."""
+        if self.candidates[0].provider_type == "claude_code":
+            raise ProviderError("Claude Code compacts this chat by itself.", retryable=False)
+        async with get_sessionmaker()() as db:
+            run = await _get_run(db, self.run_id)
+            row = await db.get(ChatMessage, run.assistant_message_id)
+            assert row is not None and run.conversation_id is not None
+            before = await conv_compaction.context_tokens(db, row.conversation_id, row.seq)
+            transcript = [Message.model_validate(m) for m in run.transcript]
+            rendered = await self._rendered(db, transcript)
+            focus = (row.compaction or {}).get("focus")
+        self.progress = StreamProgress()
+        result = await chat_compaction.summarize(
+            self.run_id, self.candidates, self._builder(self._instructed(rendered, focus))
+        )
+        async with get_sessionmaker()() as db:
+            run = await _get_run(db, self.run_id)
+            row = await db.get(ChatMessage, run.assistant_message_id)
+            assert row is not None
+            self._append_text(run, result)
+            run.model_id = result.model.model_id
+            self._add_usage(
+                db,
+                run,
+                result.model,
+                result.usage_parts or [result.usage],
+                chat_compaction.USAGE_KIND,
+            )
+            await chat_compaction.save(db, row, result, before)
+            await db.commit()
+        return "completed"
+
+    async def _compact_first(self, row_id: uuid.UUID) -> None:
+        """The turn reached the auto-compact threshold: summarize the chat before its new
+        message, then answer from the summary. When that fails, the turn is answered
+        from the full history."""
+        async with get_sessionmaker()() as db:
+            run = await _get_run(db, self.run_id)
+            row = await db.get(ChatMessage, row_id)
+            if row is None or row.status != "streaming":
+                return  # already done (or given up) before a restart
+            if self.candidates[0].provider_type == "claude_code":
+                await db.delete(row)  # Claude Code compacts the chat itself
+                await db.commit()
+                return
+            before = await conv_compaction.context_tokens(db, row.conversation_id, row.seq)
+            history = await load_history(db, row.conversation_id, before_seq=row.seq)
+            rendered = await self._rendered(db, history)
+        try:
+            # Its live text goes to the row's own stream, not into the answer.
+            result = await chat_compaction.summarize(
+                row_id, self.candidates, self._builder(self._instructed(rendered, None))
+            )
+        except ProviderError as exc:
+            async with get_sessionmaker()() as db:
+                row = await db.get(ChatMessage, row_id)
+                if row is not None:
+                    chat_compaction.fail(row, str(exc))
+                    await db.commit()
+            return
+        async with get_sessionmaker()() as db:
+            run = await _get_run(db, self.run_id)
+            row = await db.get(ChatMessage, row_id)
+            answer = await db.get(ChatMessage, run.assistant_message_id)
+            assert row is not None and answer is not None
+            await chat_compaction.save(db, row, result, before)
+            self._add_usage(
+                db,
+                run,
+                result.model,
+                result.usage_parts or [result.usage],
+                chat_compaction.USAGE_KIND,
+            )
+            # The new message, with its turn context, now follows the summary.
+            history = await load_history(db, row.conversation_id, before_seq=answer.seq)
+            run.transcript = [m.model_dump() for m in history]
+            await runs.emit(db, run, "chat.compacted", {"message_id": str(row_id)})
+            await db.commit()
+
     async def _tools_rejected(self, exc: ProviderError) -> bool:
         """The provider refused the request because of its tools. Remember that for the
         model, so the next request is right from the start. Returns whether this run can
@@ -436,6 +556,7 @@ class AgentRun:
                 provider_options=model.provider_options,
                 session_key=self.session_key,
                 turn_context=self.turn_context,
+                compact_window=self.compact_window,
             )
 
         return build
@@ -513,9 +634,17 @@ class AgentRun:
             return transcript  # Claude Code compacts its own context
         budget = _budget(self.candidates[0])
         used = estimate_tokens(transcript) + len(self.system) // 4
-        if not force and used <= budget * COMPACT_AT:
+        # Near the model's limit, or at the auto-compact setting if that comes first
+        # (a 1M-token model shouldn't carry 700k tokens through every step).
+        at = budget * COMPACT_AT
+        chat_settings = await conv_compaction.settings(db)
+        if chat_settings.auto_compact:
+            at = min(at, chat_settings.compact_at_tokens)
+        if not force and used <= at:
             return transcript
-        result = await compaction.compact(db, transcript, run.request, int(budget * keep_share))
+        # What is kept is a share of the budget the threshold stands for.
+        keep = int(min(budget, at / COMPACT_AT) * keep_share)
+        result = await compaction.compact(db, transcript, run.request, keep)
         if result is None:
             return transcript  # nothing to summarize: trimming in the request builder applies
         run.transcript = [m.model_dump() for m in result.transcript]

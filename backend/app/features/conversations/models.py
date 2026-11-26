@@ -90,7 +90,8 @@ class ChatMessage(Base, IdMixin):
         UUID(as_uuid=True), ForeignKey("conversations.id", ondelete="CASCADE")
     )
     seq: Mapped[int] = mapped_column(Integer)
-    role: Mapped[str] = mapped_column(String(20))  # user | assistant
+    # user | assistant | compaction (a summary that stands in for the earlier chat)
+    role: Mapped[str] = mapped_column(String(20))
     content: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
     text_plain: Mapped[str] = mapped_column(Text, default="")
     # complete | streaming | error | cancelled (assistant messages only change state)
@@ -111,6 +112,9 @@ class ChatMessage(Base, IdMixin):
     # User messages started with a skill (/study ...): the skill as it was then
     # (Skill.invocation()). Its instructions go into the turn context.
     skill: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    # Compaction rows: {kept_from_seq, tokens_before, tokens_after, focus, auto}
+    # (features/conversations/compaction.py, docs/specs/24-chat-compaction.md).
+    compaction: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     # Assistant messages: earlier answers to the same message (Regenerate keeps them).
     # The stored fields of each one (content, text_plain, status, error, run_id,
     # model_id, model_label, created_at); the one shown is the columns themselves,
