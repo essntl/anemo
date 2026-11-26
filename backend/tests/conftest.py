@@ -71,7 +71,12 @@ if _base_db_url:
     os.environ["DATABASE_URL"] = _base_db_url
 
 HAS_DB = bool(_base_db_url)
-requires_db = pytest.mark.skipif(not HAS_DB, reason="needs DATABASE_URL (run in dev container)")
+# A test (or module, `pytestmark = requires_db`) that touches the database. It gets a migrated,
+# empty database whatever ran before it: many such tests reach the database only through the
+# code they call (a tool opening its own session), not through a fixture, and without this
+# they passed only when an earlier test on the same xdist worker had created that worker's
+# database. With no database configured, `migrated_db` skips the test.
+requires_db = pytest.mark.usefixtures("db_clean")
 
 
 async def _recreate_database(url: str) -> None:
