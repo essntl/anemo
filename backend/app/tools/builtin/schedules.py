@@ -547,6 +547,19 @@ class UpdateSchedule(Tool):
     capability = MANAGE
     Input = UpdateScheduleInput
     idempotent = False
+    # null: back to the default (all tools, the automations model, the agent's limits...).
+    null_clears = frozenset(
+        {
+            "tools",
+            "model",
+            "profile",
+            "max_tool_calls",
+            "max_minutes",
+            "retention_days",
+            "change_check",
+            "run_anyway_hours",
+        }
+    )
 
     def actions(self, args: UpdateScheduleInput, ctx: ToolContext) -> list[Action]:
         changed = args.model_fields_set - {"id"}

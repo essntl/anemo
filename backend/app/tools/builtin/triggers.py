@@ -391,6 +391,7 @@ class UpdateTrigger(Tool):
     extra_capabilities = (MANAGE,)
     Input = UpdateTriggerInput
     idempotent = False
+    null_clears = frozenset({"expires_at"})  # null: it never expires
 
     def actions(self, args: UpdateTriggerInput, ctx: ToolContext) -> list[Action]:
         found = _lookup_trigger(args.id)
