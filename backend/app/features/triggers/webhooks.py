@@ -78,14 +78,29 @@ def _parse(body: bytes, content_type: str) -> Any:
     return text
 
 
+def _seen_key(trigger_id: uuid.UUID, signature: str) -> str:
+    return f"hooks:seen:{trigger_id}:{hashlib.sha256(signature.encode()).hexdigest()}"
+
+
 async def _first_time(trigger_id: uuid.UUID, signature: str) -> bool:
-    """Not seen before (a replay is). Without Valkey only the time window protects."""
-    key = f"hooks:seen:{trigger_id}:{hashlib.sha256(signature.encode()).hexdigest()}"
+    """Not seen before (a replay is), and now marked as seen. Without Valkey only the
+    time window protects."""
     try:
-        return bool(await get_redis().set(key, "1", nx=True, ex=SEEN_FOR_S))
+        return bool(
+            await get_redis().set(_seen_key(trigger_id, signature), "1", nx=True, ex=SEEN_FOR_S)
+        )
     except (RedisError, OSError):
         log.warning("webhook replay check skipped: valkey unavailable")
         return True
+
+
+async def _forget(trigger_id: uuid.UUID, signature: str) -> None:
+    """Unmark a request that was refused with 429, so the sender's retry of it (the same
+    signed request) is taken instead of being refused as a replay."""
+    try:
+        await get_redis().delete(_seen_key(trigger_id, signature))
+    except (RedisError, OSError):
+        pass
 
 
 async def _within_rate(trigger_id: uuid.UUID) -> bool:
@@ -135,7 +150,9 @@ async def receive(
         raise _refused()
     if not await _first_time(trigger.id, expected):
         raise _refused()
+    # The replay check comes first, so a replay doesn't use up the sender's rate.
     if not await _within_rate(trigger.id):
+        await _forget(trigger.id, expected)
         raise TooManyRequests("Too many requests for this webhook", code="rate_limited")
     content_type = headers.get("content-type", "")[:100]
     with acting_as(EXTERNAL):  # another system, not the user

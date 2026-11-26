@@ -132,6 +132,22 @@ async def test_size_and_rate_limits(authed, monkeypatch):
     assert r.status_code == 429
 
 
+async def test_a_request_refused_with_429_can_be_sent_again(authed, monkeypatch):
+    # A sender that got 429 retries the same signed request: that is not a replay.
+    _, secret, trigger = await webhook(authed)
+    monkeypatch.setattr(webhooks, "PER_MINUTE", 1)
+    first = b'{"n": 1}'
+    assert (await post(authed, trigger["id"], first, signed(secret, first))).status_code == 202
+    body = b'{"n": 2}'
+    headers = signed(secret, body)
+    assert (await post(authed, trigger["id"], body, headers)).status_code == 429
+    monkeypatch.setattr(webhooks, "PER_MINUTE", 10)  # the next minute, as far as it can tell
+    assert (await post(authed, trigger["id"], body, headers)).status_code == 202
+    assert len(await stored_events("webhook.received")) == 2
+    # Taken once, it is a replay again.
+    assert (await post(authed, trigger["id"], body, headers)).status_code == 404
+
+
 async def test_rotating_the_secret_needs_the_password_and_retires_the_old_one(authed):
     _, secret, trigger = await webhook(authed)
     r = await authed.post(f"/api/triggers/{trigger['id']}/secret")
