@@ -200,3 +200,29 @@ The Mac `trusted`; Settings → *Let Anemo read and write files* ticked. Contrac
 58. Names with Unicode (as Finder writes them, e.g. `Grüße.txt`) and spaces: get and put work.
 59. Stop key during a large copy: the call fails, the `.part` file goes. Untick the switch: within
     30 s `files on` is gone and a copy is refused.
+
+## O. Updates (Anemo Desktop 1.8.0)
+
+With a test repository as in `desktop/MANUAL-TESTS.md` *Updates*: build two apps with
+`ANEMO_UPDATE_REPOSITORY=<you>/anemo-update-test sh mac/build-app.sh` after setting `<Version>` to
+1.8.0 and then 1.8.1 (keep the first app, release the second's zip with
+`shasum -a 256 Anemo-Desktop-macos-arm64.zip > SHA256SUMS-desktop-macos.txt`). Install the 1.8.0 app in
+`/Applications` with both permissions allowed.
+
+60. Within about a minute the menu shows *Update to 1.8.1 ready: Restart to update*; Settings →
+    Updates says so and, for this ad hoc build, warns that the permissions will have to be allowed
+    again. `ls -a /Applications` shows `.Anemo Desktop.update`.
+61. *Restart to update* (nothing running): the app quits and comes back as 1.8.1 (menu → Settings
+    shows the version) with a notice; for an ad hoc build the Permissions window shows both "not
+    allowed" (remove and allow again, as in L). `/Applications/.Anemo Desktop.old.app` is 1.8.0.
+62. Quit with an update ready: the next start is the new version. A long agent task or a shared
+    Claude Code job holds *Restart to update* back until it is done (Settings says why).
+63. A zip with a wrong checksum line, a zip of another app (another bundle identifier) and a zip
+    whose app was changed after signing (`echo >> "…/Contents/MacOS/Anemo Desktop"` before zipping)
+    are each refused with a sentence; `/Applications` is unchanged.
+64. *Update automatically* off: no request for 10 minutes after a restart; *Check now* works.
+65. The app in a folder you can't write (e.g. `/Applications` as a standard user): Settings says it
+    can't replace itself there. A build whose app exits at once: after *Restart to update* the old
+    app is back within a minute and running.
+66. (Only with a Developer ID build.) A Developer ID 1.8.0 refuses an ad hoc 1.8.1 ("signed by
+    another developer") and accepts a Developer ID 1.8.1 of the same team; the permissions stay.

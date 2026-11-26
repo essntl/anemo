@@ -6,6 +6,7 @@ using Anemo.Desktop.Core.Files;
 using Anemo.Desktop.Core.Platform;
 using Anemo.Desktop.Core.SharedScreen;
 using Anemo.Desktop.Core.Storage;
+using Anemo.Desktop.Core.Updates;
 
 namespace Anemo.Desktop.Core;
 
@@ -26,7 +27,10 @@ public sealed record DesktopAgentParts(
     ICodeHost? CodeHost = null,
     CodeJobControlOptions? CodeJobControlOptions = null,
     DesktopPlatform? TargetSystem = null,
-    string? HomeFolder = null)
+    string? HomeFolder = null,
+    IUpdatePlatform? Updates = null,
+    IReleaseFeed? ReleaseFeed = null,
+    UpdateOptions? UpdateOptions = null)
 {
     /// <summary>The system the client runs on (Windows unless the host says otherwise).</summary>
     public DesktopPlatform Os => TargetSystem ?? DesktopPlatform.Windows;
@@ -39,6 +43,9 @@ public sealed record DesktopAgentParts(
 
     /// <summary>The folder of <c>settings.json</c>: the file actions never read or write in it (§8.2).</summary>
     public string DataFolder => Path.GetDirectoryName(Path.GetFullPath(Store.Path)) ?? ".";
+
+    /// <summary>The updater's marks (the started-file, the failed-file) and, on macOS, the download.</summary>
+    public string UpdatesFolder => Path.Combine(DataFolder, "updates");
 }
 
 /// <summary>
@@ -47,13 +54,23 @@ public sealed record DesktopAgentParts(
 /// </summary>
 public sealed class DesktopAgent
 {
+    /// <summary>
+    /// A restart for an update waits this long after the agent's last command: an agent sends its
+    /// commands one after another with the model thinking in between, and a restart in such a gap
+    /// would still break its task.
+    /// </summary>
+    public static readonly TimeSpan QuietBeforeRestart = TimeSpan.FromSeconds(60);
+
     private readonly DesktopAgentParts _parts;
+    private readonly CodeJobControl _codeControl;
     private readonly SharedScreenClient _sharedScreen;
     private readonly object _lock = new();
 
     /// <summary>The shell's kind for the offer, looked up once (installing pwsh needs a restart to show).</summary>
     private readonly Lazy<string> _shellKind;
     private DesktopSettings _settings;
+    private string? _runningAction;
+    private DateTimeOffset? _lastCommandEnded;
 
     public DesktopAgent(DesktopAgentParts parts)
     {
@@ -69,20 +86,21 @@ public sealed class DesktopAgent
         Control = new ControlState(parts.Time, _settings.AllowControl, _settings.PausedUntil);
         Control.Changed += SaveControlState;
         Files = new DeviceFiles(() => Settings, parts.Time, parts.Os, parts.HomeFolder, parts.DataFolder);
+        _codeControl = new CodeJobControl(
+            () => Settings,
+            parts.CodeHost ?? NoCodeHost.Instance,
+            parts.Processes ?? NoProcesses.Instance,
+            parts.Time,
+            parts.CodeJobControlOptions,
+            parts.Os,
+            parts.GitCacheFolder);
         Processor = new CommandProcessor(
             parts.Platform,
             Control,
             () => Settings,
             parts.CommandLog,
             WithWorkFolder(parts.CommandOptions ?? new CommandOptions(), parts.DefaultWorkFolder, parts.Os),
-            new CodeJobControl(
-                () => Settings,
-                parts.CodeHost ?? NoCodeHost.Instance,
-                parts.Processes ?? NoProcesses.Instance,
-                parts.Time,
-                parts.CodeJobControlOptions,
-                parts.Os,
-                parts.GitCacheFolder),
+            _codeControl,
             Files);
         CodeJobs = new CodeJobSharing(
             () => Settings,
@@ -105,6 +123,22 @@ public sealed class DesktopAgent
             () => _shellKind.Value,
             Files.Offered);
         _sharedScreen = new SharedScreenClient(parts.Http);
+        Connection.CommandRunning += OnCommandRunning;
+
+        var updates = parts.Updates ?? NoUpdatePlatform.Instance;
+        var updateOptions = parts.UpdateOptions ?? new UpdateOptions();
+        Installer = new UpdateInstaller(
+            updates.Files, updates is NoUpdatePlatform ? NoLauncher.Instance : updates.Launcher, parts.Log, parts.UpdatesFolder);
+        Updates = new Updater(
+            () => Settings,
+            updates,
+            parts.ReleaseFeed ?? (updates.Unavailable is null ? new GitHubReleaseFeed(updateOptions.Repository, parts.Version) : NoReleaseFeed.Instance),
+            Installer,
+            parts.Version,
+            updateOptions,
+            parts.Time,
+            parts.Log,
+            BusyReason);
     }
 
     public ControlState Control { get; }
@@ -118,6 +152,12 @@ public sealed class DesktopAgent
 
     /// <summary>"Share Claude Code jobs with Anemo".</summary>
     public CodeJobSharing CodeJobs { get; }
+
+    /// <summary>Updates of Anemo Desktop itself (docs/specs/23-desktop-auto-update.md).</summary>
+    public Updater Updates { get; }
+
+    /// <summary>Swaps a ready update in, at quit (the host calls it once its window and lock are gone).</summary>
+    public UpdateInstaller Installer { get; }
 
     public DesktopSettings Settings
     {
@@ -138,7 +178,45 @@ public sealed class DesktopAgent
     public Task RunAsync(CancellationToken ct)
     {
         _parts.CommandLog.Prune();
-        return Connection.RunAsync(ct);
+        return Task.WhenAll(Connection.RunAsync(ct), Updates.RunAsync(ct));
+    }
+
+    /// <summary>
+    /// Why a restart for an update has to wait, as a few words, or null when nothing is running:
+    /// a command (and the minute after it), a file copy, a Claude Code job being set up (its clone
+    /// runs in this process) or one that is running (sharing would stop until the restart).
+    /// </summary>
+    public string? BusyReason()
+    {
+        string? running;
+        DateTimeOffset? ended;
+        lock (_lock)
+        {
+            running = _runningAction;
+            ended = _lastCommandEnded;
+        }
+
+        if (running is not null)
+        {
+            return "the agent is using this computer";
+        }
+
+        if (ended is { } at && _parts.Time.GetUtcNow() - at < QuietBeforeRestart)
+        {
+            return "the agent used this computer a moment ago";
+        }
+
+        if (Files.OpenTransfers > 0)
+        {
+            return "a file is being copied";
+        }
+
+        if (_codeControl.StartingCount > 0)
+        {
+            return "a Claude Code job is being set up";
+        }
+
+        return CodeJobs.Session?.FollowingCount > 0 ? "a Claude Code job is running" : null;
     }
 
     /// <summary>
@@ -202,6 +280,19 @@ public sealed class DesktopAgent
         var result = await _sharedScreen.ShareAsync(settings, content, ct);
         _parts.Log.Info(result.Ok ? "screen shared" : "screen not shared");
         return result;
+    }
+
+    private void OnCommandRunning(string? action)
+    {
+        lock (_lock)
+        {
+            if (action is null && _runningAction is not null)
+            {
+                _lastCommandEnded = _parts.Time.GetUtcNow();
+            }
+
+            _runningAction = action;
+        }
     }
 
     private static CommandOptions WithWorkFolder(CommandOptions options, string folder, DesktopPlatform platform) => new()

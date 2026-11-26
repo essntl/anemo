@@ -1,5 +1,6 @@
 using Anemo.Desktop.Core;
 using Anemo.Desktop.Core.Storage;
+using Anemo.Desktop.Core.Updates;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 
@@ -13,18 +14,30 @@ public sealed partial class SettingsWindow : Window
 {
     private readonly DesktopSettings _current;
     private readonly Func<DesktopSettings, string?, string?> _save;
+    private readonly string _version;
 
     /// <summary>For Avalonia's designer and XAML loader only.</summary>
     public SettingsWindow()
-        : this(new DesktopSettings(), false, "", (_, _) => null)
+        : this(new DesktopSettings(), false, "", (_, _) => null, () => { }, () => { }, null)
     {
     }
 
     /// <param name="save">Saves; returns a sentence when it failed (the window then stays open).</param>
-    public SettingsWindow(DesktopSettings current, bool hasToken, string version, Func<DesktopSettings, string?, string?> save)
+    /// <param name="checkNow">"Check now": at once, whatever the box says (the box is saved with Save).</param>
+    /// <param name="restart">"Restart to update": once nothing is running.</param>
+    /// <param name="updateNote">What an update costs here (ad hoc builds lose their permissions), or null.</param>
+    public SettingsWindow(
+        DesktopSettings current,
+        bool hasToken,
+        string version,
+        Func<DesktopSettings, string?, string?> save,
+        Action checkNow,
+        Action restart,
+        string? updateNote)
     {
         _current = current;
         _save = save;
+        _version = version;
         AvaloniaXamlLoader.Load(this);
         Icon = Icons.App;
 
@@ -47,6 +60,11 @@ public sealed partial class SettingsWindow : Window
         Find<CheckBox>("FilesSwitch").IsChecked = draft.ShareFiles;
         Box("FileFolders").Text = draft.FileFolders;
         Box("FileFolders").Watermark = AppPaths.HomeFolder;
+        Find<CheckBox>("AutoUpdate").IsChecked = draft.AutoUpdate;
+        Find<TextBlock>("UpdateNote").Text = updateNote ?? "";
+        Find<TextBlock>("UpdateNote").IsVisible = updateNote is not null;
+        Find<Button>("CheckNow").Click += (_, _) => checkNow();
+        Find<Button>("RestartToUpdate").Click += (_, _) => restart();
         Find<TextBlock>("Version").Text = $"Anemo Desktop {version} for macOS";
 
         Find<Button>("Cancel").Click += (_, _) => Close();
@@ -57,6 +75,14 @@ public sealed partial class SettingsWindow : Window
     {
         Find<TextBlock>("StatusTitle").Text = summary.Title;
         Find<TextBlock>("StatusDetail").Text = summary.Detail;
+    }
+
+    /// <summary>The updater's state; called again when it changes.</summary>
+    public void ShowUpdate(UpdateState state, bool automatic)
+    {
+        Find<TextBlock>("UpdateStatus").Text = UpdateText.Status(state, automatic, _version);
+        Find<Button>("CheckNow").IsEnabled = state.Phase is not (UpdatePhase.Unavailable or UpdatePhase.Checking or UpdatePhase.Downloading or UpdatePhase.WaitingToRestart);
+        Find<Button>("RestartToUpdate").IsVisible = state.Phase == UpdatePhase.Ready;
     }
 
     private void OnSave()
@@ -77,6 +103,7 @@ public sealed partial class SettingsWindow : Window
             GitHubOwner = Box("GitHubOwner").Text ?? "",
             ShareFiles = Find<CheckBox>("FilesSwitch").IsChecked == true,
             FileFolders = Box("FileFolders").Text ?? "",
+            AutoUpdate = Find<CheckBox>("AutoUpdate").IsChecked == true,
         };
         var check = draft.Check(_current);
         if (!check.Ok)

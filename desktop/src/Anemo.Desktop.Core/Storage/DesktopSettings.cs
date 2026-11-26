@@ -63,4 +63,10 @@ public sealed record DesktopSettings
 
     /// <summary>The folders those files may be in; null or empty means the user's home folder (hidden and system folders never).</summary>
     public IReadOnlyList<string>? FileFolders { get; init; }
+
+    /// <summary>
+    /// "Update automatically" (docs/specs/23-desktop-auto-update.md, 1.8.0): check GitHub Releases
+    /// at start and every 6 hours, download a new version and install it at quit. On by default.
+    /// </summary>
+    public bool AutoUpdate { get; init; } = true;
 }

@@ -127,6 +127,24 @@ password again.
   change, respects the folder access of Settings → Workspace (a folder hidden from agents
   can't be sent away either), and its content is untrusted for the model. Stop pauses
   copies too. The client's log keeps paths and sizes, never contents.
+- **Updates of Anemo Desktop** (1.8.0). The client asks GitHub's API for this repository's
+  Releases every 6 hours, unauthenticated: GitHub sees the computer's address and
+  `Anemo-Desktop/<version>`, nothing else (no token, device or Anemo address); Anemo's server
+  isn't involved. **What it trusts:** a stable `desktop-v…` Release of the repository compiled
+  into it, fetched over HTTPS from addresses it builds itself, whose file matches the SHA-256 in
+  the Release's checksum file. That checksum comes from the same Release, so on its own it guards
+  against a damaged download, not against someone who can change the Release. With the release
+  key set up (`desktop/README.md`, *Signing updates*), the checksum file must also carry a valid
+  ECDSA signature by the key compiled into the client, bound to the tag; that stops someone who
+  can edit Releases but not run the release workflow with its secret. Neither stops someone who
+  controls the repository (they can have the workflow build and sign their code): review of what
+  reaches `main` is the boundary. On a Mac with a Developer ID build, the new app must also be
+  signed by the same Apple team; an ad hoc build's signature only proves the bundle is intact. On
+  Windows the exe has no Authenticode signature. Before swapping, the new version is started once
+  with `--self-test`; it is never restarted into while the agent is working; the previous
+  version is kept beside it and put back if the new one doesn't start. Downloads carry no Mark of
+  the Web / quarantine, so SmartScreen and Gatekeeper don't ask again: the checks above are what
+  decides. Design: [specs/23-desktop-auto-update.md](specs/23-desktop-auto-update.md).
 - **Screens are untrusted.** Screenshots, window text and a shared screen can contain
   text written to steer the agent (an email, a web page, a document). They reach the
   model labelled as untrusted, like web pages, and what contains the damage is the
