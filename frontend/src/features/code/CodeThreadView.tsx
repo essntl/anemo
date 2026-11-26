@@ -21,7 +21,7 @@ import { toast } from '@/components/ui/toast'
 import { useIslandVisible } from '@/features/island/islandStore'
 import { DESKTOP, useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
-import { formatCost, formatDuration, formatWhen } from '@/lib/format'
+import { formatCost, formatCount, formatDuration, formatWhen } from '@/lib/format'
 import { t } from '@/lib/i18n'
 import { AGENT_PARAM, type AgentInfo, MAIN, agentTree, agentsOf, eventsOfAgent } from './agents'
 import { type AgentNav, AgentNavContext, type ThreadAgent } from './agentNav'
@@ -34,6 +34,7 @@ import { StateBadge, TodoChecklist } from './parts'
 import { type CodeJob, jobDurationMs, pullRequest, toThreads } from './threads'
 import { PromptImages } from './ImageAttachments'
 import { useFollowEnd } from './useFollowEnd'
+import { JobUsage } from './UsageMeter'
 import { type ResultInfo, buildTimeline, num, resultOf, todoProgress, toTodos } from './timeline'
 
 function Fact({ icon, children, className }: { icon: ReactNode; children: ReactNode; className?: string }) {
@@ -72,6 +73,7 @@ function ResultCard({ job, result }: { job: CodeJob; result?: ResultInfo }) {
   const ms = jobDurationMs(job) ?? result?.durationMs ?? null
   const cost = num(job.cost_usd) ?? result?.costUsd
   const subtype = job.result_subtype ?? result?.subtype
+  const tokens = job.tokens
   const failed = state === 'failed' || state === 'exited_without_result'
   const head = {
     done: { icon: <CheckCircle2 className="h-4 w-4 text-tool-ok" />, label: t('Finished') },
@@ -89,10 +91,20 @@ function ResultCard({ job, result }: { job: CodeJob; result?: ResultInfo }) {
       {state === 'exited_without_result' && !job.stderr_tail && (
         <p className="mt-2 text-[12.5px] text-muted">{t('The process ended without writing a result.')}</p>
       )}
-      {(turns !== undefined || ms !== null || cost !== undefined) && (
-        <div className="mt-3 grid grid-cols-2 gap-3 border-t border-border pt-3 sm:grid-cols-3">
+      {(turns !== undefined || ms !== null || cost !== undefined || tokens) && (
+        <div className="mt-3 grid grid-cols-2 gap-3 border-t border-border pt-3 sm:grid-cols-4">
           {turns !== undefined && <Stat label={t('Turns')}>{turns}</Stat>}
           {ms !== null && <Stat label={t('Duration')}>{formatDuration(ms / 1000)}</Stat>}
+          {tokens && (
+            <Stat label={t('Tokens')}>
+              <span title={t('{input} input ({cached} read from the cache, {written} written to it) · {output} output', {
+                input: formatCount(tokens.input + tokens.cache_read + tokens.cache_creation),
+                cached: formatCount(tokens.cache_read), written: formatCount(tokens.cache_creation), output: formatCount(tokens.output),
+              })}>
+                {t('{input} in · {output} out', { input: formatCount(tokens.input + tokens.cache_read + tokens.cache_creation), output: formatCount(tokens.output) })}
+              </span>
+            </Stat>
+          )}
           {cost !== undefined && <Stat label={t('API-equivalent cost')}>{formatCost(cost)}</Stat>}
         </div>
       )}
@@ -299,6 +311,7 @@ function Header({ thread }: { thread: CodeJob[] }) {
           </Stat>
         )}
       </div>
+      <JobUsage deviceId={device.id} />
     </header>
   )
 }

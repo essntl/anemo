@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_sessionmaker
 from app.core.ids import uuid7
 from app.events import bus
-from app.features.code_sessions import parse, service, trim
+from app.features.code_sessions import parse, service, trim, usage
 from app.features.code_sessions.models import TERMINAL, CodeJob, CodeJobEvent, State
 from app.features.notifications import service as notifications
 
@@ -130,6 +130,7 @@ class _Changes:
     old_state: str | None  # None: the row is new
     thread_changed: bool = False
     stored: list[CodeJobEvent] = field(default_factory=list)
+    usage_changed: bool = False  # the computer's usage (code_usage) was updated
 
 
 async def _locked(db: AsyncSession, device_id: uuid.UUID, job_key: str) -> CodeJob | None:
@@ -378,6 +379,8 @@ def _apply(job: CodeJob, item: _Prepared) -> bool:
         job.result_text = result.text
         job.result_subtype = result.subtype
         job.is_error = result.is_error
+        if result.tokens is not None:
+            job.tokens = result.tokens.as_json()
         _result_state(job, result)
     return session_known
 
@@ -444,6 +447,7 @@ async def _events(db: AsyncSession, job: CodeJob, frame: EventsFrame) -> _Change
         )
     )
     session_known = False
+    newest_limit: parse.RateLimit | None = None
     for p in prepared:
         if p.seq not in inserted:
             continue
@@ -452,8 +456,12 @@ async def _events(db: AsyncSession, job: CodeJob, frame: EventsFrame) -> _Change
         if p.trimmed or p.dropped:
             job.truncated = True
         session_known = _apply(job, p) or session_known
+        if p.pulled.rate_limit is not None:
+            newest_limit = p.pulled.rate_limit  # prepared is in seq order
     if not inserted:
         return changes
+    if newest_limit is not None:
+        changes.usage_changed = await usage.record(db, job, newest_limit)
     job.last_event_at = datetime.now(UTC)
     if min(inserted) <= job.last_seq + 1:
         job.last_seq = await _contiguous(db, job)
@@ -546,6 +554,8 @@ async def _publish(db: AsyncSession, job: CodeJob, changes: _Changes) -> None:
         maxlen=service.STREAM_MAXLEN,
         ttl_s=service.STREAM_TTL_S,
     )
+    if changes.usage_changed:
+        await bus.publish_global("code.usage", {"device_id": str(job.device_id)})
     now = time.monotonic()
     state_changed = changes.old_state != job.state or changes.thread_changed
     if state_changed or now - _last_global.get(job.id, 0.0) >= GLOBAL_EVERY_S:
@@ -607,7 +617,7 @@ async def _handle_events(device_id: uuid.UUID, frame: EventsFrame) -> dict[str, 
             return None  # the client always sends code.job first
         changes = await _events(db, job, frame)
         await _finish(db, job)
-        if changes.stored or changes.old_state != job.state:
+        if changes.stored or changes.old_state != job.state or changes.usage_changed:
             await _publish(db, job, changes)
         return ack(job.job_key, job.last_seq)
 

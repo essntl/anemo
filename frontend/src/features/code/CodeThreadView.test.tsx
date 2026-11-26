@@ -11,6 +11,7 @@ import { CodeThreadView } from './CodeThreadView'
 import { codeJob } from './testJobs'
 import type { CodeJob } from './threads'
 import type { CodeEvent } from './timeline'
+import type { CodeUsage } from './usage'
 
 /** A stand-in for the browser's EventSource: the test sends the frames. */
 class FakeEventSource {
@@ -51,6 +52,7 @@ vi.mock('@/hooks/useMediaQuery', async (importOriginal) => {
 })
 
 let thread: CodeJob[] = []
+let usage: CodeUsage[] = []
 let events: Record<string, CodeEvent[]> = {}
 const eventCalls: { job: string; after: number }[] = []
 
@@ -59,8 +61,9 @@ beforeEach(() => {
   eventCalls.length = 0
   vi.stubGlobal('EventSource', FakeEventSource)
   vi.spyOn(api, 'GET').mockImplementation((async (path: string, init: { params: { path: { job_id: string }; query?: { after_seq?: number } } }) => {
-    const id = init.params.path.job_id
     const response = { ok: true, status: 200 } as Response
+    if (path === '/api/code/usage') return { data: { usage }, response }
+    const id = init.params.path.job_id
     if (path === '/api/code/jobs/{job_id}') return { data: { job: thread.find((j) => j.id === id) ?? thread[0], thread }, response }
     const after = init.params.query?.after_seq ?? 0
     eventCalls.push({ job: id, after })
@@ -69,6 +72,7 @@ beforeEach(() => {
   }) as unknown as typeof api.GET)
 })
 afterEach(() => {
+  usage = []
   media.desktop = true
   media.wide = false
   useIslandVisible.setState({ visible: false })
@@ -140,6 +144,20 @@ describe('a finished thread', () => {
     expect(second).toHaveTextContent('Failed: error_max_turns')
     // A finished job opens no stream.
     expect(FakeEventSource.all).toHaveLength(0)
+  })
+
+  it('shows the computer’s usage in the header and a job’s tokens in its result', async () => {
+    thread[0] = { ...thread[0], tokens: { input: 90, output: 23_300, cache_read: 8_398_746, cache_creation: 41_469 } }
+    usage = [{
+      device_id: 'dev-1', device_name: 'Desk PC', status: 'allowed', limit_type: 'five_hour', resets_at: null,
+      windows: [{ name: 'five_hour', utilization: 0.49, resets_at: new Date(Date.now() + 3600_000).toISOString(), status: 'allowed' }],
+      observed_at: new Date().toISOString(), job_id: null,
+    }]
+    show('j1')
+    const meter = await screen.findByTestId('code-usage')
+    expect(meter).toHaveTextContent('49%')
+    const first = within(screen.getAllByTestId('code-job')[0]).getByRole('region', { name: 'Result' })
+    expect(first).toHaveTextContent('8.4M in · 23k out')
   })
 
   it('keeps the way back, the state and the title in one row', async () => {

@@ -242,3 +242,21 @@ describe('toTodos', () => {
     ])
   })
 })
+
+describe('bookkeeping events', () => {
+  it('leaves rate_limit_event out of the timeline, also between stubs', () => {
+    at = 0
+    const limit = { type: 'rate_limit_event', rate_limit_info: { status: 'allowed', resetsAt: 1795435800 } }
+    const items = buildTimeline([
+      assistant([{ type: 'text', text: 'Working.' }]),
+      ev(limit),
+      ev({ type: 'assistant' }, { dropped: true }),
+      ev(limit),
+      ev({ type: 'user' }, { dropped: true }),
+    ])
+    expect(items.map((i) => i.kind)).toEqual(['text', 'dropped'])
+    const dropped = items[1]
+    expect(dropped.kind === 'dropped' && dropped.count).toBe(2)
+  })
+})
+

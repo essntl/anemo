@@ -36,6 +36,13 @@ class CodeImageOut(BaseModel):
     name: str  # the file name in the job's folder on the computer (images\\<name>)
 
 
+class CodeTokensOut(BaseModel):
+    input: int = 0
+    output: int = 0
+    cache_read: int = 0
+    cache_creation: int = 0
+
+
 class CodeJobOut(BaseModel):
     id: uuid.UUID
     job_key: str  # the job's folder name on its computer
@@ -73,6 +80,34 @@ class CodeJobOut(BaseModel):
     conversation_title: str | None = None
     # The images sent with its prompt (only for a job Anemo started with images).
     images: list[CodeImageOut] = []
+    # The token counts of its last result (None: no result yet, or none given).
+    tokens: CodeTokensOut | None = None
+
+
+class CodeUsageWindowOut(BaseModel):
+    # five_hour | seven_day | seven_day_opus | … (as Claude Code names them)
+    name: str
+    utilization: float | None  # 0.49 = 49 % used; past 1 once the limit was hit
+    resets_at: datetime | None
+    status: str | None  # allowed | allowed_warning | rejected
+
+
+class CodeUsageOut(BaseModel):
+    """The usage of the Claude subscription a computer's jobs run on, as its newest
+    `rate_limit_event` said (§14)."""
+
+    device_id: uuid.UUID
+    device_name: str
+    status: str | None  # of the window that decides (limit_type)
+    limit_type: str | None
+    resets_at: datetime | None  # when that window resets
+    windows: list[CodeUsageWindowOut]
+    observed_at: datetime  # when it was true ("as of")
+    job_id: uuid.UUID | None  # the job whose event it came from
+
+
+class CodeUsageListOut(BaseModel):
+    usage: list[CodeUsageOut]  # one per computer, the newest first
 
 
 class CodeJobListOut(BaseModel):

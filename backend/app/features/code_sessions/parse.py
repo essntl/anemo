@@ -16,6 +16,7 @@ untrusted: each pull-out checks its type and size.
 import math
 import re
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any, Literal
 
@@ -48,6 +49,24 @@ NEW_BRANCH = re.compile(r"Switched to a new branch '" + _NAME + "'")
 
 
 @dataclass
+class Tokens:
+    """A `result` event's `usage`: what the job's turns read and wrote."""
+
+    input: int = 0  # input_tokens (not cached)
+    output: int = 0
+    cache_read: int = 0
+    cache_creation: int = 0
+
+    def as_json(self) -> dict[str, int]:
+        return {
+            "input": self.input,
+            "output": self.output,
+            "cache_read": self.cache_read,
+            "cache_creation": self.cache_creation,
+        }
+
+
+@dataclass
 class Result:
     """The fields of a `result` event."""
 
@@ -58,10 +77,35 @@ class Result:
     cost_usd: Decimal | None
     text: str | None
     session_id: str | None
+    tokens: Tokens | None = None
 
     @property
     def failed(self) -> bool:
         return self.is_error or self.subtype != "success"
+
+
+@dataclass
+class UsageWindow:
+    """One window of a Claude subscription's usage limit (`five_hour`, `seven_day`, …)."""
+
+    name: str
+    utilization: float | None  # 0.49 = 49 % used; may pass 1 when the limit was hit
+    resets_at: datetime | None
+    status: str | None  # allowed | allowed_warning | rejected (as Claude Code wrote it)
+
+
+@dataclass
+class RateLimit:
+    """A `rate_limit_event`: how much of the subscription's limits is used."""
+
+    status: str | None  # of the window that decides: allowed | allowed_warning | rejected
+    limit_type: str | None  # which window that is (`rateLimitType`)
+    resets_at: datetime | None  # when that window resets
+    windows: list[UsageWindow]
+
+    @property
+    def rejected(self) -> bool:
+        return self.status == "rejected" or any(w.status == "rejected" for w in self.windows)
 
 
 @dataclass
@@ -74,6 +118,7 @@ class PullOuts:
     pr_url: str | None = None
     branch: str | None = None
     result: Result | None = None
+    rate_limit: RateLimit | None = None
 
 
 def kind(event: dict[str, Any]) -> Kind:
@@ -236,7 +281,105 @@ def _result(event: dict[str, Any]) -> Result:
         cost_usd=_cost(event.get("total_cost_usd")),
         text=_text(event.get("result"), MAX_RESULT_TEXT),
         session_id=_text(event.get("session_id"), MAX_ID),
+        tokens=_tokens(event.get("usage")),
     )
+
+
+def _tokens(usage: Any) -> Tokens | None:
+    if not isinstance(usage, dict):
+        return None
+    counts = {
+        name: _int(usage.get(key)) or 0
+        for name, key in (
+            ("input", "input_tokens"),
+            ("output", "output_tokens"),
+            ("cache_read", "cache_read_input_tokens"),
+            ("cache_creation", "cache_creation_input_tokens"),
+        )
+    }
+    return Tokens(**counts) if any(counts.values()) else None
+
+
+# -- usage limits (rate_limit_event) ---------------------------------------------------------
+
+MAX_WINDOWS = 8
+_WINDOW_NAME = re.compile(r"^[a-z0-9_]{1,40}$")
+# Seconds since 1970 between 2001 and 2286; larger numbers are taken as milliseconds.
+_EPOCH_S_MAX = 10_000_000_000
+
+
+def epoch_time(value: Any) -> datetime | None:
+    """A time Claude Code wrote: seconds (or milliseconds) since 1970, or ISO 8601 text
+    (without an offset: UTC). None when it is none of these or out of range."""
+    if _number(value):
+        seconds = float(value)
+        if seconds >= _EPOCH_S_MAX:
+            seconds /= 1000
+        if not 1_000_000_000 <= seconds < _EPOCH_S_MAX:
+            return None
+        return datetime.fromtimestamp(seconds, UTC)
+    if isinstance(value, str) and 0 < len(value) <= 40:
+        try:
+            parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+    return None
+
+
+def _utilization(value: Any) -> float | None:
+    if not _number(value):
+        return None
+    return min(max(float(value), 0.0), 10.0)
+
+
+def _window(name: str, data: Any) -> UsageWindow | None:
+    if not isinstance(data, dict):
+        return None
+    window = UsageWindow(
+        name=name,
+        utilization=_utilization(data.get("utilization")),
+        resets_at=epoch_time(data.get("resetsAt")),
+        status=_text(data.get("status"), 40),
+    )
+    if window.utilization is None and window.resets_at is None and window.status is None:
+        return None
+    return window
+
+
+def rate_limit(event: dict[str, Any]) -> RateLimit | None:
+    """The usage a `rate_limit_event` reports, or None for any other event. Claude Code
+    writes `rate_limit_info` with the window that decides (`rateLimitType`, `status`,
+    `resetsAt`, sometimes `utilization`) and `unifiedWindows` ({name: {utilization,
+    resetsAt, status}}); either may be missing, and unknown fields are ignored."""
+    if event.get("type") != "rate_limit_event":
+        return None
+    info = event.get("rate_limit_info")
+    if not isinstance(info, dict):
+        return None
+    limit_type = _text(info.get("rateLimitType"), 40)
+    windows: list[UsageWindow] = []
+    unified = info.get("unifiedWindows")
+    if isinstance(unified, dict):
+        for name, data in list(unified.items())[: MAX_WINDOWS * 2]:
+            if isinstance(name, str) and _WINDOW_NAME.match(name):
+                window = _window(name, data)
+                if window is not None and len(windows) < MAX_WINDOWS:
+                    windows.append(window)
+    if limit_type and _WINDOW_NAME.match(limit_type) and all(w.name != limit_type for w in windows):
+        # An older shape: only the deciding window, at the top level.
+        window = _window(limit_type, info)
+        if window is not None:
+            windows.insert(0, window)
+    found = RateLimit(
+        status=_text(info.get("status"), 40),
+        limit_type=limit_type,
+        resets_at=epoch_time(info.get("resetsAt")),
+        windows=windows,
+    )
+    if not windows and found.status is None and found.resets_at is None:
+        return None
+    return found
 
 
 def pull_outs(event: dict[str, Any]) -> PullOuts:
@@ -269,6 +412,8 @@ def pull_outs(event: dict[str, Any]) -> PullOuts:
     elif kind_ == "user":
         texts = _tool_result_texts(event)
         out.branch = _last_branch(texts, (NEW_BRANCH,))
+    elif kind_ == "other":
+        out.rate_limit = rate_limit(event)
     elif kind_ == "result":
         out.result = _result(event)
         out.session_id = out.result.session_id

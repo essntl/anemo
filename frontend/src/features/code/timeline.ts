@@ -14,6 +14,8 @@
  *   parent_tool_use_id = X     → nested under the Task/Agent call X
  *   raw                        → plain text; stored-as-stub events → one "not stored" run
  *   result                     → the result
+ *   rate_limit_event           → nothing: the subscription's usage is the page's usage
+ *                                indicator (usage.ts), not a step of the job
  */
 import type { Schemas } from '@/api/client'
 
@@ -172,6 +174,12 @@ function blocksOf(event: Json): Json[] {
   return arr(content).map(obj).filter((b): b is Json => b !== undefined)
 }
 
+/**
+ * Event types that are bookkeeping, not something the job did: kept in the stored log,
+ * left out of the timeline.
+ */
+export const HIDDEN_EVENT_TYPES: ReadonlySet<string> = new Set(['rate_limit_event'])
+
 /** The timeline of one job's events (in any order; sorted by seq here). */
 export function buildTimeline(events: readonly CodeEvent[]): TimelineItem[] {
   const top: TimelineItem[] = []
@@ -192,10 +200,12 @@ export function buildTimeline(events: readonly CodeEvent[]): TimelineItem[] {
       }
       continue
     }
-    dropped = null
-
     const e = obj(ev.event) ?? {}
     const type = str(e.type) ?? ''
+    // Before the run of stubs ends: hidden events between stubs don't split it.
+    if (HIDDEN_EVENT_TYPES.has(type)) continue
+    dropped = null
+
     const parent = str(e.parent_tool_use_id)
     // A sub-agent's events go inside its Task call (at the top when that call isn't known).
     const into = (parent && calls.get(parent)?.children) || top

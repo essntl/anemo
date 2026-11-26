@@ -3829,6 +3829,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Code Usage
+         * @description The latest known usage of the Claude subscription of each computer (from its jobs'
+         *     `rate_limit_event`s), with when it was seen; kept while no job runs.
+         */
+        get: operations["code_usage_api_code_usage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/jobs/{job_id}": {
         parameters: {
             query?: never;
@@ -6912,6 +6933,7 @@ export interface components {
              * @default []
              */
             images: components["schemas"]["CodeImageOut"][];
+            tokens?: components["schemas"]["CodeTokensOut"] | null;
         };
         /** CodeProjectOut */
         CodeProjectOut: {
@@ -6961,6 +6983,74 @@ export interface components {
             status: string;
             /** Activeform */
             activeForm?: string | null;
+        };
+        /** CodeTokensOut */
+        CodeTokensOut: {
+            /**
+             * Input
+             * @default 0
+             */
+            input: number;
+            /**
+             * Output
+             * @default 0
+             */
+            output: number;
+            /**
+             * Cache Read
+             * @default 0
+             */
+            cache_read: number;
+            /**
+             * Cache Creation
+             * @default 0
+             */
+            cache_creation: number;
+        };
+        /** CodeUsageListOut */
+        CodeUsageListOut: {
+            /** Usage */
+            usage: components["schemas"]["CodeUsageOut"][];
+        };
+        /**
+         * CodeUsageOut
+         * @description The usage of the Claude subscription a computer's jobs run on, as its newest
+         *     `rate_limit_event` said (§14).
+         */
+        CodeUsageOut: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Device Name */
+            device_name: string;
+            /** Status */
+            status: string | null;
+            /** Limit Type */
+            limit_type: string | null;
+            /** Resets At */
+            resets_at: string | null;
+            /** Windows */
+            windows: components["schemas"]["CodeUsageWindowOut"][];
+            /**
+             * Observed At
+             * Format: date-time
+             */
+            observed_at: string;
+            /** Job Id */
+            job_id: string | null;
+        };
+        /** CodeUsageWindowOut */
+        CodeUsageWindowOut: {
+            /** Name */
+            name: string;
+            /** Utilization */
+            utilization: number | null;
+            /** Resets At */
+            resets_at: string | null;
+            /** Status */
+            status: string | null;
         };
         /** ContentOut */
         ContentOut: {
@@ -22337,6 +22427,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CodeJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    code_usage_api_code_usage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeUsageListOut"];
                 };
             };
             /** @description Validation Error */

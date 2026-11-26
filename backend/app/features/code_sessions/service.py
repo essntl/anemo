@@ -30,6 +30,7 @@ from app.features.code_sessions.schemas import (
     CodeJobListOut,
     CodeJobOut,
     CodeTodoOut,
+    CodeTokensOut,
 )
 from app.features.conversations.models import Conversation
 from app.features.devices import relay
@@ -107,7 +108,17 @@ def job_out(
         run_id=job.run_id,
         conversation_title=conversation_title if job.conversation_id else None,
         images=[CodeImageOut.model_validate(ref) for ref in images.refs(job.images)],
+        tokens=_tokens(job.tokens),
     )
+
+
+def _tokens(raw: object) -> CodeTokensOut | None:
+    if not isinstance(raw, dict):
+        return None
+    counts = {
+        k: v for k, v in raw.items() if k in CodeTokensOut.model_fields and isinstance(v, int)
+    }
+    return CodeTokensOut(**counts)
 
 
 def event_out(event: CodeJobEvent) -> CodeEventOut:

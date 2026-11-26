@@ -111,6 +111,33 @@ class CodeJob(Base, IdMixin, TimestampMixin):
     images: Mapped[list[dict[str, str]]] = mapped_column(
         JSONB, default=list, server_default=text("'[]'::jsonb")
     )
+    # The last result's token counts ({input, output, cache_read, cache_creation}).
+    tokens: Mapped[dict[str, int] | None] = mapped_column(JSONB)
+
+
+class CodeUsage(Base, IdMixin, TimestampMixin):
+    """The latest usage of the Claude subscription a computer's jobs run on, from the
+    newest `rate_limit_event` any of its jobs wrote (docs/specs/code-sessions.md §14).
+    One row per computer: it stays when no job runs, with the time it was seen."""
+
+    __tablename__ = "code_usage"
+    __table_args__ = (UniqueConstraint("device_id"),)
+
+    device_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("devices.id", ondelete="CASCADE")
+    )
+    status: Mapped[str | None] = mapped_column(String(40))  # of the deciding window
+    limit_type: Mapped[str | None] = mapped_column(String(40))  # that window's name
+    resets_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # [{name, utilization, resets_at (ISO), status}], at most 8
+    windows: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb")
+    )
+    # When it was true: when the event arrived for a running job, else when its job ended.
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    job_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("code_jobs.id", ondelete="SET NULL")
+    )
 
 
 EventKind = Literal["system", "assistant", "user", "result", "raw", "other"]

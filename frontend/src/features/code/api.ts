@@ -171,6 +171,19 @@ export function useCodeProjects(deviceId: string | null) {
   })
 }
 
+/** Not under `codeKey`: refreshed by its own app-wide notice (`code.usage`), not by every job's. */
+export const codeUsageKey = ['code-usage'] as const
+
+/** The latest known usage of each computer's Claude subscription (§14), kept while no job runs. */
+export function useCodeUsage() {
+  return useQuery({
+    queryKey: codeUsageKey,
+    // The reset times pass by themselves: look again now and then.
+    refetchInterval: 5 * 60_000,
+    queryFn: async () => unwrap(await api.GET('/api/code/usage')).usage,
+  })
+}
+
 export interface StartJobInput {
   device_id: string
   project: string

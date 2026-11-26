@@ -16052,6 +16052,56 @@
         }
       }
     },
+    "/api/code/usage": {
+      "get": {
+        "tags": [
+          "code"
+        ],
+        "summary": "Code Usage",
+        "description": "The latest known usage of the Claude subscription of each computer (from its jobs'\n`rate_limit_event`s), with when it was seen; kept while no job runs.",
+        "operationId": "code_usage_api_code_usage_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeUsageListOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/code/jobs/{job_id}": {
       "get": {
         "tags": [
@@ -26810,6 +26860,16 @@
             "type": "array",
             "title": "Images",
             "default": []
+          },
+          "tokens": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CodeTokensOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -26994,6 +27054,182 @@
           "status"
         ],
         "title": "CodeTodoOut"
+      },
+      "CodeTokensOut": {
+        "properties": {
+          "input": {
+            "type": "integer",
+            "title": "Input",
+            "default": 0
+          },
+          "output": {
+            "type": "integer",
+            "title": "Output",
+            "default": 0
+          },
+          "cache_read": {
+            "type": "integer",
+            "title": "Cache Read",
+            "default": 0
+          },
+          "cache_creation": {
+            "type": "integer",
+            "title": "Cache Creation",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "CodeTokensOut"
+      },
+      "CodeUsageListOut": {
+        "properties": {
+          "usage": {
+            "items": {
+              "$ref": "#/components/schemas/CodeUsageOut"
+            },
+            "type": "array",
+            "title": "Usage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "usage"
+        ],
+        "title": "CodeUsageListOut"
+      },
+      "CodeUsageOut": {
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Device Id"
+          },
+          "device_name": {
+            "type": "string",
+            "title": "Device Name"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "limit_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Type"
+          },
+          "resets_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resets At"
+          },
+          "windows": {
+            "items": {
+              "$ref": "#/components/schemas/CodeUsageWindowOut"
+            },
+            "type": "array",
+            "title": "Windows"
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Observed At"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device_id",
+          "device_name",
+          "status",
+          "limit_type",
+          "resets_at",
+          "windows",
+          "observed_at",
+          "job_id"
+        ],
+        "title": "CodeUsageOut",
+        "description": "The usage of the Claude subscription a computer's jobs run on, as its newest\n`rate_limit_event` said (\u00a714)."
+      },
+      "CodeUsageWindowOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "utilization": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utilization"
+          },
+          "resets_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resets At"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "utilization",
+          "resets_at",
+          "status"
+        ],
+        "title": "CodeUsageWindowOut"
       },
       "ContentOut": {
         "properties": {

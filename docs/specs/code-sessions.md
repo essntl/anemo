@@ -674,3 +674,47 @@ thumbnails that can be removed before sending (the chat's `AttachmentChip`).
   message shows them too.
 - **Retention**: pruning a job (§5.3) deletes its images' attachments unless a chat or a
   job that stays has them.
+
+## 14. The usage indicator
+
+Claude Code writes a `rate_limit_event` before most API calls (dozens per job). Real jobs
+(Claude Code 2.1, `C:\anemo-bridge\jobs\*\out.jsonl`) write:
+
+```
+{"type": "rate_limit_event", "rate_limit_info": {
+   "status": "allowed" | "allowed_warning" | "rejected",   // of the deciding window
+   "rateLimitType": "five_hour",                           // which window decides
+   "resetsAt": 1795435800,                                 // seconds since 1970
+   "utilization": 0.9,                                     // only sometimes
+   "overageStatus", "isUsingOverage", "surpassedThreshold", …,
+   "unifiedWindows": {
+     "five_hour": {"utilization": 0.49, "resetsAt": 1795435800, "status": "allowed"},
+     "seven_day": {"utilization": 0.25, "resetsAt": 1795874400, "status": "allowed"},
+     "seven_day_overage_included": {…}}},
+ "uuid", "session_id"}
+```
+
+- **Timeline**: the page leaves these events out (`HIDDEN_EVENT_TYPES` in `timeline.ts`);
+  they stay in the stored log like every other line.
+- **Parsing** (`parse.rate_limit`, pure): every field is optional. Windows come from
+  `unifiedWindows` (names `^[a-z0-9_]{1,40}$`, at most 8; `utilization` a number clamped to
+  0–10, `resetsAt` seconds, milliseconds or ISO 8601 text, `status` text); an event with only
+  the top-level fields gives one window named by `rateLimitType`. Anything else is dropped.
+- **Kept per computer** (`code_usage`, migration 0084, `usage.py`): one row per device
+  (the account is the computer's Claude Code login, so the device stands for it): `status`,
+  `limit_type`, `resets_at`, `windows` `[{name, utilization, resets_at, status}]`,
+  `observed_at`, `job_id`. The newest event of a batch replaces the row only when it is not
+  older than what is stored: an event of a running job counts as true *now*, one of a job
+  that has ended (a back-fill, or a computer catching up) as of the job's end. A change is
+  published on the global stream as `code.usage {device_id}`.
+- **API**: `GET /api/code/usage` → `{usage: [CodeUsageOut]}` (newest first):
+  `device_id, device_name, status, limit_type, resets_at, windows[], observed_at, job_id`.
+- **Page** (`UsageMeter.tsx`, `usage.ts`): the list's header shows each computer's usage
+  (with its name when there are several), the thread's header its computer's: per window a
+  thin bar and the share used (5-hour and weekly; others only in the tooltip, the
+  `…_overage_included` copy never), the reset time when a window is over 80 % or was hit,
+  and "as of …". A window whose reset time has passed shows "has reset" instead of an old
+  share. Refetched on `code.usage` and every 5 minutes.
+- **Tokens**: a `result`'s `usage` gives `code_jobs.tokens` (`{input, output, cache_read,
+  cache_creation}`, `CodeJobOut.tokens`); the result card shows them next to turns,
+  duration and API-equivalent cost.

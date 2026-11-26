@@ -30,7 +30,7 @@ from app.api.deps import Db
 from app.api.sse import comment, frame, sse_response
 from app.core.db import get_sessionmaker
 from app.events import bus
-from app.features.code_sessions import control, git, service
+from app.features.code_sessions import control, git, service, usage
 from app.features.code_sessions.models import State
 from app.features.code_sessions.schemas import (
     CodeDeviceOut,
@@ -41,6 +41,7 @@ from app.features.code_sessions.schemas import (
     CodeJobListOut,
     CodeJobOut,
     CodeProjectsOut,
+    CodeUsageListOut,
 )
 
 router = APIRouter(prefix="/code", tags=["code"])
@@ -71,6 +72,13 @@ async def list_jobs(
         before=before,
         before_id=before_id,
     )
+
+
+@router.get("/usage", response_model=CodeUsageListOut)
+async def code_usage(db: Db) -> CodeUsageListOut:
+    """The latest known usage of the Claude subscription of each computer (from its jobs'
+    `rate_limit_event`s), with when it was seen; kept while no job runs."""
+    return await usage.list_usage(db)
 
 
 @router.get("/jobs/{job_id}", response_model=CodeJobDetailOut)
