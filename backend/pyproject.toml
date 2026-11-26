@@ -42,6 +42,7 @@ dev = [
   "hypothesis>=6.120",
   "pytest-cov>=6",
   "import-linter>=2.1",
+  "pytest-xdist>=3.6",
 ]
 
 [tool.ruff]
