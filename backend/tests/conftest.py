@@ -104,9 +104,15 @@ async def migrated_db() -> AsyncIterator[None]:
 
 @pytest.fixture
 async def db_clean(migrated_db: None) -> AsyncIterator[None]:
-    """Empty every table and the test Redis DB before each test."""
-    from sqlalchemy import text
+    """Empty every table and the test Redis DB before each test.
 
+    DELETE, not TRUNCATE: TRUNCATE gives every table and index new files, and Postgres
+    keeps the old ones until the next checkpoint, which must then fsync them all. With
+    several test workers that was ~1,400 files a second and a checkpoint of 7 minutes,
+    and everything that waits for a checkpoint (DROP DATABASE in the migration tests)
+    stalled with it. The tables hold a few rows, so DELETE is quick; children go first,
+    and no table has a sequence that TRUNCATE's RESTART IDENTITY would have reset.
+    """
     from app.core.db import get_engine
     from app.core.redis import get_redis
     from app.db.models import Base
@@ -114,10 +120,9 @@ async def db_clean(migrated_db: None) -> AsyncIterator[None]:
 
     listener.install()  # as the API and the worker do (event triggers)
 
-    tables = ", ".join(f'"{t.name}"' for t in Base.metadata.sorted_tables)
     async with get_engine().begin() as conn:
-        if tables:
-            await conn.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
+        for table in reversed(Base.metadata.sorted_tables):
+            await conn.execute(table.delete())
     await get_redis().flushdb()
     yield
 
