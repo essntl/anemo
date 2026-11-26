@@ -119,7 +119,8 @@ public static class JobFeeder
     /// <summary>
     /// The script (Windows PowerShell 5.1). It never builds JSON: it forwards what Anemo
     /// Desktop wrote. It ends, closing Claude Code's stdin, when Claude Code wrote a
-    /// <c>result</c> and then nothing for <c>$quiet</c> while no message waits, when the job
+    /// <c>result</c> and then no assistant or user line for <c>$quiet</c> while no message
+    /// waits, when the job
     /// was cancelled, when the pipe breaks (Claude Code ended), or when Claude Code is no
     /// longer among the processes of the job's <c>cmd.exe</c>.
     /// </summary>
@@ -174,8 +175,11 @@ public static class JobFeeder
                     $pos += $end + 1
                     foreach ($line in $utf8.GetString($buffer, 0, $end + 1).Split("`n")) {
                       if ($line.Length -lt 2) { continue }
+                      # A result: Claude Code answered. It goes on (a queued message, a background
+                      # task's news) only with a new assistant or user line; system lines after a
+                      # result (commands_changed, task_progress, …) are bookkeeping.
                       if ($line.Contains('"type":"result"')) { $answeredAt = [DateTime]::UtcNow }
-                      elseif (-not ($line.Contains('"type":"command_lifecycle"') -or $line.Contains('"type":"control_response"'))) { $answeredAt = $null }
+                      elseif ($line.StartsWith('{"type":"assistant"') -or $line.StartsWith('{"type":"user"')) { $answeredAt = $null }
                     }
                   }
                 }

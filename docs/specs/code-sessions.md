@@ -759,8 +759,9 @@ cmd.exe /d /v:off /s /c ""<powershell.exe>" -NoProfile -NonInteractive -Executio
 
 The script forwards the files of `<job>\inbox\` in name order (each claimed by renaming
 `*.jsonl` → `*.sending` → `*.sent`) and never builds JSON itself. It ends, closing Claude
-Code's stdin, when Claude Code wrote a `result` followed by 4 s with nothing new
-(bookkeeping lines don't count) and no message waits, when the job was cancelled, when the
+Code's stdin, when Claude Code wrote a `result` followed by 4 s without a new
+`assistant` or `user` line (system lines such as `commands_changed` come after a result
+too) and no message waits, when the job was cancelled, when the
 pipe breaks, or when Claude Code is no longer a child of the job's `cmd.exe` (checked every
 15 s); then it writes `inbox\closed`. Anemo Desktop only writes files into `inbox`, so a
 restart of Anemo Desktop changes nothing for a running job. Windows PowerShell is taken
