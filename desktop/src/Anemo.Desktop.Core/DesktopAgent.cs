@@ -216,7 +216,7 @@ public sealed class DesktopAgent
             return "a Claude Code job is being set up";
         }
 
-        return CodeJobs.Session?.FollowingCount > 0 ? "a Claude Code job is running" : null;
+        return CodeJobs.Session?.RunningCount > 0 ? "a Claude Code job is running" : null;
     }
 
     /// <summary>
