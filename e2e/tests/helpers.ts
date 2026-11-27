@@ -68,6 +68,8 @@ export async function newAgentChatWithLevels(page: Page, modelId: string, levels
   await newChat(page, 'Agent', modelId)
   await page.getByRole('combobox', { name: 'Agent profile' }).click()
   await page.getByRole('option', { name }).click()
+  // As in pickModel: wait for the list to close, or Enter would open it again instead of sending.
+  await expect(page.getByRole('listbox')).toHaveCount(0)
   return id
 }
 
