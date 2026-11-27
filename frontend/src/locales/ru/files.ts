@@ -76,5 +76,9 @@ const messages: Messages = {
   "The connection failed": "Не удалось подключиться",
   "Too large for the server (or a proxy in front of it)": "Слишком большой для сервера (или прокси перед ним)",
   "{failed} of {n} file was not uploaded. {detail} | {failed} of {n} files were not uploaded. {detail}": "Не загружено {failed} из {n} файла. {detail} | Не загружено {failed} из {n} файлов. {detail} | Не загружено {failed} из {n} файлов. {detail}",
+  "Keep scratch files": "Хранить файлы в scratch",
+  "Agents put throwaway files (clones, build output, experiments) in scratch/. Deleting inside it needs no approval, and older files are removed automatically.": "Агенты кладут временные файлы (клоны, результаты сборки, эксперименты) в scratch/. Удаление в ней не требует подтверждения, а старые файлы удаляются автоматически.",
+  "temporary": "временная",
+  "Agents’ throwaway files; cleaned automatically": "Временные файлы агентов; очищается автоматически",
 }
 export default messages

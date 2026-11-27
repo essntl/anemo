@@ -30737,6 +30737,13 @@
             "minimum": 1.0,
             "title": "Device File Max Mb",
             "default": 50
+          },
+          "scratch_keep_days": {
+            "type": "integer",
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Scratch Keep Days",
+            "default": 7
           }
         },
         "type": "object",

@@ -9,7 +9,7 @@ import { Select } from '@/components/ui/Select'
 import { withReauth } from '@/features/auth/reauthStore'
 import { settingsKey, useSaveSection, useSettings } from '@/features/settings/api'
 import { Switch } from '@/components/ui/Switch'
-import { msg, rich, t } from '@/lib/i18n'
+import { msg, plural, rich, t } from '@/lib/i18n'
 import { useFolder } from './api'
 
 type WorkspaceSettings = Schemas['WorkspaceSettings']
@@ -20,6 +20,8 @@ const ACCESS_LABELS: Record<Access, string> = {
   read: msg('Read only'),
   none: msg('Hidden from agents'),
 }
+
+const SCRATCH_DAYS = [1, 3, 7, 14, 30, 90]
 
 const ACCESS_OPTIONS = Object.entries(ACCESS_LABELS).map(([value, label]) => ({ value, label }))
 
@@ -119,6 +121,17 @@ function FilesPageCard() {
         </div>
         <Switch label={t('Show the documents folder in Files')} checked={files.show_documents_folder}
           onChange={(v) => save.mutate({ ...files, show_documents_folder: v }, { onSuccess: () => void qc.invalidateQueries({ queryKey: ['files'] }) })} />
+      </CardBody>
+      <CardBody className="flex items-center justify-between gap-4 border-t border-border">
+        <div>
+          <div className="text-[13.5px] font-medium">{t('Keep scratch files')}</div>
+          <div className="text-[12.5px] text-muted">
+            {t('Agents put throwaway files (clones, build output, experiments) in scratch/. Deleting inside it needs no approval, and older files are removed automatically.')}
+          </div>
+        </div>
+        <Select className="w-40" aria-label={t('Keep scratch files')} value={String(files.scratch_keep_days)}
+          onValueChange={(v) => save.mutate({ ...files, scratch_keep_days: Number(v) })}
+          options={SCRATCH_DAYS.map((d) => ({ value: String(d), label: plural(d, '{n} day', '{n} days') }))} />
       </CardBody>
     </Card>
   )

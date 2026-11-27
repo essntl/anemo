@@ -8329,6 +8329,11 @@ export interface components {
              * @default 50
              */
             device_file_max_mb: number;
+            /**
+             * Scratch Keep Days
+             * @default 7
+             */
+            scratch_keep_days: number;
         };
         /**
          * FilterChip

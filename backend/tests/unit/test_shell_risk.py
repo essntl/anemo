@@ -294,3 +294,101 @@ def test_reasons_are_human_readable() -> None:
     r = classify("git push --force && rm -rf build")
     assert r.risk == "dangerous"
     assert any("push" in x for x in r.reasons) and any("recursively" in x for x in r.reasons)
+
+
+# --- deletes inside the workspace scratch folder (spec 25 §0) ---------------------------
+
+SCRATCH_MODERATE = [  # (cwd, command): deletes that stay inside scratch/
+    (".", "rm -rf scratch/clone"),
+    (".", "rm -rf scratch/clone scratch/build"),
+    (".", "rm -rf /workspace/scratch/clone"),
+    (".", "rm -r -f -- scratch/clone"),
+    (".", "rm -rf scratch/*"),
+    (".", "rm -rf scratch/build-*"),
+    (".", "cd scratch && rm -rf clone"),
+    (".", "cd scratch/proj && rm -rf build dist && ls"),
+    ("scratch", "rm -rf clone"),
+    ("scratch/proj", "rm -rf *"),
+    ("scratch/proj", "rm -rf ../other"),
+    (".", "find scratch/clone -name '*.o' -delete"),
+    ("scratch/proj", "find -name '*.tmp' -delete"),
+    (".", "git -C scratch/clone clean -fdx"),
+    ("scratch/clone", "git clean -fdx"),
+    (".", "rm -rf notes/../scratch/x"),
+]
+
+SCRATCH_DANGEROUS = [  # (cwd, command): must stay dangerous
+    (".", "rm -rf scratch"),
+    (".", "rm -rf scratch/"),
+    (".", "rm -rf scratch/."),
+    (".", "rm -rf /workspace/scratch"),
+    (".", "rm -rf scratch/.."),
+    (".", "rm -rf scratch/../notes"),
+    ("scratch", "rm -rf ../notes"),
+    ("scratch", "rm -rf ../.."),
+    (".", "rm -rf scratch/out"),  # a symlink out of scratch
+    (".", "rm -rf scratch/out/x"),
+    (".", "rm -rf $X"),
+    (".", "rm -rf scratch/$X"),
+    (".", 'rm -rf "scratch/$(echo x)"'),
+    (".", "rm -rf ~/scratch/x"),
+    (".", "rm -rf scratch/{a,../../notes}"),
+    (".", "rm -rf scratch/.*"),
+    (".", "rm -rf scratch/*/../../notes"),
+    (".", "rm -rf scratch/clone notes"),
+    (".", "rm -rf *"),
+    (".", "rm -rf notes"),
+    (".", "cd scratch; rm -rf notes"),
+    (".", "cd scratch || rm -rf notes"),
+    (".", "cd scratch && true || rm -rf notes"),
+    (".", "(cd scratch && true); rm -rf notes"),
+    (".", "cd scratch && x; rm -rf notes"),
+    (".", "cd $D && rm -rf x"),
+    (".", "! cd scratch && rm -rf notes"),
+    (".", "echo scratch | xargs rm -rf"),
+    (".", "env rm -rf scratch/x notes"),
+    (".", "find . -delete"),
+    (".", "find scratch -delete"),
+    (".", "find scratch/x -L -delete"),
+    (".", "find scratch/x -exec rm -rf /workspace/notes \;"),
+    (".", "git clean -fdx"),
+    (".", "git -C scratch clean -fdx"),
+    (".", "git --work-tree=notes -C scratch/x clean -fdx"),
+    ("scratch/proj", "rm -rf ../../notes"),
+]
+
+
+@pytest.fixture
+def workspace(tmp_path):
+    from app.workspace import scratch
+
+    (tmp_path / "notes").mkdir()
+    (tmp_path / "scratch" / "proj").mkdir(parents=True)
+    (tmp_path / "scratch" / "clone").mkdir()
+    (tmp_path / "scratch" / "out").symlink_to(tmp_path / "notes")
+    return lambda cwd: scratch.delete_scope(cwd, root=tmp_path)
+
+
+@pytest.mark.parametrize(("cwd", "command"), SCRATCH_MODERATE)
+def test_deletes_inside_scratch_are_moderate(workspace, cwd: str, command: str) -> None:
+    r = classify(command, workspace(cwd))
+    assert r.risk == "moderate", (command, r.risk, r.reasons)
+
+
+@pytest.mark.parametrize(("cwd", "command"), SCRATCH_DANGEROUS)
+def test_deletes_reaching_out_of_scratch_stay_dangerous(workspace, cwd: str, command: str) -> None:
+    r = classify(command, workspace(cwd))
+    assert r.risk == "dangerous", (command, r.risk, r.reasons)
+
+
+def test_scratch_swapped_for_a_link_is_not_scratch(tmp_path) -> None:
+    from app.workspace import scratch
+
+    (tmp_path / "notes").mkdir()
+    (tmp_path / "scratch").symlink_to(tmp_path)
+    r = classify("rm -rf scratch/notes", scratch.delete_scope(".", root=tmp_path))
+    assert r.risk == "dangerous"
+
+
+def test_without_a_scope_scratch_deletes_are_as_before() -> None:
+    assert classify("rm -rf scratch/clone").risk == "dangerous"

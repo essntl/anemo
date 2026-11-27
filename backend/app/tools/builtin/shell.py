@@ -15,11 +15,11 @@ import time
 from pydantic import BaseModel, Field
 
 from app.policy.models import Action
-from app.policy.shell_risk import classify
+from app.policy.shell_risk import DeleteScope, classify
 from app.sandbox_client import SandboxUnavailable, run_command
 from app.tools.base import Tool, ToolContext, ToolResult
 from app.tools.builtin.workspace import path_action
-from app.workspace import fs_guard
+from app.workspace import fs_guard, scratch
 
 MODEL_OUTPUT_CHARS = 12_000  # per stream, head + tail, sent to the model
 STORED_OUTPUT_CHARS = 64_000  # per stream, kept for the activity view
@@ -66,6 +66,16 @@ def _tail(text: str, limit: int) -> str:
     return text if len(text) <= limit else "…\n" + text[-limit:]
 
 
+def _delete_scope(cwd: str) -> DeleteScope | None:
+    """Deletes inside scratch/ need no approval (policy/shell_risk.py); None when the
+    working folder isn't a valid workspace folder (the call is refused anyway)."""
+    try:
+        rel = fs_guard.relative(fs_guard.resolve(cwd))
+    except (fs_guard.OutsideWorkspace, ValueError, OSError):
+        return None
+    return scratch.delete_scope(rel)
+
+
 class RunShell(Tool):
     name = "run_shell"
     description = (
@@ -85,7 +95,7 @@ class RunShell(Tool):
     timeout_s = 3700.0  # the sandbox enforces the command's own timeout
 
     def actions(self, args: ShellInput, ctx: ToolContext) -> list[Action]:
-        risk = classify(args.command)
+        risk = classify(args.command, _delete_scope(args.cwd))
         why = f" ({risk.summary})" if risk.reasons and risk.risk != "safe" else ""
         run = path_action(ctx, self.capability, args.cwd, "Run in", "read_write", risk.risk)
         where = run.resource or args.cwd
