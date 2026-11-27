@@ -31,9 +31,11 @@ object StatusBus {
 
     private val listeners = CopyOnWriteArraySet<(Status) -> Unit>()
 
+    /** Listeners hear of a change only: each one rebuilds and posts the notification, and
+     *  callbacks repeat states (speech recognition available again, the same run count). */
     fun update(change: (Status) -> Status) {
-        val next = synchronized(this) { change(status).also { status = it } }
-        listeners.forEach { it(next) }
+        val (before, next) = synchronized(this) { status to change(status).also { status = it } }
+        if (next != before) listeners.forEach { it(next) }
     }
 
     /** History changed: the app reloads its list. */
