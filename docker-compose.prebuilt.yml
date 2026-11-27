@@ -87,6 +87,8 @@ services:
     container_name: anemo-postgres
     image: pgvector/pgvector:pg17
     restart: unless-stopped
+    # Query statistics (pg_stat_statements); see docs/deployment.md, "Slow queries".
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements", "-c", "pg_stat_statements.track=top"]
     labels: *icon
     environment:
       POSTGRES_DB: aiw

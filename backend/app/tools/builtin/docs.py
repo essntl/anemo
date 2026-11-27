@@ -14,6 +14,7 @@ finds a document that was moved, with a note to update the reference.
 import asyncio
 import uuid
 from collections import Counter
+from collections.abc import Collection
 from datetime import UTC, date, datetime
 from typing import Any, Literal
 
@@ -36,6 +37,7 @@ from app.features.provenance import service as provenance
 from app.features.tasks.models import Project
 from app.knowledge import index
 from app.policy.models import Action
+from app.providers.base import ToolSpec
 from app.tools.base import Tool, ToolContext, ToolResult
 from app.tools.builtin import linking
 from app.tools.builtin.sketch_read import sketch_result
@@ -89,6 +91,39 @@ LINKING = (
     "(or #<heading> for a section)."
 )
 DOCUMENT_REF = "The document: its path (documents/notes/idea.md), id or link (/documents/<id>)"
+
+# Who says each shared sentence when several of these tools are in one request: the
+# first of them by name (the order of the request); the others point there.
+SHARED_SENTENCES = (
+    (
+        FOLDERS_AND_PROPERTIES,
+        ("list_documents", "search_documents", "set_document_properties"),
+        " Folders vs properties: as in {owner}.",
+    ),
+    (
+        LINKING,
+        ("list_documents", "read_document", "search_documents"),
+        " How to link a document: as in {owner}.",
+    ),
+)
+
+
+def say_shared_once(spec: ToolSpec, offered: Collection[str]) -> ToolSpec:
+    """`spec` with the sentences it shares with another document tool of the same
+    request (SHARED_SENTENCES) replaced by a pointer, unless it is the one that says them."""
+    text = spec.description
+    for sentence, group, pointer in SHARED_SENTENCES:
+        owner = min((n for n in group if n in offered), default=spec.name)
+        if sentence in text and owner != spec.name:
+            text = text.replace(sentence, pointer.format(owner=owner))
+    return ToolSpec(name=spec.name, description=text, input_schema=spec.input_schema)
+
+
+class SharesSentences(Tool):
+    """A document tool whose description has some of SHARED_SENTENCES."""
+
+    def spec(self, offered: Collection[str] = ()) -> ToolSpec:
+        return say_shared_once(super().spec(offered), offered)
 
 
 def link(doc: Document) -> str:
@@ -230,7 +265,7 @@ class ListDocumentsInput(FilterInput):
     )
 
 
-class ListDocuments(Tool):
+class ListDocuments(SharesSentences):
     name = "list_documents"
     description = (
         "List the user's documents (Markdown files under documents/) with their titles and "
@@ -303,10 +338,10 @@ class ListDocuments(Tool):
 class ReadDocumentInput(BaseModel):
     path: str = Field(description=DOCUMENT_REF + " (see list_documents)")
     start: int = Field(0, ge=0, description="Character offset, to continue a long document")
-    max_chars: int = Field(15_000, ge=500, le=15_000)
+    max_chars: int = Field(10_000, ge=500, le=15_000)
 
 
-class ReadDocument(Tool):
+class ReadDocument(SharesSentences):
     name = "read_document"
     description = (
         "Read one of the user's documents as Markdown, with its properties and what links "
@@ -364,7 +399,7 @@ class SearchDocumentsInput(FilterInput):
     limit: int = Field(8, ge=1, le=20)
 
 
-class SearchDocuments(Tool):
+class SearchDocuments(SharesSentences):
     name = "search_documents"
     description = (
         "Find documents by what they say (by meaning when an embedding model is set, "
@@ -654,7 +689,7 @@ class SetDocumentPropertiesInput(BaseModel):
     )
 
 
-class SetDocumentProperties(Tool):
+class SetDocumentProperties(SharesSentences):
     name = "set_document_properties"
     description = (
         "Set or remove properties of one or more documents (written into their front "

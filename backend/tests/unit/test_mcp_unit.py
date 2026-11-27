@@ -33,6 +33,32 @@ def test_schemas_are_made_safe_for_providers():
     assert provider_schema({"type": "string"}) == {"type": "object", "properties": {}}
 
 
+def test_mcp_schemas_lose_their_titles_but_keep_their_nulls():
+    nullable = {"anyOf": [{"type": "string"}, {"type": "null"}], "default": None, "title": "N"}
+    schema = {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string", "title": "Title"},  # a property called title stays
+            "note": nullable,
+            "items": {
+                "type": "array",
+                "items": {"type": "object", "title": "Item", "properties": {"x": nullable}},
+            },
+        },
+        "$defs": {"D": {"title": "D", "type": "object", "properties": {"y": nullable}}},
+    }
+    kept = {"anyOf": [{"type": "string"}, {"type": "null"}], "default": None}
+    assert provider_schema(schema) == {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string"},
+            "note": kept,
+            "items": {"type": "array", "items": {"type": "object", "properties": {"x": kept}}},
+        },
+        "$defs": {"D": {"type": "object", "properties": {"y": kept}}},
+    }
+
+
 def test_arguments_are_checked_against_the_tools_schema():
     model = _input_model(
         {"type": "object", "properties": {"n": {"type": "integer"}}, "required": ["n"]}

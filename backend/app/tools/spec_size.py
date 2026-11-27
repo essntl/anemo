@@ -8,6 +8,7 @@ keeps the total under a budget (tests/unit/test_tool_spec_size.py).
 import json
 
 from app.tools.registry import all_tools
+from app.tools.say_once import say_once
 
 CHARS_PER_TOKEN = 3.3  # a rough average for English text and JSON
 
@@ -23,8 +24,7 @@ def spec_sizes() -> list[tuple[str, int, int, int]]:
     tools = [t for t in all_tools() if not t.hidden]
     offered = frozenset(t.name for t in tools)
     rows = []
-    for tool in tools:
-        spec = tool.spec(offered)
+    for spec in say_once([t.spec(offered) for t in sorted(tools, key=lambda t: t.name)]):
         total = len(
             spec_json(
                 {

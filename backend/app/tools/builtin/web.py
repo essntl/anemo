@@ -134,7 +134,7 @@ class WebSearch(Tool):
 class PageInput(BaseModel):
     url: str = Field(max_length=2000)
     start: int = Field(0, ge=0, description="Character offset, to continue a long page")
-    max_chars: int = Field(15_000, ge=500, le=15_000)
+    max_chars: int = Field(8_000, ge=500, le=15_000)
 
     @field_validator("url")
     @classmethod
@@ -223,7 +223,7 @@ class TranscriptInput(BaseModel):
         description='Caption language, e.g. "en" or "nb". Default: the video\'s own language',
     )
     start: int = Field(0, ge=0, description="Character offset, to continue a long transcript")
-    max_chars: int = Field(15_000, ge=500, le=15_000)
+    max_chars: int = Field(10_000, ge=500, le=15_000)
 
     @field_validator("url")
     @classmethod
@@ -366,7 +366,7 @@ class HttpInput(BaseModel):
     headers: dict[str, str] = Field(default_factory=dict, max_length=30)
     json_body: Any = Field(None, description="Sent as JSON (sets Content-Type)")
     text_body: str | None = Field(None, max_length=1_000_000)
-    max_chars: int = Field(15_000, ge=500, le=15_000)
+    max_chars: int = Field(8_000, ge=500, le=15_000)
 
     @field_validator("url")
     @classmethod

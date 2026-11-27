@@ -475,6 +475,47 @@ async def test_an_agent_starts_a_job_and_follows_it(authed, device_side):
     assert secret_tail not in content and len(content) < 3000
     assert "Fixed in https://github.com/essntl/anemo/pull/9" in content
     assert "API-equivalent cost $1.25" in content
+    assert status["result_data"]["code_report"]["job"] == str(job.id)
+
+    # The report reaches the model once per chat: later calls say it is unchanged,
+    # unless the model asks for it again with full=true.
+    # (The fake model plays the script of the chat's first message, step by step.)
+    script(
+        "fix the login",
+        [Done("end")],
+        [Done("end")],
+        [call("code_status", job_id=str(job.id)), Done("tool_use")],
+        [call("code_status", job_id=str(job.id), full=True), Done("tool_use")],
+        [TextDelta("Same."), Done("end")],
+    )
+    run3 = await agent_turn(authed, cid, "and now")
+    again, full = (await timeline(authed, run3))["tool_calls"]
+    assert "Fixed in" not in again["result"] and code_tools.REPORT_UNCHANGED in again["result"]
+    assert "done" in again["result"] and "code_report" not in again["result_data"]
+    assert "Fixed in https://github.com/essntl/anemo/pull/9" in full["result"]
+    await ws.disconnect()
+
+
+async def test_another_chat_gets_the_report_again(authed, device_side):
+    device, ws = await computer(authed, "Desk PC")
+    cid = await setup(authed)
+    script(
+        "fix it",
+        [call("code_start", device="desk pc", project="anemo", prompt="Fix it"), Done("tool_use")],
+        [TextDelta("Started."), Done("end")],
+    )
+    await agent_turn(authed, cid, "fix it")
+    await announce(ws, KEY, prompt="Fix it")
+    await send(ws, (1, init()), (2, result(result="Fixed: PR 7")), key=KEY)
+    job = await row()
+    status_call = [call("code_status", job_id=str(job.id)), Done("tool_use")]
+    script("fix it", [Done("end")], status_call, [TextDelta("Ok."), Done("end")])
+    script("status", status_call, [TextDelta("Ok."), Done("end")])
+    # the chat that started it, then another chat
+    for chat, text in ((cid, "how is it"), (await setup(authed), "status")):
+        run_id = await agent_turn(authed, chat, text)
+        (status,) = (await timeline(authed, run_id))["tool_calls"]
+        assert "Fixed: PR 7" in status["result"], chat
     await ws.disconnect()
 
 

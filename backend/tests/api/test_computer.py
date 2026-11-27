@@ -440,6 +440,19 @@ async def test_actions_and_powershell_reach_the_device_with_their_timeouts(fake)
     await SHELL.run(computer.ShellInput(device="VM", command="x", timeout_s=600), ctx)
     assert fake.sent[-1][3] == 615
 
+    # PowerShell's error stream arrives as CLIXML; the model reads it as text.
+    fake.answer = {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": '#< CLIXML\r\n<Objs Version="1.1.0.1" xmlns="x"><S S="Error">'
+        'Get-Item : Cannot find path_x000D__x000A_</S><S S="warning">careful</S></Objs>',
+        "duration_ms": 5,
+    }
+    result = await SHELL.run(computer.ShellInput(device="VM", command="Get-Item x"), ctx)
+    assert "--- stderr ---\nGet-Item : Cannot find path\nWARNING: careful" in result.content
+    assert "CLIXML" not in result.content and result.data
+    assert result.data["shell"]["stderr"].startswith("Get-Item : Cannot find path")
+
 
 GONE = "That control is gone; look again"
 
@@ -878,7 +891,7 @@ async def test_what_the_client_sends_is_capped(fake):
 
     fake.answer = {"exit_code": 0, "stdout": "a" * 50_000, "stderr": "", "duration_ms": 1}
     result = await SHELL.run(computer.ShellInput(device="VM", command="Get-Date"), ctx)
-    assert result.data and len(result.data["shell"]["stdout"]) < 30_100
+    assert result.data and len(result.data["shell"]["stdout"]) < 12_100
     assert "characters left out" in result.data["shell"]["stdout"]
 
 
