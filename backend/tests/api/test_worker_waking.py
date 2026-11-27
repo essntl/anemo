@@ -1,5 +1,5 @@
 """The worker finds work when it is due, not on a polling tick: delayed jobs, new jobs
-(NOTIFY), and automations that come due or are scheduled while it waits."""
+(NOTIFY), and automations and reminders that come due or are scheduled while it waits."""
 
 import asyncio
 import time
@@ -108,6 +108,56 @@ async def test_an_automation_starts_when_due_not_on_the_next_tick(authed, monkey
         await _wait_for(started, 6)
         late = (datetime.now(UTC) - at).total_seconds()
         assert late < 2.5  # it was up to 30 s
+    finally:
+        await worker.close()
+
+
+async def _reminders_sent() -> list[str]:
+    from app.features.notifications.models import Notification
+
+    async with get_sessionmaker()() as db:
+        rows = await db.scalars(select(Notification).where(Notification.kind == "reminder"))
+        return [n.title for n in rows]
+
+
+async def test_a_reminder_goes_when_due_not_on_the_next_tick(authed, monkeypatch):
+    monkeypatch.setattr(scheduler, "periodic_tasks", lambda: [])  # no tick sends it
+    worker = Worker({}, with_scheduler=True)
+    try:
+        await asyncio.sleep(0.5)  # nothing due: the scheduler waits for its 30 s tick
+        # An event saved while it waits, with a reminder in 2 s: the NOTIFY has it look.
+        at = datetime.now(UTC) + timedelta(seconds=2)
+        r = await authed.post(
+            "/api/calendar/events",
+            json={"title": "Call", "start_at": at.isoformat(), "remind_minutes": 0},
+        )
+        assert r.status_code == 201, r.text
+
+        async def sent() -> bool:
+            return "Reminder: Call" in await _reminders_sent()
+
+        await _wait_for(sent, 6)
+        assert (datetime.now(UTC) - at).total_seconds() < 2.5  # it was up to 30 s
+
+        # A task changed to be due (with its reminder) in 2 s, the same.
+        r = await authed.post("/api/tasks", json={"title": "Pay rent"})
+        assert r.status_code == 201, r.text
+        due = datetime.now(UTC) + timedelta(seconds=2)
+        r = await authed.patch(
+            f"/api/tasks/{r.json()['id']}",
+            json={
+                "due_date": due.date().isoformat(),
+                "due_time": due.time().replace(microsecond=0).isoformat(),
+                "remind_minutes": 0,
+            },
+        )
+        assert r.status_code == 200, r.text
+
+        async def task_sent() -> bool:
+            return "Reminder: Pay rent" in await _reminders_sent()
+
+        await _wait_for(task_sent, 6)
+        assert (datetime.now(UTC) - due).total_seconds() < 2.5
     finally:
         await worker.close()
 

@@ -32,6 +32,7 @@ from app.features.tasks.models import Project, Task, TaskDependency
 from app.features.tasks.schemas import OPEN_STATUSES, ChecklistItem, clean_checklist
 from app.features.trash import service as trash
 from app.features.trash.models import TrashedItem
+from app.jobs import queue
 
 
 async def notify() -> None:
@@ -228,6 +229,7 @@ async def create_task(
         await links_index.add_explicit(db, "task", task.id, links)
     await links_index.refresh_inline(db, "task", task.id, task.description)
     await activity.created(db, "task", task.id, task.title)
+    await _wake_for_reminder(db, task)
     await db.commit()
     await db.refresh(task)
     await notify()
@@ -329,11 +331,19 @@ async def update_task(
     if "description" in changes:
         await links_index.refresh_inline(db, "task", task.id, task.description)
     await _log_change(db, task, logged)
+    await _wake_for_reminder(db, task)
     await db.commit()
     await db.refresh(task)
     await _tell_ready(db, ready)
     await notify()
     return task
+
+
+async def _wake_for_reminder(db: AsyncSession, task: Task) -> None:
+    """A reminder was set or its due time moved: the scheduler looks at it on commit, so
+    one due before its next tick goes on time. Doesn't commit."""
+    if task.remind_minutes is not None and is_open(task.status):
+        await queue.wake_scheduler(db)
 
 
 async def task_snapshot(db: AsyncSession, task: Task, blockers: bool = False) -> dict[str, Any]:

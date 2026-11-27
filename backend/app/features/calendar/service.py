@@ -27,6 +27,7 @@ from app.features.provenance.schemas import ActorOut, SourceIn
 from app.features.tasks.models import Project, Task
 from app.features.trash import service as trash
 from app.features.trash.models import TrashedItem
+from app.jobs import queue
 
 DEFAULT_DURATION = timedelta(hours=1)
 MAX_RANGE = timedelta(days=400)
@@ -115,6 +116,7 @@ async def create_event(
         await links_index.add_explicit(db, "event", event.id, refs)
     await links_index.refresh_inline(db, "event", event.id, event.description)
     await activity.created(db, "event", event.id, event.title)
+    await _wake_for_reminder(db, event.remind_minutes)
     await db.commit()
     await db.refresh(event)
     await notify()
@@ -189,10 +191,18 @@ async def update_event(
         await db.execute(delete(EventException).where(EventException.event_id == event.id))
     await links_index.refresh_inline(db, "event", event.id, event.description)
     await _log_change(db, event, logged)
+    await _wake_for_reminder(db, event.remind_minutes)
     await db.commit()
     await db.refresh(event)
     await notify()
     return event
+
+
+async def _wake_for_reminder(db: AsyncSession, remind_minutes: int | None) -> None:
+    """A reminder was set or moved: the scheduler looks at its time on commit, so one due
+    before its next tick goes on time. Doesn't commit."""
+    if remind_minutes is not None:
+        await queue.wake_scheduler(db)
 
 
 async def delete_event(
@@ -571,6 +581,7 @@ async def set_occurrence(
                 # Not undoable from the log: the occurrence's own changes are in the calendar.
                 summary=f"Changed “{event.title}” on {when:%Y-%m-%d %H:%M} only"[:300],
             )
+    await _wake_for_reminder(db, event.remind_minutes)
     await db.commit()
     await notify()
 

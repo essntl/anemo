@@ -6,7 +6,7 @@ claims what it does in the database.
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 log = logging.getLogger("worker.scheduler")
 
@@ -55,10 +55,12 @@ def periodic_tasks() -> list[tuple[str, Callable[[], Awaitable[object]]]]:
 
 
 async def run(stop: asyncio.Event, wake: asyncio.Event | None = None) -> None:
-    """Every task each TICK_S. In between, automations start when they come due (not
-    on the next tick: that made a scheduled run up to 30 s late), and `wake` (set when an
-    automation's run time changed, jobs/queue.wake_scheduler) has it look again."""
+    """Every task each TICK_S. In between, automations start and reminders go when they
+    come due (not on the next tick: that made them up to 30 s late), and `wake` (set when
+    an automation's run time or a reminder changed, jobs/queue.wake_scheduler) has it
+    look again."""
     from app.features.automations import service as automations
+    from app.features.calendar import reminders
 
     tasks = periodic_tasks()
     wake = wake or asyncio.Event()
@@ -70,14 +72,12 @@ async def run(stop: asyncio.Event, wake: asyncio.Event | None = None) -> None:
             next_tick = loop.time() + TICK_S
             await _run_tasks(tasks)
         else:
-            await _run_tasks([("automations", automations.fire_due)])
+            # Between ticks: what may have come due (both are cheap when nothing is).
+            await _run_tasks(
+                [("automations", automations.fire_due), ("reminders", reminders.fire_due)]
+            )
         wait = next_tick - loop.time()
-        try:
-            due = await _next_automation()
-        except Exception:  # noqa: BLE001 - the tick still comes
-            log.warning("next automation time not read", exc_info=True)
-            due = None
-        if due is not None:
+        for due in await _next_times(timedelta(seconds=max(0.0, wait))):
             in_s = (due - datetime.now(UTC)).total_seconds()
             # Already due but not started (paused, or another worker has it): the tick.
             if in_s > 0:
@@ -93,12 +93,27 @@ async def _run_tasks(tasks: list[tuple[str, Callable[[], Awaitable[object]]]]) -
             log.warning("periodic task failed", extra={"ctx": {"task": name}}, exc_info=True)
 
 
-async def _next_automation() -> datetime | None:
+async def _next_times(within: timedelta) -> list[datetime]:
+    """When the next automation and the next reminder (within `within`) come due."""
     from app.core.db import get_sessionmaker
     from app.features.automations import service as automations
+    from app.features.calendar import reminders
 
-    async with get_sessionmaker()() as db:
-        return await automations.next_due(db)
+    times: list[datetime] = []
+    try:
+        async with get_sessionmaker()() as db:
+            automation = await automations.next_due(db)
+        if automation is not None:
+            times.append(automation)
+    except Exception:  # noqa: BLE001 - the tick still comes
+        log.warning("next automation time not read", exc_info=True)
+    try:
+        reminder = await reminders.next_due(within)
+        if reminder is not None:
+            times.append(reminder)
+    except Exception:  # noqa: BLE001 - the tick still comes
+        log.warning("next reminder time not read", exc_info=True)
+    return times
 
 
 async def _wait(stop: asyncio.Event, wake: asyncio.Event, seconds: float) -> None:
