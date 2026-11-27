@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, m } from 'motion/react'
 import { cn } from '@/lib/cn'
 
 /**
@@ -14,7 +14,7 @@ export function RollingText({ value, className }: { value: string; className?: s
         // Keyed by position from the right, so 9:59 → 10:00 keeps the seconds in place.
         <span key={value.length - i} aria-hidden className="relative inline-block overflow-hidden">
           <AnimatePresence mode="popLayout" initial={false}>
-            <motion.span
+            <m.span
               key={ch}
               initial={{ y: '-70%', opacity: 0 }}
               animate={{ y: '0%', opacity: 1 }}
@@ -23,7 +23,7 @@ export function RollingText({ value, className }: { value: string; className?: s
               className="inline-block"
             >
               {ch}
-            </motion.span>
+            </m.span>
           </AnimatePresence>
         </span>
       ))}

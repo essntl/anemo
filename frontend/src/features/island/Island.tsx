@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, m } from 'motion/react'
 import { useNavigate } from 'react-router'
 import { Maximize2, Pause, Play, Plus, SkipBack, SkipForward, StepForward } from 'lucide-react'
 import { Equalizer } from '@/components/ui/Equalizer'
@@ -171,7 +171,7 @@ export function Island() {
       <div className="sr-only" role="status" aria-live="polite">{alert ? `${alert.title}. ${alert.body ?? ''}` : ''}</div>
       <AnimatePresence>
         {mode !== 'hidden' && (
-          <motion.div ref={pill} layout data-testid="island" data-mode={mode}
+          <m.div ref={pill} layout data-testid="island" data-mode={mode}
             // Opened, it counts as something to close (back on a phone closes it: app/overlays.ts).
             data-overlay={mode === 'expanded' ? 'open' : undefined}
             initial={settled ? { opacity: 0, scale: 0.6, y: -10 } : false}
@@ -182,7 +182,7 @@ export function Island() {
             className="pointer-events-auto max-w-full select-none overflow-hidden bg-island text-island-fg shadow-float ring-1 ring-island-ring">
             <AnimatePresence mode="popLayout" initial={false}>
               {mode === 'alert' && alert && (
-                <motion.button key={`alert-${alert.id}`} {...content} type="button"
+                <m.button key={`alert-${alert.id}`} {...content} type="button"
                   aria-label={alert.link ? t('{title}. Open', { title: alert.title }) : t('{title}. Dismiss', { title: alert.title })}
                   onClick={() => {
                     dismissIslandAlert()
@@ -194,11 +194,11 @@ export function Island() {
                     <span className="block truncate text-[14px] font-semibold leading-tight">{alert.title}</span>
                     {alert.body && <span className="block truncate text-[12px] leading-tight text-island-muted">{alert.body}</span>}
                   </span>
-                </motion.button>
+                </m.button>
               )}
 
               {mode === 'compact' && (
-                <motion.button key="compact" ref={toggleRef} {...content} type="button" aria-expanded={false}
+                <m.button key="compact" ref={toggleRef} {...content} type="button" aria-expanded={false}
                   aria-label={t('{summary}. Show controls', { summary })} onClick={() => setExpanded(true)}
                   className={cn('flex h-9 items-center md:h-10', dropped ? 'gap-2 px-2.5' : 'gap-2.5 px-3')}>
                   {showTimer && (
@@ -222,11 +222,11 @@ export function Island() {
                       <Equalizer playing={p.status === 'playing'} className="text-accent" />
                     </span>
                   )}
-                </motion.button>
+                </m.button>
               )}
 
               {mode === 'expanded' && (
-                <motion.div key="expanded" {...content} role="group" aria-label={t('Focus and music controls')}
+                <m.div key="expanded" {...content} role="group" aria-label={t('Focus and music controls')}
                   className="flex w-[min(380px,calc(100vw-1.5rem))] flex-col gap-3 p-3.5">
                   {showTimer && (
                     <div className="flex items-center gap-3">
@@ -287,10 +287,10 @@ export function Island() {
                       </button>
                     )}
                   </div>
-                </motion.div>
+                </m.div>
               )}
             </AnimatePresence>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </div>

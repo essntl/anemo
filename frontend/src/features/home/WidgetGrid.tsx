@@ -1,5 +1,5 @@
 import { useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject } from 'react'
-import { motion, useDragControls } from 'motion/react'
+import { m, useDragControls } from 'motion/react'
 import { EyeOff, GripVertical, Plus } from 'lucide-react'
 import { matchesShortcut, SHORTCUTS } from '@/features/shortcuts/registry'
 import { cn } from '@/lib/cn'
@@ -106,7 +106,7 @@ function WidgetFrame({ item, index, prevIndex, nextIndex, editing, gridRef, acti
   }
 
   return (
-    <motion.div
+    <m.div
       ref={frameRef}
       data-widget={item.id}
       data-index={index}
@@ -196,7 +196,7 @@ function WidgetFrame({ item, index, prevIndex, nextIndex, editing, gridRef, acti
           </div>
         </>
       )}
-    </motion.div>
+    </m.div>
   )
 }
 

@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { motion } from 'motion/react'
+import { m } from 'motion/react'
 import {
   AlertTriangle, Bot, Check, Coffee, ListPlus, Music, Repeat, ShieldQuestion, Shuffle, SkipForward, Timer,
 } from 'lucide-react'
@@ -32,7 +32,7 @@ const ICONS: Record<AlertIcon, ReactNode> = {
 /** A round control on the Island; `big` is the white play/pause button. */
 export function IslandButton({ label, onClick, children, big }: { label: string; onClick: () => void; children: ReactNode; big?: boolean }) {
   return (
-    <motion.button type="button" aria-label={label} title={label} whileTap={{ scale: 0.88 }} transition={spring.snappy}
+    <m.button type="button" aria-label={label} title={label} whileTap={{ scale: 0.88 }} transition={spring.snappy}
       onClick={(e) => {
         e.stopPropagation()
         onClick()
@@ -42,7 +42,7 @@ export function IslandButton({ label, onClick, children, big }: { label: string;
           : 'h-9 w-9 bg-island-control text-island-fg hover:bg-island-control-hover [&_svg]:h-4 [&_svg]:w-4',
         'pointer-coarse:h-11 pointer-coarse:w-11')}>
       {children}
-    </motion.button>
+    </m.button>
   )
 }
 
