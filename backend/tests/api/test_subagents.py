@@ -7,6 +7,7 @@ import uuid
 from sqlalchemy import select
 
 from app.core.db import get_sessionmaker
+from app.features.memory.service import MEMORY_TOOLS_HINT
 from app.features.runs.models import Run
 from app.jobs.models import Job
 from app.providers.adapters.fake import FakeAdapter
@@ -98,6 +99,38 @@ async def test_parent_waits_for_its_sub_agent_and_gets_the_answer(authed):
     messages = (await authed.get(f"/api/conversations/{cid}/messages")).json()
     assert messages[-1]["text"] == "I'll delegate.\n\nThere are 3 otters."
     assert len(messages) == 2  # the sub-agent wrote nothing into the chat
+
+
+async def test_a_sub_agent_gets_only_the_tools_its_task_needs(authed):
+    cid = await setup(authed, **SPAWN)
+    script(
+        "look it up",
+        [
+            call(
+                "run_subagent",
+                task="find the otter count",
+                tools=["read_file", "web_search", "nope"],
+            ),
+            Done("tool_use"),
+        ],
+        [TextDelta("Done."), Done("end")],
+    )
+    script("find the otter count", [TextDelta("3."), Done("end")])
+    run_id = await agent_turn(authed, cid, "look it up")
+    full = len(FakeAdapter.requests[-1].tools)
+    full_system = FakeAdapter.requests[-1].system
+    (child,) = await children_of(authed, run_id)
+    await execute_run(uuid.UUID(child["id"]))
+    # Only what was asked for that it may have (an unknown name is ignored), plus what
+    # every run keeps; a tool the parent didn't get is never added.
+    offered = set(tools_offered())
+    assert offered <= {"read_file", "web_search", "read_tool_output"} and "read_file" in offered
+    assert len(offered) < full
+    # Its system prompt leaves out hints about tools it doesn't have.
+    system = FakeAdapter.requests[-1].system
+    assert MEMORY_TOOLS_HINT in full_system and MEMORY_TOOLS_HINT not in system
+    await run_all(authed, run_id)
+    assert await run_status(authed, run_id) == "completed"
 
 
 async def test_several_sub_agents_at_once_and_the_caps(authed):

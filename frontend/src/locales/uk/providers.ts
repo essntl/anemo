@@ -50,7 +50,7 @@ const messages: Messages = {
   "Compacting long conversations and documents.": "Стискання довгих розмов і документів.",
   "Extracting memories from conversations.": "Видобування спогадів із розмов.",
   "Background tasks": "Фонові завдання",
-  "Indexing and other housekeeping.": "Індексування та інші службові роботи.",
+  "Indexing and other housekeeping; titles, summaries and memory use it when they have no model of their own.": "Індексування та інші службові роботи; заголовки, підсумки й пам’ять використовують її, якщо не мають власної моделі.",
   "Inline & formatting": "Вбудовані дії та форматування",
   "Anemo Companion: translate and explain on web pages, and formatting what it saves. A fast model is ideal.": "Anemo Companion: переклад і пояснення на вебсторінках та форматування збереженого. Найкраще підходить швидка модель.",
   "Scheduled agent jobs.": "Заплановані завдання агентів.",

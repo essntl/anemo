@@ -396,3 +396,42 @@ async def test_agent_first_conversations_get_a_title(authed):
     await agent_turn(authed, cid, "plan my week")
     async with get_sessionmaker()() as db:
         assert await db.scalar(select(Job.id).where(Job.type == "conversation.title")) is not None
+
+
+async def test_a_turn_with_nothing_about_the_user_costs_no_extraction_call(authed):
+    cid = await setup(authed)
+    script("Summarize the attached report", [TextDelta("Summary."), Done("end")])
+    await chat_turn(authed, cid, "Summarize the attached report")
+    FakeAdapter.extraction_reply = json.dumps([{"op": "add", "content": "Should not appear."}])
+    before = len(FakeAdapter.requests)
+    assert await extraction.extract(uuid.UUID(cid), 2) == 0
+    assert len(FakeAdapter.requests) == before  # no model call
+    # The next turn about the user is read (from after the skipped one).
+    await chat_turn(authed, cid, "My daughter starts school in May")
+    FakeAdapter.extraction_reply = json.dumps(
+        [{"op": "add", "content": "Daughter starts school in May."}]
+    )
+    assert await extraction.extract(uuid.UUID(cid), 4) == 1
+    prompt = FakeAdapter.requests[-1].messages[0].content[0].text  # type: ignore[union-attr]
+    assert "My daughter" in prompt and "Summarize the attached" not in prompt
+
+
+def test_what_may_hold_a_memory():
+    for text in (
+        "I moved to Utrecht",
+        "my cat is called Bo",
+        "We use Postgres at work",
+        "Always answer in Dutch",
+        "Я переїхала до Львова",
+        "Мой муж врач",
+        "запам'ятай: я не їм м'яса",
+    ):
+        assert extraction.may_hold_a_memory(text), text
+    for text in (
+        "Summarize this page",
+        "fix the bug in auth.py",
+        "What is 2+2?",
+        "Перекладіть цей текст",
+        "Сделай таблицу",
+    ):
+        assert not extraction.may_hold_a_memory(text), text

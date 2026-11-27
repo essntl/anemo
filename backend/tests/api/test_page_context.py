@@ -107,10 +107,11 @@ def test_truncated_pages_say_so():
 
 async def test_page_content_never_reaches_memory_extraction(authed):
     cid = await _setup(authed)
-    await _turn(authed, cid, text="What does this say?", page=PAGE)
+    # (Words about the user, so the extraction is not skipped as holding no memory.)
+    await _turn(authed, cid, text="What does this say? I want to know.", page=PAGE)
     await extraction.extract(uuid.UUID(cid), 2)
     prompt = _sent_text()
-    assert "What does this say?" in prompt  # the extraction request
+    assert "What does this say? I want to know." in prompt  # the extraction request
     assert "Photosynthesis" not in prompt and INJECTION not in prompt
 
 

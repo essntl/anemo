@@ -52,11 +52,17 @@ from app.runtime.chat import (
 )
 from app.tools import mcp_tool
 from app.tools.builtin import computer
+from app.tools.builtin.browser import BROWSER_TOOLS
+from app.tools.builtin.memory import MEMORY_TOOLS
 from app.web.settings import WebSettings
 from app.workspace.access import WorkspaceSettings
 
 # Chat turns run through the same loop, but only with memory tools and tight limits.
 CHAT_LIMITS = Limits(max_steps=8, max_tool_calls=16, max_runtime_s=900)
+
+# For the system prompt's hints: a run limited to other tools doesn't get them.
+BROWSER_TOOL_NAMES = {t.name for t in BROWSER_TOOLS} | {"browser_current_tab"}
+MEMORY_TOOL_NAMES = {t.name for t in MEMORY_TOOLS}
 
 
 def _last_user_text(transcript: list[Message]) -> str:
@@ -109,11 +115,21 @@ async def snapshot_run(db: AsyncSession, run: Run, transcript: list[Message]) ->
     system = (
         CHAT_SYSTEM_PROMPT if chat else build_system_prompt(profile, skills, settings.plan_review)
     )
+    # The tools a run is limited to: an automation's list, a sub-agent's task list (or the
+    # list of the automation above it). Hints about tools it won't have are left out.
+    sub_tools = (sub or {}).get("tools")
+    automation_tools = automation.tool_allowlist if automation is not None else None
+    inherited_tools = ((sub or {}).get("automation") or {}).get("tools")
+    limited_to = sub_tools or automation_tools or inherited_tools
+
+    def may_have(names: set[str]) -> bool:
+        return limited_to is None or bool(names & set(limited_to))
+
     memory_settings = await memory.get_settings(db)
     # The chat's always-included memories (as they were when it started) and what its
     # earlier turns gave: each memory reaches the model once (runtime/memory_context.py).
     memories = await memory_context.for_turn(db, run, memory_settings)
-    if memory_settings.enabled:
+    if memory_settings.enabled and may_have(MEMORY_TOOL_NAMES):
         system += memory.MEMORY_TOOLS_HINT
     # The chat's project: where its files are, and the user's instructions for it.
     project = await projects.for_conversation(db, run.conversation_id)
@@ -121,7 +137,7 @@ async def snapshot_run(db: AsyncSession, run: Run, transcript: list[Message]) ->
     has_sandbox = (
         not chat and browser_client.available() and level_for(settings, "browser.use") != "deny"
     )
-    if has_sandbox:
+    if has_sandbox and may_have(BROWSER_TOOL_NAMES):
         system += BROWSER_HINT
     if automation is not None:
         result = AUTOMATION_RESULT.get(automation.notify, AUTOMATION_RESULT_DEFAULT)
@@ -138,7 +154,7 @@ async def snapshot_run(db: AsyncSession, run: Run, transcript: list[Message]) ->
         and level_for(settings, "browser.mine") != "deny"
         and await browser_relay.available()
     )
-    if my_browser:
+    if my_browser and may_have(BROWSER_TOOL_NAMES):
         system += MY_BROWSER_HINT
     has_browser = has_sandbox or my_browser
     if sub is not None:

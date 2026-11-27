@@ -124,6 +124,25 @@ def without_page_answers(
     return kept
 
 
+# A durable memory is about the user: what they say about themselves, their own things,
+# or what the assistant should always or never do. A turn whose words have none of these
+# ("summarize this page", "fix the bug in auth.py") holds nothing to remember, and its
+# extraction call is skipped (English, Ukrainian and Russian; explicit requests to
+# remember go through the memory tools anyway).
+PERSONAL = re.compile(
+    r"\b(?:i|i'm|i've|i'd|i'll|im|me|my|mine|myself|we|we're|our|ours|us|"
+    r"remember|prefer|always|never|from now on|call me|"
+    r"я|мене|мені|мій|моя|моє|мої|мною|ми|нас|нам|наш|наша|наше|наші|завжди|ніколи|запам\w*|"
+    r"меня|мне|мой|моя|моё|мое|мои|мной|мы|нам|наш|наша|наше|наши|всегда|никогда|запомн\w*)\b",
+    re.IGNORECASE,
+)
+
+
+def may_hold_a_memory(user_text: str) -> bool:
+    """Whether the user's words could state something durable about them (PERSONAL)."""
+    return PERSONAL.search(user_text) is not None
+
+
 def _render(messages: list[ChatMessage]) -> str:
     parts = [f"{m.role.upper()}: {m.text_plain.strip()[:3000]}" for m in messages if m.text_plain]
     text = "\n\n".join(parts)
@@ -165,8 +184,10 @@ async def extract(conversation_id: uuid.UUID, upto_seq: int) -> int:
         messages = without_page_answers(messages, before)
         conv.memory_extracted_seq = upto_seq
         user_text = " ".join(m.text_plain for m in messages if m.role == "user")
-        if not user_text.strip():
-            await db.commit()
+        if not user_text.strip() or not may_hold_a_memory(user_text):
+            await (
+                db.commit()
+            )  # nothing about the user: no model call (memory_extracted_seq moves on)
             return 0
 
         # What is already known and could be related, so the model neither repeats it
