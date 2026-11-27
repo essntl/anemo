@@ -73,8 +73,11 @@ from app.runtime.agent_prompt import build_system_prompt
 from app.runtime.agent_snapshot import resolve_models, session_key_for, snapshot_run
 from app.runtime.history import (
     estimate_tokens,
+    history_cap,
     latest_user_attachment_kinds,
     load_history,
+    load_recent_history,
+    needs_whole_history,
     resolve_attachments,
     trim_to_budget,
 )
@@ -1408,11 +1411,14 @@ async def _prepare(run_id: uuid.UUID) -> AgentRun | None:
         if not await automations.may_start(db, run):
             return None
 
+        whole = True  # the transcript has the whole conversation
         if not run.transcript:
             assert run.conversation_id is not None
             message = await db.get(ChatMessage, run.assistant_message_id)
             assert message is not None
-            history = await load_history(db, run.conversation_id, before_seq=message.seq)
+            history, whole = await load_recent_history(
+                db, run.conversation_id, message.seq, max_tokens=await history_cap(db)
+            )
             run.transcript = [m.model_dump() for m in history]
         transcript = [Message.model_validate(m) for m in run.transcript]
 
@@ -1440,6 +1446,14 @@ async def _prepare(run_id: uuid.UUID) -> AgentRun | None:
         except NoModelAvailable as exc:
             await finalize(db, run, "failed", error=exc.message)
             return None
+        if not whole and needs_whole_history(candidates):
+            # The snapshot saved the new message's turn context on its row, so the
+            # whole history has it too.
+            assert run.conversation_id is not None and run.assistant_message_id is not None
+            message = await db.get(ChatMessage, run.assistant_message_id)
+            assert message is not None
+            transcript = await load_history(db, run.conversation_id, before_seq=message.seq)
+            run.transcript = [m.model_dump() for m in transcript]
         tools = await run_tools(
             db, run, policy, ceiling, ancestors, web=web, skills=skills,
             has_chat=answer_message is not None,

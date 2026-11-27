@@ -3,12 +3,13 @@
 import uuid
 
 from pydantic import ValidationError
-from sqlalchemy import select
+from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.features.attachments.service import render_blocks
 from app.features.conversations import compaction
 from app.features.conversations.models import ChatMessage
+from app.features.providers.models import Model, Provider
 from app.features.settings import service as settings_service
 from app.features.triggers import render as event_render
 from app.providers.base import (
@@ -22,6 +23,7 @@ from app.providers.base import (
     ResearchRef,
     TextBlock,
 )
+from app.providers.router import ResolvedModel
 from app.runtime import pages, research
 
 CHARS_PER_TOKEN = 4  # rough estimate; good enough for trimming decisions
@@ -48,6 +50,30 @@ def estimate_tokens(messages: list[Message]) -> int:
     return _tokens(sum(c for c, _ in costs), sum(i for _, i in costs))
 
 
+# Rows read at a time when only the newest messages are needed.
+_PAGE = 100
+# A model without a known context window is given this many tokens (as in the requests).
+_UNKNOWN_CONTEXT = 32_000
+
+
+async def history_cap(db: AsyncSession) -> int:
+    """How much history a run reads (load_recent_history): twice the largest context
+    window of an enabled model, so whichever model answers (fallbacks included) gets at
+    least what its request keeps after trimming."""
+    largest = await db.scalar(
+        select(func.max(func.coalesce(Model.context_window, _UNKNOWN_CONTEXT)))
+        .join(Provider, Model.provider_id == Provider.id)
+        .where(Model.enabled.is_(True), Provider.enabled.is_(True))
+    )
+    return 2 * (largest or _UNKNOWN_CONTEXT)
+
+
+def needs_whole_history(candidates: list[ResolvedModel]) -> bool:
+    """Claude Code matches the whole conversation against what its session has seen
+    (providers/adapters/claude_code.py), so it is never given a shortened one."""
+    return any(c.provider_type == "claude_code" for c in candidates)
+
+
 async def load_history(
     db: AsyncSession, conversation_id: uuid.UUID, before_seq: int, *, with_context: bool = True
 ) -> list[Message]:
@@ -56,40 +82,101 @@ async def load_history(
 
     A compacted chat starts with its newest summary, then the messages from the one it
     kept on (docs/specs/24-chat-compaction.md)."""
-    history: list[Message] = []
+    history, _ = await _load(db, conversation_id, before_seq, with_context, max_tokens=None)
+    return history
+
+
+async def load_recent_history(
+    db: AsyncSession, conversation_id: uuid.UUID, before_seq: int, *, max_tokens: int
+) -> tuple[list[Message], bool]:
+    """Like load_history, but reads from the newest message back and stops once the
+    messages read are well over `max_tokens` (the request trims them to the model's
+    budget anyway): a long chat no longer reads and copies every message on every run.
+    Returns (history, whether it is the whole conversation)."""
+    return await _load(db, conversation_id, before_seq, True, max_tokens=max_tokens)
+
+
+async def _load(
+    db: AsyncSession,
+    conversation_id: uuid.UUID,
+    before_seq: int,
+    with_context: bool,
+    *,
+    max_tokens: int | None,
+) -> tuple[list[Message], bool]:
     start = 0
     newest = await compaction.latest(db, conversation_id, before_seq)
     if newest is not None:
         start = int((newest.compaction or {}).get("kept_from_seq", newest.seq))
-        history.append(Message.user(compaction.summary_message_text(newest.text_plain)))
-    rows = await db.scalars(
-        select(ChatMessage)
-        .where(
-            ChatMessage.conversation_id == conversation_id,
-            ChatMessage.seq >= start,
-            ChatMessage.seq < before_seq,
-            ChatMessage.role != compaction.ROLE,
-        )
-        .order_by(ChatMessage.seq)
+    base = select(ChatMessage).where(
+        ChatMessage.conversation_id == conversation_id,
+        ChatMessage.seq >= start,
+        ChatMessage.role != compaction.ROLE,
     )
-    for row in rows:
-        if row.role == "assistant" and row.status not in ("complete", "cancelled"):
-            continue  # failed turns are not part of the context
-        try:
-            msg = Message.model_validate({"role": row.role, "content": row.content})
-        except ValidationError:
-            msg = Message(role=row.role, content=[TextBlock(text=row.text_plain)])  # type: ignore[arg-type]
-        msg.content = [b for b in msg.content if not (isinstance(b, TextBlock) and not b.text)]
-        if with_context and row.role == "user" and row.turn_context:
-            msg.content.append(TextBlock(text=row.turn_context))
-        if not msg.content:
-            continue
+    if max_tokens is None:
+        rows = await db.scalars(base.where(ChatMessage.seq < before_seq).order_by(ChatMessage.seq))
+        messages = [m for m in (_as_message(r, with_context) for r in rows) if m is not None]
+        complete = True
+    else:
+        messages, complete = await _newest(db, base, before_seq, with_context, max_tokens)
+        messages.reverse()
+    history: list[Message] = []
+    if newest is not None and complete:
+        history.append(Message.user(compaction.summary_message_text(newest.text_plain)))
+    for msg in messages:
         # Providers expect alternating roles: merge consecutive same-role messages.
         if history and history[-1].role == msg.role:
             history[-1].content.extend(msg.content)
         else:
             history.append(msg)
-    return history
+    return history, complete
+
+
+async def _newest(
+    db: AsyncSession,
+    base: Select[tuple[ChatMessage]],
+    before_seq: int,
+    with_context: bool,
+    max_tokens: int,
+) -> tuple[list[Message], bool]:
+    """The newest messages before `before_seq`, newest first, a page at a time, until
+    their estimate passes `max_tokens` on a user message (a history starts with one).
+    Also returns whether that reached the oldest message."""
+    messages: list[Message] = []
+    chars, images = 0, 0
+    cursor = before_seq
+    while True:
+        page = list(
+            await db.scalars(
+                base.where(ChatMessage.seq < cursor).order_by(ChatMessage.seq.desc()).limit(_PAGE)
+            )
+        )
+        for row in page:
+            cursor = row.seq
+            msg = _as_message(row, with_context)
+            if msg is None:
+                continue
+            messages.append(msg)
+            c, i = _cost(msg)
+            chars, images = chars + c, images + i
+            if msg.role == "user" and _tokens(chars, images) > max_tokens:
+                return messages, False
+        if len(page) < _PAGE:
+            return messages, True
+
+
+def _as_message(row: ChatMessage, with_context: bool) -> Message | None:
+    """A stored message as model input; None when it is not part of the context."""
+    if row.role == "assistant" and row.status not in ("complete", "cancelled"):
+        return None  # failed turns are not part of the context
+    try:
+        msg = Message.model_validate({"role": row.role, "content": row.content})
+    except ValidationError:
+        msg = Message(role=row.role, content=[TextBlock(text=row.text_plain)])  # type: ignore[arg-type]
+    msg.content = [b for b in msg.content if not (isinstance(b, TextBlock) and not b.text)]
+    if with_context and row.role == "user" and row.turn_context:
+        msg.content.append(TextBlock(text=row.turn_context))
+    return msg if msg.content else None
 
 
 async def resolve_attachments(
