@@ -267,7 +267,7 @@ async def approve(
         automation.script_hash = version.hash
     if enable and not automation.enabled:
         automation.enabled = True
-        service.reschedule(automation)
+        await service.reschedule(db, automation)
     await db.flush()
     return version
 

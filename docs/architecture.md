@@ -538,7 +538,7 @@ Settings is a full-page route with a left sub-nav: General, Appearance, Provider
 |---|---|---|---|---|
 | `migrate` | backend | core | – | `alembic upgrade head`; one-shot; `app`/`worker` depend on `service_completed_successfully` |
 | `app` | backend | core, proxy(opt) | `${APP_PORT:-8080}` (bind addr configurable) | API + SPA; health `/api/health` |
-| `worker` | backend | core, sandbox_int, egress | – | runtime + scheduler; health via `cli worker-health` (Redis heartbeat freshness); scalable |
+| `worker` | backend | core, sandbox_int, egress | – | runtime + scheduler; health: the age of `/tmp/anemo-worker-alive`, touched with each Redis heartbeat (`cli worker-health` still checks Redis itself); scalable |
 | `postgres` | pgvector/pgvector:pg17 | core | – | volume `pgdata`; `pg_isready` health |
 | `valkey` | valkey/valkey:8-alpine | core | – | small AOF volume (optional) |
 | `sandbox` | sandbox | sandbox_int (internal) | – | `/workspace` bind; hardened |

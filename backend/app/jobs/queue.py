@@ -20,6 +20,8 @@ from app.jobs.models import Job
 
 Lane = Literal["interactive", "background"]
 NOTIFY_CHANNEL = "jobs_new"
+# Wakes the scheduler (jobs/scheduler.py): an automation's next run time changed.
+SCHEDULER_CHANNEL = "scheduler_wake"
 LEASE = timedelta(seconds=60)
 
 
@@ -60,6 +62,19 @@ async def enqueue(
         text("SELECT pg_notify(:channel, :lane)"), {"channel": NOTIFY_CHANNEL, "lane": lane}
     )
     return job
+
+
+async def wake_scheduler(db: AsyncSession) -> None:
+    """Tell the workers' schedulers to look at the automations' run times again, once
+    this transaction commits. Part of a bigger change: doesn't commit."""
+    await db.execute(text("SELECT pg_notify(:channel, '')"), {"channel": SCHEDULER_CHANNEL})
+
+
+async def next_due(db: AsyncSession, lanes: list[str]) -> datetime | None:
+    """When the next queued job in these lanes is due (a retry or a delayed job)."""
+    return await db.scalar(
+        select(func.min(Job.run_at)).where(Job.status == "queued", Job.lane.in_(lanes))
+    )
 
 
 async def claim(db: AsyncSession, worker_id: str, lanes: list[str]) -> Job | None:

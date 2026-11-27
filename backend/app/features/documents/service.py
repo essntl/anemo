@@ -9,6 +9,7 @@ something else (an agent's file tools, another program) gets a revision.
 import asyncio
 import hashlib
 import html
+import os
 import re
 import unicodedata
 import uuid
@@ -136,27 +137,44 @@ class FileInfo:
 def _scan() -> tuple[list[FileInfo], list[str], bool]:
     """All documents on disk, the sub-folders (for the folder picker), and whether the
     scan is complete: a file can be moved or deleted while we look (by an agent, the
-    file manager or another request), and then it is simply left out."""
+    file manager or another request), and then it is simply left out.
+
+    It runs on every document list, so it walks with os.scandir (the entry's type and
+    size come with the listing) and builds the paths from the names, instead of
+    resolving each one against the workspace (that was ~0.5 s for 6,000 files)."""
     base = files.root() / DOCS_DIR
     found: list[FileInfo] = []
     folders: list[str] = []
     complete = True
     if not base.is_dir():
         return found, folders, complete
-    for path in sorted(base.rglob("*")):
-        rel_parts = path.relative_to(base).parts
-        if any(p.startswith(".") or p == ASSETS_DIR for p in rel_parts) or path.is_symlink():
+    pending: list[tuple[str, ...]] = [()]
+    while pending:
+        parts = pending.pop()
+        try:
+            with os.scandir(base.joinpath(*parts)) as listing:
+                entries = list(listing)
+        except FileNotFoundError:
+            complete = False
             continue
-        if path.is_dir():
-            folders.append("/".join(rel_parts))
-        elif path.suffix.lower() == ".md":
+        for entry in entries:
+            if entry.name.startswith(".") or entry.name == ASSETS_DIR or entry.is_symlink():
+                continue
+            here = (*parts, entry.name)
             try:
-                st = path.stat()
+                if entry.is_dir(follow_symlinks=False):
+                    folders.append("/".join(here))
+                    pending.append(here)
+                elif entry.name.lower().endswith(".md"):
+                    st = entry.stat(follow_symlinks=False)
+                    if st.st_size <= MAX_DOC_BYTES:
+                        rel = "/".join((DOCS_DIR, *here))
+                        found.append(FileInfo(rel, st.st_size, st.st_mtime))
             except FileNotFoundError:
                 complete = False
-                continue
-            if st.st_size <= MAX_DOC_BYTES:
-                found.append(FileInfo(files.rel(path), st.st_size, st.st_mtime))
+    # The order a sorted walk gives (by path parts), as before.
+    folders.sort(key=lambda f: f.split("/"))
+    found.sort(key=lambda f: f.path.split("/"))
     return found, folders, complete
 
 
@@ -174,6 +192,14 @@ def _read(path: str) -> str:
 async def reconcile(db: AsyncSession) -> list[str]:
     """Bring the index in line with the folder. Returns the sub-folders."""
     on_disk, folders, complete = await asyncio.to_thread(_scan)
+    if not await _differs(db, on_disk):
+        # The usual case (every list of documents comes here): nothing changed on disk,
+        # so the rows need not be loaded.
+        changed = await _index_stale(db)
+        changed = await _links_stale(db) or changed
+        if changed or db.dirty:
+            await db.commit()
+        return folders
     rows = {d.path: d for d in await db.scalars(select(Document))}
     disk_paths = {f.path for f in on_disk}
     gone = {p: d for p, d in rows.items() if p not in disk_paths}
@@ -234,6 +260,24 @@ async def reconcile(db: AsyncSession) -> list[str]:
     if changed or db.dirty:
         await db.commit()
     return folders
+
+
+async def _differs(db: AsyncSession, on_disk: list[FileInfo]) -> bool:
+    """Whether the folder differs from the index: a file new, gone, or with another size
+    or time than its row. Reads only those three columns."""
+    stats = {
+        path: (size, mtime)
+        for path, size, mtime in await db.execute(
+            select(Document.path, Document.size, Document.mtime)
+        )
+    }
+    if len(stats) != len(on_disk):
+        return True
+    for info in on_disk:
+        known = stats.get(info.path)
+        if known is None or known[0] != info.size or abs(known[1] - info.mtime) >= 1e-6:
+            return True
+    return False
 
 
 async def _apply(

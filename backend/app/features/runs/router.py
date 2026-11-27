@@ -45,6 +45,8 @@ class RunTotals(BaseModel):
     tool_calls: int = 0
     active_s: float = 0.0  # time spent working (not paused or waiting)
     compactions: int = 0
+    # The first model request's size, estimated (agent runs); None before it was sent.
+    first_request_tokens: int | None = None
 
 
 class RunOut(BaseModel):
@@ -99,6 +101,7 @@ def totals_out(r: Run) -> RunTotals:
         tool_calls=t.get("tool_calls") or 0,
         active_s=t.get("active_s") or 0.0,
         compactions=t.get("compactions") or 0,
+        first_request_tokens=t.get("first_request_tokens"),
     )
 
 

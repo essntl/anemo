@@ -141,6 +141,8 @@ const messages: Messages = {
   "Cost": "Вартість",
   "Context": "Контекст",
   "Summarized {n}×": "Стиснуто {n}×",
+  "First request": "Перший запит",
+  "about {n} tokens": "близько {n} токенів",
   "Full history": "Повна історія",
   "{n} action | {n} actions": "{n} дія | {n} дії | {n} дій",
   "{n} step | {n} steps": "{n} крок | {n} кроки | {n} кроків",

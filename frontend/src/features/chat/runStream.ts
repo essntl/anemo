@@ -10,6 +10,7 @@ import { useEffect, useReducer, useRef } from 'react'
 import { t } from '@/lib/i18n'
 import type { QuestionMark } from './api'
 import type { Waiting } from './timing'
+import { formatCount } from '@/lib/format'
 
 export const TERMINAL = ['completed', 'failed', 'cancelled']
 
@@ -71,6 +72,15 @@ export function runReducer(state: RunView, event: RunEvent | { type: 'reset' }):
       return { ...state, pauseRequested: true }
     case 'run.pause_cancelled':
       return { ...state, pauseRequested: false }
+    case 'request.large':
+      return {
+        ...state,
+        notice: t('A large request: about {tokens} tokens (tools {tools}, earlier messages {messages})', {
+          tokens: formatCount(Number(data.tokens) || 0),
+          tools: formatCount(Number(data.tools) || 0),
+          messages: formatCount(Number(data.messages) || 0),
+        }),
+      }
     case 'context.compacted':
       return { ...state, notice: t('Older steps were summarized to keep the context small') }
     case 'message.delta':
@@ -118,6 +128,7 @@ const EVENT_TYPES = [
   'run.pause_requested',
   'run.pause_cancelled',
   'context.compacted',
+  'request.large', // the first request was large: what made it so
   'memory.saved', // a memory tool saved something (shown as a notice with Undo)
 ]
 

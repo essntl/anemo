@@ -474,6 +474,9 @@ export function RunPanel({ runId }: { runId: string }) {
             <dt className="text-muted">{t('Working time')}</dt><dd className="text-right tabular-nums">{formatDuration(run.totals.active_s)}</dd>
             <dt className="text-muted">{t('Tokens')}</dt><dd className="text-right tabular-nums">{t('{input} in · {output} out', { input: formatCount(run.totals.input_tokens), output: formatCount(run.totals.output_tokens) })}</dd>
             <dt className="text-muted">{t('Cost')}</dt><dd className="text-right tabular-nums">{formatCost(run.totals.cost_usd)}</dd>
+            {run.totals.first_request_tokens != null && (
+              <><dt className="text-muted">{t('First request')}</dt><dd className="text-right tabular-nums">{t('about {n} tokens', { n: formatCount(run.totals.first_request_tokens) })}</dd></>
+            )}
             <dt className="text-muted">{t('Context')}</dt><dd className="text-right">{run.totals.compactions ? t('Summarized {n}×', { n: run.totals.compactions }) : t('Full history')}</dd>
           </dl>
         </div>

@@ -6,6 +6,7 @@ claims what it does in the database.
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 
 log = logging.getLogger("worker.scheduler")
 
@@ -53,15 +54,58 @@ def periodic_tasks() -> list[tuple[str, Callable[[], Awaitable[object]]]]:
     ]
 
 
-async def run(stop: asyncio.Event) -> None:
+async def run(stop: asyncio.Event, wake: asyncio.Event | None = None) -> None:
+    """Every task each TICK_S. In between, automations start when they come due (not
+    on the next tick: that made a scheduled run up to 30 s late), and `wake` (set when an
+    automation's run time changed, jobs/queue.wake_scheduler) has it look again."""
+    from app.features.automations import service as automations
+
     tasks = periodic_tasks()
+    wake = wake or asyncio.Event()
+    loop = asyncio.get_running_loop()
+    next_tick = loop.time()
     while not stop.is_set():
-        for name, task in tasks:
-            try:
-                await task()
-            except Exception:  # noqa: BLE001 - one failing task must not stop the others
-                log.warning("periodic task failed", extra={"ctx": {"task": name}}, exc_info=True)
+        wake.clear()
+        if loop.time() >= next_tick:
+            next_tick = loop.time() + TICK_S
+            await _run_tasks(tasks)
+        else:
+            await _run_tasks([("automations", automations.fire_due)])
+        wait = next_tick - loop.time()
         try:
-            await asyncio.wait_for(stop.wait(), timeout=TICK_S)
-        except TimeoutError:
-            pass
+            due = await _next_automation()
+        except Exception:  # noqa: BLE001 - the tick still comes
+            log.warning("next automation time not read", exc_info=True)
+            due = None
+        if due is not None:
+            in_s = (due - datetime.now(UTC)).total_seconds()
+            # Already due but not started (paused, or another worker has it): the tick.
+            if in_s > 0:
+                wait = min(wait, in_s)
+        await _wait(stop, wake, max(0.0, wait))
+
+
+async def _run_tasks(tasks: list[tuple[str, Callable[[], Awaitable[object]]]]) -> None:
+    for name, task in tasks:
+        try:
+            await task()
+        except Exception:  # noqa: BLE001 - one failing task must not stop the others
+            log.warning("periodic task failed", extra={"ctx": {"task": name}}, exc_info=True)
+
+
+async def _next_automation() -> datetime | None:
+    from app.core.db import get_sessionmaker
+    from app.features.automations import service as automations
+
+    async with get_sessionmaker()() as db:
+        return await automations.next_due(db)
+
+
+async def _wait(stop: asyncio.Event, wake: asyncio.Event, seconds: float) -> None:
+    """Until `seconds` pass, or `stop` or `wake` is set."""
+    waiters = [asyncio.ensure_future(stop.wait()), asyncio.ensure_future(wake.wait())]
+    try:
+        await asyncio.wait(waiters, timeout=seconds, return_when=asyncio.FIRST_COMPLETED)
+    finally:
+        for w in waiters:
+            w.cancel()

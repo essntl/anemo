@@ -183,6 +183,7 @@ const messages: Messages = {
   "skills": "навички",
   "<1m": "<1 хв",
   "{n}m": "{n} хв",
+  "A large request: about {tokens} tokens (tools {tools}, earlier messages {messages})": "Великий запит: близько {tokens} токенів (інструменти {tools}, попередні повідомлення {messages})",
   "Older steps were summarized to keep the context small": "Давніші кроки стиснуто до підсумку, щоб зменшити контекст",
   "{from} was unavailable{reason}, switched to {to}": "{from}: недоступно{reason}, перемкнено на {to}",
   "Resumed after an interruption": "Відновлено після переривання",

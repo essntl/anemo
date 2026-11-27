@@ -358,10 +358,17 @@ def _checks(checks: list[ChangeCheck] | None) -> list[dict[str, Any]] | None:
     return [c.model_dump(mode="json") for c in checks] if checks else None
 
 
-def reschedule(automation: Automation) -> None:
-    """Its next run time, after it was switched on or off or its schedule changed."""
+async def reschedule(db: AsyncSession, automation: Automation) -> None:
+    """Its next run time, after it was switched on or off or its schedule changed. The
+    scheduler hears of it on commit, so a run due soon starts on time. Doesn't commit."""
     schedule = stored(automation.schedule)
     automation.next_run_at = next_run(schedule, _now()) if automation.enabled else None
+    await queue.wake_scheduler(db)
+
+
+async def next_due(db: AsyncSession) -> datetime | None:
+    """When the next automation comes due (the scheduler sleeps until then)."""
+    return await db.scalar(select(func.min(Automation.next_run_at)).where(Automation.enabled))
 
 
 def _time_passed(automation: Automation) -> bool:
@@ -413,7 +420,7 @@ async def create(db: AsyncSession, data: AutomationIn, *, created_by: str = "use
         change_check=_checks(data.change_check),
         run_anyway_hours=data.run_anyway_hours,
     )
-    reschedule(automation)
+    await reschedule(db, automation)
     if _time_passed(automation):
         raise AppError("That time has already passed", code="schedule_in_past")
     db.add(automation)
@@ -492,7 +499,7 @@ async def update(db: AsyncSession, automation: Automation, data: AutomationPatch
         except ValueError as exc:
             raise AppError(TOO_OFTEN, code="schedule_too_often") from exc
     if timing_changed:
-        reschedule(automation)
+        await reschedule(db, automation)
         if _time_passed(automation):
             raise AppError("That time has already passed", code="schedule_in_past")
     await db.flush()
