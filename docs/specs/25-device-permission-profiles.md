@@ -336,3 +336,20 @@ Written by the job that built this spec; each PR group adds its own part.
   - The command is then sent with `approval: {id, scope: "hour"}`, so the device accepts it.
 - Grants are listed in Settings › Devices › Permissions with **Revoke** (`DELETE /api/devices/{id}/grants/{grant_id}`). Revoking only tightens, so it needs no password.
 - The e2e test (`e2e/tests/device-permissions.spec.ts`) uses the fake device of `fakeDevice.ts` (now with `hello.capabilities`). Its analysis is a stand-in for the four cases; the real analyser is covered by the Desktop corpus.
+
+**Group D (relevance check, Recycle Bin, activity log, automations)**
+- *Relevance check:* it runs in `computer_shell.prepare()` once the device allowed a command with a delete, a recursive change, or a write to a folder this run hasn't changed yet.
+  - The model is Settings › Devices › "Model of the relevance check" (`devices.relevance_model_id`). The default is the background model (Settings › Models › Background tasks, usually the cheapest), then the chat model.
+  - It has 4 s and fails open; the log line is "relevance check unavailable".
+  - A "no" asks with its reason. That approval offers only Once, because the device itself allowed the command, so a folder grant would mean nothing.
+  - "The chat hasn't touched yet" is tracked per run, not per chat.
+- *Recycle Bin:* the Remove-Item proxy is a function, so the aliases (`rm`, `del`, `ri`, `erase`, `rd`, `rmdir`) reach it. It moves items with `Microsoft.VisualBasic.FileIO.FileSystem` and `SendToRecycleBin`.
+  - Windows doesn't say what the Recycle Bin of a drive will hold, so "too large" means more than 5% of the drive's size (the default limit is about that). Such an item is refused with an error, never deleted for good.
+  - The `shell` result now carries `recycled` and `work_folder`.
+  - `device_file_put` doesn't delete anything (replacing a file asks as "dangerous", as before), so it has no Recycle Bin step.
+  - "Restore from Recycle Bin" as an Activity action is left for later: Windows has no stable API to restore a single item by path, and the entry says "recycle bin", so it can be restored there.
+- *Activity log:* `features/devices/activity_log.py` writes one entry (`object_type: device`) per shell command, file copy, act, and Claude Code start or cancel, auto-allowed ones included.
+  - A shell entry has the device, the command (2,000 characters), the working folder, the verdict, the rule, the approval or grant, the relevance result, "recycle bin"/"permanent" for deletes, the exit code, and the run.
+  - Entries can't be undone.
+  - The Activity page has the filter "On computers".
+- *Automations:* `refresh()` turns an Unrestricted computer into Scoped categories for an automation run, unless "Unrestricted for automations" is on. `shell.analyze` and `shell` carry `automation: true`, so the device analyses with the same rule. Hour grants and "this exact command" are never loaded for automation runs, and `contacts_people` works as before.

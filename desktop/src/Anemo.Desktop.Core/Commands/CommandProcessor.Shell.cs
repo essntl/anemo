@@ -15,9 +15,10 @@ public sealed partial class CommandProcessor
     /// How PowerShell is started: no profile, never waiting for input, the command passed
     /// encoded (UTF-16LE, base64) so no quoting can change it.
     /// </summary>
-    public static ShellStart ShellStartFor(string program, string command, string workFolder)
+    public static ShellStart ShellStartFor(string program, string command, string workFolder, bool recycle = false)
     {
-        var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(ShellPrelude + command));
+        var prelude = recycle ? ShellPrelude + Core.Permissions.RecyclePrelude.Script : ShellPrelude;
+        var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(prelude + command));
         return new ShellStart(program, ["-NoProfile", "-NonInteractive", "-OutputFormat", "Text", "-EncodedCommand", encoded], workFolder);
     }
 
@@ -26,11 +27,11 @@ public sealed partial class CommandProcessor
     /// <c>-f</c> (no startup files) and bash with <c>--noprofile --norc</c>, the command as one
     /// argument after <c>-c</c>, so nothing needs quoting (docs/specs/09-desktop-macos.md D5).
     /// </summary>
-    public static ShellStart ShellStartFor(ShellProgram shell, string command, string workFolder) => shell.Kind switch
+    public static ShellStart ShellStartFor(ShellProgram shell, string command, string workFolder, bool recycle = false) => shell.Kind switch
     {
         ShellKinds.Zsh => new ShellStart(shell.Path, ["-f", "-c", command], workFolder),
         ShellKinds.Bash => new ShellStart(shell.Path, ["--noprofile", "--norc", "-c", command], workFolder),
-        _ => ShellStartFor(shell.Path, command, workFolder),
+        _ => ShellStartFor(shell.Path, command, workFolder, recycle),
     };
 
     /// <summary>The folder the shell starts in: Settings', else <c>%USERPROFILE%\AnemoWork</c>.</summary>
@@ -45,14 +46,19 @@ public sealed partial class CommandProcessor
             ?? throw CommandException.Unavailable(_options.Platform.NoShellMessage);
         var folder = ShellFolder();
         // The device's own check (spec 25 §6.1): whatever the server decided, the profile here holds.
+        Core.Permissions.ShellAnalysis? analysis = null;
         if (_permissions is not null && ShellKinds.IsPowerShell(program.Kind))
         {
-            await _permissions.CheckShellAsync(args, command, folder, ct);
+            analysis = await _permissions.CheckShellAsync(args, command, folder, ct);
         }
+
         else if (_permissions is not null && _permissions.Profile.Level("shell") == "deny")
         {
             throw CommandException.Refused("The shell isn't allowed on this computer (its permission profile in Anemo).");
         }
+
+        // Deletes to the Recycle Bin when every delete is in a work folder that wants it (§8).
+        var recycle = analysis?.RecycleDeletes == true;
 
         _platform.Shell.EnsureFolder(folder);
 
@@ -65,7 +71,7 @@ public sealed partial class CommandProcessor
         try
         {
             exitCode = await _platform.Shell.RunAsync(
-                ShellStartFor(program, command, folder), stdout.AppendLine, stderr.AppendLine, linked.Token);
+                ShellStartFor(program, command, folder, recycle), stdout.AppendLine, stderr.AppendLine, linked.Token);
         }
         catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !ct.IsCancellationRequested)
         {
@@ -79,6 +85,8 @@ public sealed partial class CommandProcessor
             ["stderr"] = stderr.ToString(),
             ["truncated"] = stdout.Truncated || stderr.Truncated,
             ["duration_ms"] = (long)watch.Elapsed.TotalMilliseconds,
+            ["recycled"] = recycle,
+            ["work_folder"] = folder,
         };
     }
 }

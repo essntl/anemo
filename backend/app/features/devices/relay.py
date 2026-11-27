@@ -128,6 +128,8 @@ class DeviceInfo:
     categories: dict[str, str] | None = None
     # The server's version of that profile, and what the device said in its offer (§9).
     permissions_version: int = 0
+    relevance_check: bool = False  # the profile's relevance check (spec 25 §7)
+    automations_unrestricted: bool = False  # "Unrestricted for automations" (§9)
     capabilities: tuple[str, ...] = ()
     profile_version: int | None = None
     profile_pending: bool = False
@@ -529,6 +531,12 @@ async def list_online() -> list[DeviceInfo]:
                     else None
                 ),
                 permissions_version=device.permissions_version,
+                relevance_check=(
+                    profiles[device.profile_id].relevance_check
+                    if device.profile_id in profiles
+                    else False
+                ),
+                automations_unrestricted=device.automations_unrestricted,
                 capabilities=offer.capabilities if offer else (),
                 profile_version=offer.profile_version if offer else None,
                 profile_pending=offer.profile_pending if offer else False,

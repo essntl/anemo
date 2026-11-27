@@ -27,6 +27,9 @@ export function DeviceApproval({ options }: { options: DeviceOptions }) {
           ))}
         </ul>
       )}
+      {options.relevance && (
+        <div className="text-warning">{t('The relevance check: {why}', { why: options.relevance })}</div>
+      )}
       {options.unknown.length > 0 && (
         <div className="text-muted">{t('It can’t tell: {what}', { what: options.unknown.join('; ') })}</div>
       )}

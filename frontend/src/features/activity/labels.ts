@@ -19,6 +19,7 @@ export const OBJECT_FILTERS: { value: ObjectType | ''; label: string }[] = [
   { value: 'document', label: msg('Documents') },
   { value: 'file', label: msg('Files') },
   { value: 'project', label: msg('Projects') },
+  { value: 'device', label: msg('On computers') },
 ]
 
 export type TimeRange = '' | 'day' | 'week' | 'month'
@@ -55,6 +56,7 @@ const OBJECTS: Record<string, string> = {
   document: msg('document'),
   file: msg('file'),
   project: msg('project'),
+  device: msg('computer'),
 }
 // The fields a change names, as the editors call them.
 const FIELDS: Record<string, string> = {

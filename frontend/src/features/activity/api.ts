@@ -3,7 +3,7 @@ import { api, type Schemas, unwrap } from '@/api/client'
 
 export type ActivityEntry = Schemas['ActivityOut']
 export type ActorKind = 'user' | 'assistant' | 'automation' | 'script' | 'plugin' | 'trigger'
-export type ObjectType = 'task' | 'event' | 'document' | 'file' | 'project'
+export type ObjectType = 'task' | 'event' | 'document' | 'file' | 'project' | 'device'
 
 export const activityKey = ['activity'] as const
 const PAGE = 50

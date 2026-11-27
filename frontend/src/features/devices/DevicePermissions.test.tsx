@@ -21,7 +21,7 @@ const permissions = {
   ],
   automations_unrestricted: false,
   version: 3,
-  grants: [{ id: 'g1', folder: 'C:\Users\a\Pictures', command_hash: null, expires_at: '2030-01-01T10:00:00Z' }],
+  grants: [{ id: 'g1', folder: 'C:\\Users\\a\\Pictures', command_hash: null, expires_at: '2030-01-01T10:00:00Z' }],
 }
 vi.mock('./api', () => ({
   useDevicePermissions: () => ({ data: permissions, isError: false }),
@@ -68,7 +68,7 @@ describe('Settings → Devices → Permissions', () => {
 
   it('revokes a grant for the next hour', async () => {
     render(<DevicePermissionsPanel deviceId="d1" deviceName="Main PC" />)
-    expect(screen.getByText('C:\Users\a\Pictures')).toBeInTheDocument()
+    expect(screen.getByText('C:\\Users\\a\\Pictures')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Revoke' }))
     expect(revoke).toHaveBeenCalledWith('g1', expect.anything())
   })

@@ -251,5 +251,6 @@ const messages: Messages = {
   "runs a program in": "запускає програму в",
   "use the parent folder": "узяти батьківську теку",
   "writes": "записує",
+  "The relevance check: {why}": "Перевірка доречності: {why}",
 }
 export default messages

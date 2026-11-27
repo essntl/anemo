@@ -71,5 +71,7 @@ const messages: Messages = {
   "name": "назва",
   "archived": "в архіві",
   "instructions": "інструкції",
+  "On computers": "На комп’ютерах",
+  "computer": "комп’ютер",
 }
 export default messages
