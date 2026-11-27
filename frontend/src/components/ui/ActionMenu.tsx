@@ -26,7 +26,7 @@ export interface MenuAction {
  * low for it). On phones it is a sheet along the bottom edge instead, like the dialogs:
  * a popup next to a button low in a list had no room and ran off the screen.
  */
-export function ActionMenu({ actions, label = t('More actions'), className, icon, heading }: {
+export function ActionMenu({ actions, label = t('More actions'), className, icon, heading, open: shown, onOpenChange }: {
   actions: MenuAction[]
   label?: string
   className?: string
@@ -34,10 +34,18 @@ export function ActionMenu({ actions, label = t('More actions'), className, icon
   heading?: string
   /** The button's icon (default "⋯"), e.g. a chevron for the menu half of a split button. */
   icon?: ReactNode
+  /** Opened from outside too (a list row's right-click), with `onOpenChange`. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }) {
-  const [open, setOpen] = useState(false)
+  const [own, setOwn] = useState(false)
+  const open = shown ?? own
+  const setOpen = useCallback((next: boolean) => {
+    setOwn(next)
+    onOpenChange?.(next)
+  }, [onOpenChange])
   const desktop = useMediaQuery(DESKTOP)
-  useCloseOnScroll(open && desktop, useCallback(() => setOpen(false), []))
+  useCloseOnScroll(open && desktop, useCallback(() => setOpen(false), [setOpen]))
   const trigger = (
     <button type="button" aria-label={label}
       className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-control text-muted hover:bg-surface-hover hover:text-text', className)}>
