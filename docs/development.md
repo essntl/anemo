@@ -1,8 +1,8 @@
 # Development
 
-How to work on Anemo itself. The conventions for new code, and recipes for a tool, an
-endpoint, a job, a setting or a page, are in [CLAUDE.md](../CLAUDE.md); the design and the
-reasons behind it in [architecture.md](architecture.md).
+How to work on Anemo itself. Where things live, how to run one test, the recipes and the
+gotchas are in [code-map.md](code-map.md); the rules for new code in [CLAUDE.md](../CLAUDE.md);
+the design and the reasons behind it in [architecture.md](architecture.md).
 
 Requires Docker and Node 22. On Windows, a WSL2 checkout is strongly recommended
 (the Makefile needs `make`, which Git Bash does not include).
