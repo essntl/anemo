@@ -2,9 +2,12 @@
  * The usage indicator (docs/specs/code-sessions.md §14): how much of the Claude
  * subscription's 5-hour and weekly windows a computer's jobs have used, and when each
  * resets, as of the newest `rate_limit_event`. Compact: a thin bar and a percentage per
- * window; the details (every window, "as of") in its title.
+ * window; the details (every window, its reset, when it was measured) in a popup that
+ * opens on hover, on focus and on a tap, and closes with Escape.
  */
+import { type PointerEvent, useId, useState } from 'react'
 import { Gauge } from 'lucide-react'
+import { useShortcut } from '@/hooks/useShortcut'
 import { cn } from '@/lib/cn'
 import { formatAgo, formatDateTime, formatUpcoming } from '@/lib/format'
 import { t } from '@/lib/i18n'
@@ -41,23 +44,65 @@ function Window({ v }: { v: UsageView }) {
   )
 }
 
+/** The popup's line for a window: what is used and when it resets. */
+function Detail({ v }: { v: UsageView }) {
+  const when = v.resetsAt ? formatDateTime(v.resetsAt.toISOString()) : null
+  return (
+    <>
+      <dt className="text-muted">{windowLabel(v.name)}</dt>
+      <dd className="text-right tabular-nums">{v.reset ? t('has reset') : v.used !== null ? percent(v.used) : '–'}</dd>
+      <dd className="col-span-2 -mt-0.5 text-[11.5px] text-subtle">
+        {when ? (v.reset ? t('reset at {when}', { when }) : t('resets {when}', { when })) : t('reset time not known')}
+      </dd>
+    </>
+  )
+}
+
 /** One computer's usage. `name`: say which computer (when several report one). */
 export function UsageMeter({ usage, name, className }: { usage: CodeUsage; name?: boolean; className?: string }) {
+  const [pinned, setPinned] = useState(false)
+  const [hovered, setHovered] = useState(false)
+  const open = pinned || hovered
+  const popupId = useId()
+  useShortcut('app.close', () => {
+    setPinned(false)
+    setHovered(false)
+  }, { enabled: open })
   const { main, other } = usageWindows(usage)
   if (!main.length) return null
-  const asOf = t('as of {when}', { when: formatAgo(usage.observed_at) })
-  const title = [
-    name ? usage.device_name : null,
-    ...[...main, ...other].map(describe),
-    t('Claude subscription usage as of {when}', { when: formatDateTime(usage.observed_at) }),
-  ].filter(Boolean).join('\n')
+  // Hover is for a mouse only: a tap also sends pointer events, and would leave it open.
+  const hover = (on: boolean) => (e: PointerEvent<HTMLElement>) => {
+    if (e.pointerType === 'mouse') setHovered(on)
+  }
   return (
-    <div data-testid="code-usage" title={title}
-      className={cn('flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px]', className)}>
-      <Gauge aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-subtle" />
-      {name && <span className="min-w-0 max-w-[8rem] truncate font-medium text-muted">{usage.device_name}</span>}
-      {main.map((v) => <Window key={v.name} v={v} />)}
-      <span className="shrink-0 text-subtle">{asOf}</span>
+    <div data-testid="code-usage" className={cn('relative min-w-0', className)}
+      onPointerEnter={hover(true)} onPointerLeave={hover(false)}>
+      <button type="button" aria-expanded={open} aria-controls={open ? popupId : undefined}
+        aria-describedby={open ? popupId : undefined}
+        aria-label={[name ? usage.device_name : null, ...main.map(describe)].filter(Boolean).join('; ')}
+        onClick={() => setPinned(!pinned)} onFocus={() => setPinned(true)} onBlur={() => setPinned(false)}
+        className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-md px-1 py-0.5 text-left text-[11.5px] hover:bg-surface-hover">
+        <Gauge aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-subtle" />
+        {name && <span className="min-w-0 max-w-[8rem] truncate font-medium text-muted">{usage.device_name}</span>}
+        {main.map((v) => <Window key={v.name} v={v} />)}
+      </button>
+      {open && (
+        <div id={popupId} role="tooltip"
+          className="absolute left-0 top-full z-20 mt-1 w-64 rounded-lg border border-border bg-surface p-2.5 text-[12px] text-text shadow-float">
+          <p className="mb-1.5 font-medium">
+            {name ? usage.device_name : t('Claude subscription usage')}
+          </p>
+          <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1">
+            {[...main, ...other].map((v) => <Detail key={v.name} v={v} />)}
+          </dl>
+          <p className="mt-2 border-t border-border pt-1.5 text-[11.5px] text-muted">
+            {t('Measured {ago} ({when}), when a job last reported it.', {
+              ago: formatAgo(usage.observed_at),
+              when: formatDateTime(usage.observed_at),
+            })}
+          </p>
+        </div>
+      )}
     </div>
   )
 }
