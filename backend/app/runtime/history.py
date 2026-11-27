@@ -28,15 +28,24 @@ CHARS_PER_TOKEN = 4  # rough estimate; good enough for trimming decisions
 IMAGE_TOKENS = 1_600  # what a ~1568px image costs on current vision models
 
 
-def estimate_tokens(messages: list[Message]) -> int:
+def _cost(message: Message) -> tuple[int, int]:
+    """(characters, images) of one message, the two parts of its token estimate."""
     chars, images = 0, 0
-    for m in messages:
-        for b in m.content:
-            if isinstance(b, ImageBlock) or (isinstance(b, AttachmentRef) and b.kind == "image"):
-                images += 1  # its base64 length says nothing about its token cost
-            else:
-                chars += len(b.model_dump_json())
+    for b in message.content:
+        if isinstance(b, ImageBlock) or (isinstance(b, AttachmentRef) and b.kind == "image"):
+            images += 1  # its base64 length says nothing about its token cost
+        else:
+            chars += len(b.model_dump_json())
+    return chars, images
+
+
+def _tokens(chars: int, images: int) -> int:
     return chars // CHARS_PER_TOKEN + images * IMAGE_TOKENS
+
+
+def estimate_tokens(messages: list[Message]) -> int:
+    costs = [_cost(m) for m in messages]
+    return _tokens(sum(c for c, _ in costs), sum(i for _, i in costs))
 
 
 async def load_history(
@@ -146,10 +155,24 @@ def latest_user_attachment_kinds(history: list[Message]) -> set[str]:
 
 
 def trim_to_budget(history: list[Message], max_tokens: int) -> list[Message]:
-    """Drop the oldest messages until the estimate fits; always start on a user turn."""
-    trimmed = list(history)
-    while len(trimmed) > 1 and estimate_tokens(trimmed) > max_tokens:
-        trimmed.pop(0)
-        while trimmed and trimmed[0].role != "user":
-            trimmed.pop(0)
-    return trimmed
+    """Drop the oldest messages until the estimate fits; always start on a user turn.
+
+    Each message is measured once and the totals updated as messages go: this runs for
+    every request of an agent run, and re-measuring the whole history per dropped
+    message took ~0.6 s for an 800-message chat."""
+    costs = [_cost(m) for m in history]
+    chars = sum(c for c, _ in costs)
+    images = sum(i for _, i in costs)
+    start = 0
+
+    def drop() -> None:
+        nonlocal start, chars, images
+        chars -= costs[start][0]
+        images -= costs[start][1]
+        start += 1
+
+    while len(history) - start > 1 and _tokens(chars, images) > max_tokens:
+        drop()
+        while start < len(history) and history[start].role != "user":
+            drop()
+    return list(history[start:])
