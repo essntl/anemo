@@ -13,6 +13,19 @@ make test           # backend (in container) + frontend checks
 make lint
 make revision m="describe change"   # new Alembic migration
 make gen-api        # regenerate frontend API types after backend changes
+make fmt-changed    # fix and format only the backend .py files changed since origin/main
+```
+
+Only `backend/` is formatted with ruff (its settings are in `backend/pyproject.toml`). The side
+containers' Python (`claude-runner/`, `browser/`, `sandbox/`, `mcp-host/`) is formatted by hand;
+a `ruff.toml` in each keeps ruff from rewriting it when it is run on those folders.
+
+How big a request to the model is, and what it is made of (system prompt, tool specs, earlier
+messages, the new message and its turn context), rebuilt from a run in the database:
+
+```bash
+docker compose exec app python -m app.cli request-size            # the newest chat or agent run
+docker compose exec app python -m app.cli request-size <run id>
 ```
 
 Backend tests run in parallel ([pytest-xdist](https://pytest-xdist.readthedocs.io)):
