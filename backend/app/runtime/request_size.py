@@ -25,6 +25,7 @@ from app.policy.models import Policy
 from app.providers.base import Message, TextBlock
 from app.runtime.agent import run_tools
 from app.runtime.history import CHARS_PER_TOKEN, load_history
+from app.tools.say_once import say_once
 from app.web.settings import WebSettings
 
 
@@ -93,7 +94,11 @@ async def first_request(db: AsyncSession, run_id: uuid.UUID | None = None) -> Re
         skills=[s["slug"] for s in run.policy.get("skills") or []],
         has_chat=True,
     )
-    specs = [t.spec() for t in sorted(tools, key=lambda t: t.name) if not t.hidden]
+    # As the agent sends them (AgentRun._builder): each knowing the others' names, and a
+    # long field description they share said once (tools/say_once.py).
+    offered = sorted((t for t in tools if not t.hidden), key=lambda t: t.name)
+    names = frozenset(t.name for t in offered)
+    specs = say_once([t.spec(names) for t in offered])
 
     history = await load_history(db, run.conversation_id, before_seq=answer.seq)
     earlier, latest = history[:-1], history[-1:]
