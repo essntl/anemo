@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { answerPrompt, confirmWith, fakeModels, login, openMessageBox, pickModel, recordAnimations, removeTrack, signOutAfterEach, startMusic } from './helpers'
+import { answerPrompt, confirmWith, fakeModels, login, openMessageBox, pickModel, recordAnimations, removeTrack, signOutAfterEach, startMusic, useHomeLayout } from './helpers'
 
 /*
  * Phone layout and installable-app checks. Runs in the "mobile" project
@@ -614,6 +614,7 @@ test('the Island sits in the top bar, at the right where that end is free, and p
 
 test('Home on a phone: the saved layout in one column, same order', async ({ page }) => {
   await login(page)
+  await useHomeLayout()
   const before = (await (await page.request.get('/api/settings')).json()).home
   const layout = [
     { id: 'music', w: 2, h: 1, hidden: false, pinned: false, options: {} },

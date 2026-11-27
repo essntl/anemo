@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { fakeModels, login, newChat, send, signOutAfterEach } from './helpers'
+import { fakeModels, login, newAgentChatWithLevels, send, signOutAfterEach } from './helpers'
 
 signOutAfterEach()
 
@@ -15,16 +15,10 @@ test('a batch change of tasks asks once, lists every task, and changes them all'
     expect(r.ok()).toBeTruthy()
     made.push((await r.json()) as Task)
   }
-  // Changing tasks asks first in this test; restore the user's settings after.
-  const previous = ((await (await page.request.get('/api/settings')).json()) as {
-    permissions: { levels?: Record<string, string> }
-  }).permissions
-  const changed = await page.request.put('/api/settings/permissions', {
-    data: { ...previous, levels: { ...previous.levels, 'tasks.write': 'ask' } },
-  })
-  expect(changed.ok()).toBeTruthy()
+  // Changing tasks asks first in this chat (its own agent profile; the settings stay).
+  let profile = ''
   try {
-    await newChat(page, 'Agent', models.agent)
+    profile = await newAgentChatWithLevels(page, models.agent, { 'tasks.write': 'ask' })
     // The fake agent model lists the tasks matching the words, then moves them all in one call.
     await send(page, `postpone my tasks: ${stamp}`)
     await expect(page.getByText('The agent wants to: Change 4 tasks: due → Fri 2030-01-04')).toBeVisible({ timeout: 15_000 })
@@ -40,7 +34,7 @@ test('a batch change of tasks asks once, lists every task, and changes them all'
       expect(now.find((t) => t.id === task.id)?.due_date).toBe('2030-01-04')
     }
   } finally {
-    await page.request.put('/api/settings/permissions', { data: previous })
+    if (profile) await page.request.delete(`/api/profiles/${profile}`)
     for (const task of made) await page.request.delete(`/api/tasks/${task.id}`)
     if (page.url().includes('/c/')) await page.request.delete(page.url().replace(/.*\/c\//, '/api/conversations/'))
   }

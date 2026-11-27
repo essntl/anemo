@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { login, signOutAfterEach } from './helpers'
+import { login, signOutAfterEach, useHomeLayout } from './helpers'
 
 /*
  * Home: rearranging and resizing widgets, by mouse and keyboard; the layout is saved
@@ -21,6 +21,7 @@ const order = (page: Page) => page.locator('[data-widget]').evaluateAll((els) =>
 
 test('rearrange and resize widgets; the layout is saved', async ({ page }) => {
   await login(page)
+  await useHomeLayout()
   const before = (await (await page.request.get('/api/settings')).json()).home
   try {
     await page.request.put('/api/settings/home', { data: { layout: [] } }) // the default layout
@@ -89,6 +90,7 @@ test('rearrange and resize widgets; the layout is saved', async ({ page }) => {
 
 test('Today adds and completes a task for today; Ask Anemo starts a chat', async ({ page }) => {
   await login(page)
+  await useHomeLayout()
   await page.goto('/home')
   const title = `E2E today ${Date.now()}`
   const today = page.locator('[data-widget="today"]')
@@ -130,6 +132,7 @@ test('move, reorder and open tasks on the Home board', async ({ page }) => {
   const tag = `e2eboard${Math.random().toString(36).slice(2, 8)}`
   const [first, second, third] = ['Paint the hall', 'Fix the tap', 'Call the plumber'].map((t) => `E2E ${t} ${tag}`)
   await login(page)
+  await useHomeLayout()
   const before = (await (await page.request.get('/api/settings')).json()).home
   try {
     for (const title of [first, second, third]) {
