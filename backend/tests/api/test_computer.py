@@ -1021,3 +1021,113 @@ def test_the_turn_context_line_names_a_new_profile() -> None:
         "- Main PC: computer, profile Scoped (writes only in work folders), control allowed, "
         "every action is asked, PowerShell on"
     )
+
+
+def _analysis(verdict: str, rule: str, kind: str = "delete", **more: Any) -> dict[str, Any]:
+    return {
+        "verdict": verdict,
+        "rule": rule,
+        "effects": [{"kind": kind, "path": "C:\dev\x", "recursive": False}],
+        "unknown": [],
+        "network": False,
+        **more,
+    }
+
+
+def _scoped_with_analyser(ctx: ToolContext, name: str) -> None:
+    _profile(ctx, name, "scoped")
+    ctx.state["computers"][name.casefold()]["capabilities"] = ["profiles", "shell.analyze"]
+
+
+async def test_on_a_scoped_computer_the_devices_analysis_decides(fake):
+    fake.add("Main PC", "trusted", shell=True)
+    ctx = await _ctx(fake)
+    _scoped_with_analyser(ctx, "Main PC")
+    careful = {"computer.shell": "ask_dangerous"}
+    answers = {"verdict": "allow"}
+
+    def answer(action: str, fields: dict[str, Any]) -> dict[str, Any]:
+        if action == "shell.analyze":
+            return _analysis(answers["verdict"], answers.get("rule", "delete inside work folder C:\dev"))
+        return {"exit_code": 0, "stdout": "", "stderr": "", "duration_ms": 1}
+
+    fake.answer = answer
+    delete = computer.ShellInput(device="Main PC", command="Remove-Item C:\dev\x")
+    await SHELL.prepare(delete, ctx)
+    analyze = [s for s in fake.sent if s[1] == "shell.analyze"]
+    assert analyze == [("Main PC", "shell.analyze", {"command": delete.command}, 3.0)]
+    # The regexes call any Remove-Item dangerous; the device knows it is inside a work folder.
+    assert _decide(SHELL, delete, ctx, careful) == "allow"
+    action = SHELL.actions(delete, ctx)[0]
+    assert action.risk == "moderate" and "work folder C:\dev" in action.summary
+    # The same command is analysed once per step.
+    await SHELL.prepare(delete, ctx)
+    assert len([s for s in fake.sent if s[1] == "shell.analyze"]) == 1
+
+    answers.update(verdict="ask", rule="deletes C:\Users\a\Pictures\x, outside the work folders")
+    pictures = computer.ShellInput(device="Main PC", command="Remove-Item C:\Users\a\Pictures\x")
+    await SHELL.prepare(pictures, ctx)
+    assert _decide(SHELL, pictures, ctx, {"computer.shell": "autonomous"}) == "ask"
+    assert "outside the work folders" in (SHELL.actions(pictures, ctx)[0].device_reason or "")
+    # An "allow for this run" doesn't skip the device's question.
+    grant = Grant(capability="computer.shell", resource_prefix=computer._resource(ctx, "Main PC"))
+    assert _decide(SHELL, pictures, ctx, {"computer.shell": "autonomous"}, grants=[grant]) == "ask"
+
+    answers.update(verdict="deny", rule="the protected folder C:\Users\a\.ssh: refused")
+    ssh = computer.ShellInput(device="Main PC", command="Remove-Item C:\Users\a\.ssh\id_rsa")
+    await SHELL.prepare(ssh, ctx)
+    assert _decide(SHELL, ssh, ctx, {"computer.shell": "autonomous"}) == "deny"
+
+
+async def test_without_the_devices_analysis_the_old_rules_decide_and_say_so(fake):
+    fake.add("Main PC", "trusted", shell=True)
+    ctx = await _ctx(fake)
+    _profile(ctx, "Main PC", "scoped")  # an Anemo Desktop without shell.analyze
+    delete = computer.ShellInput(device="Main PC", command="Remove-Item C:\dev\x")
+    await SHELL.prepare(delete, ctx)
+    assert fake.sent == []
+    assert _decide(SHELL, delete, ctx, {"computer.shell": "ask_dangerous"}) == "ask"
+    assert "couldn't check" in SHELL.actions(delete, ctx)[0].summary
+    # No answer within 3 s: the same.
+    ctx.state["computers"]["main pc"]["capabilities"] = ["profiles", "shell.analyze"]
+    fake.answer = relay.Unavailable("The device didn't answer in time")
+    other = computer.ShellInput(device="Main PC", command="Remove-Item C:\dev\y")
+    await SHELL.prepare(other, ctx)
+    assert "couldn't check" in SHELL.actions(other, ctx)[0].summary
+    # Trusted (legacy) never asks the device.
+    fake.sent.clear()
+    _profile(ctx, "Main PC", "legacy")
+    await SHELL.prepare(computer.ShellInput(device="Main PC", command="Get-Date"), ctx)
+    assert fake.sent == []
+
+
+async def test_the_shell_carries_the_decision_and_a_stale_device_is_synced(fake, monkeypatch):
+    fake.add("Main PC", "trusted", shell=True)
+    ctx = await _ctx(fake)
+    _scoped_with_analyser(ctx, "Main PC")
+    pushed: list[uuid.UUID] = []
+
+    async def push(device_id: uuid.UUID) -> None:
+        pushed.append(device_id)
+
+    monkeypatch.setattr(computer.profile_sync, "push", push)
+    shells = {"n": 0}
+
+    def answer(action: str, fields: dict[str, Any]) -> dict[str, Any]:
+        if action == "shell.analyze":
+            return _analysis("allow", "delete inside work folder C:\dev")
+        shells["n"] += 1
+        if shells["n"] == 1:
+            raise relay.ProfileStale("This computer's copy of its permissions is older")
+        return {"exit_code": 0, "stdout": "ok", "stderr": "", "duration_ms": 1}
+
+    fake.answer = answer
+    args = computer.ShellInput(device="Main PC", command="Remove-Item C:\dev\x")
+    await SHELL.prepare(args, ctx)
+    result = await SHELL.run(args, ctx)
+    assert not result.is_error, result.content
+    sent = [s for s in fake.sent if s[1] == "shell"]
+    assert len(sent) == 2 and len(pushed) == 1
+    fields = sent[-1][2]
+    assert fields["auto"] == {"rule": "delete inside work folder C:\dev"}
+    assert "approval" not in fields and "profile_version" in fields

@@ -432,6 +432,7 @@ class ScriptRun:
                 "failed",
                 ToolResult(content=f"Invalid arguments for {name}: {problems}", is_error=True),
             )
+        await tool.prepare(args, self.ctx)
         verdict = tool_calls.decide(
             tool,
             args,

@@ -558,3 +558,66 @@ async def test_a_malformed_cursor_counts_as_none(authed):
         ws, welcome = await welcomed(phone["token"], kind="phone", last_id=bad)
         assert welcome["missed"] is False and welcome["cursor"] == (head or "0-0")
         await ws.disconnect()
+
+
+# -- permission profiles (docs/specs/25-device-permission-profiles.md, Desktop 1.10.0) ----------
+
+
+async def test_a_desktop_with_profiles_gets_its_copy_and_reports_its_version(authed):
+    vm = await add(authed, "VM", trust="trusted")
+    device_id = uuid.UUID(vm["id"])
+    ws = WsClient(PATH, {})
+    await ws.connect()
+    await ws.send(
+        {
+            "type": "hello",
+            "token": vm["token"],
+            "kind": "computer",
+            "version": "1.10.0",
+            "last_id": None,
+            "capabilities": ["profiles", "shell.analyze", "something-new"],
+        }
+    )
+    assert (await ws.json())["type"] == "welcome"
+    command = await _answer_next(ws, ok=True, state={"applied": True, "version": 1})
+    assert command["action"] == "profile.sync"
+    sent = command["profile"]
+    assert sent["version"] == 1 and sent["profile"]["name"] == "Trusted (legacy)"
+    assert set(sent["categories"].values()) == {"policy"}
+    await ws.send({"type": "device.offer", "control": True, "shell": True, "profile_version": 1})
+    await roundtrip(ws)
+    offer = await relay.online(device_id)
+    assert offer is not None and offer.capabilities == ("profiles", "shell.analyze")
+    assert offer.profile_version == 1 and offer.profile_pending is False
+
+    # A change in Anemo reaches the device at once.
+    r = await authed.put(
+        f"/api/devices/{vm['id']}/permissions", json={"automations_unrestricted": True}
+    )
+    assert r.status_code == 200 and r.json()["analyser"] is True
+    command = await _answer_next(ws, ok=True, state={"applied": False, "pending": True})
+    assert command["action"] == "profile.sync" and command["profile"]["version"] == 2
+    assert command["profile"]["automations_unrestricted"] is True
+    # The device holds it for its user's click: the page says so.
+    await ws.send(
+        {
+            "type": "device.offer",
+            "control": True,
+            "shell": True,
+            "profile_version": 1,
+            "profile_pending": True,
+        }
+    )
+    await roundtrip(ws)
+    body = (await authed.get(f"/api/devices/{vm['id']}/permissions")).json()
+    assert body["device_version"] == 1 and body["waiting_for_confirmation"] is True
+    await ws.disconnect()
+
+
+async def test_an_older_desktop_gets_no_profile(authed):
+    vm = await add(authed, "VM", trust="trusted")
+    ws, _ = await welcomed(vm["token"])
+    await _offer(ws, shell=True)  # no command came first: the next message is the pong
+    offer = await relay.online(uuid.UUID(vm["id"]))
+    assert offer is not None and offer.capabilities == () and offer.profile_version is None
+    await ws.disconnect()

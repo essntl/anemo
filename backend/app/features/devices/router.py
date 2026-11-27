@@ -239,6 +239,12 @@ class DevicePermissionsOut(BaseModel):
     automations_unrestricted: bool
     version: int
     grants: list[DeviceGrantOut] = Field(default_factory=list)
+    # What the device said in its last offer (Anemo Desktop 1.10.0, spec 25 §10): the version
+    # it enforces (None: offline or an older client), and whether a loosening waits for a
+    # click there ("Confirm loosened permissions on this computer").
+    device_version: int | None = None
+    waiting_for_confirmation: bool = False
+    analyser: bool = False  # it checks PowerShell commands itself (shell.analyze)
 
 
 class DevicePermissionsIn(BaseModel):
@@ -251,7 +257,15 @@ class DevicePermissionsIn(BaseModel):
 async def _permissions_out(db: Db, device: Device) -> DevicePermissionsOut:
     profile = await profiles.get_profile(db, device.profile_id)
     levels = perms.protected_levels(device.protected_overrides)
+    offer = await relay.online(device.id)
     return DevicePermissionsOut(
+        device_version=offer.profile_version if offer else None,
+        waiting_for_confirmation=bool(
+            offer
+            and offer.profile_pending
+            and (offer.profile_version or 0) < device.permissions_version
+        ),
+        analyser=bool(offer and "shell.analyze" in offer.capabilities),
         device_id=device.id,
         profile=_profile_out(profile, await profiles.devices_using(db, profile.id)),
         work_folders=[perms.WorkFolder.model_validate(f) for f in device.work_folders or []],

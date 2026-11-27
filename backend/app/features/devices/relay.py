@@ -97,6 +97,12 @@ class Offer:
     # The jobs it starts take messages while they run (code-sessions.md §15, Anemo Desktop
     # 1.9.0): `code_start` takes `input`, and `code_input`, `code_input_withdraw` are there.
     code_input: bool = False
+    # Permission profiles (docs/specs/25-device-permission-profiles.md, Anemo Desktop 1.10.0):
+    # what `hello.capabilities` named ("profiles", "shell.analyze"), the version of the profile
+    # the device enforces and whether a loosening waits for a click there. Older clients: none.
+    capabilities: tuple[str, ...] = ()
+    profile_version: int | None = None
+    profile_pending: bool = False
     # From `hello` (older clients: Windows) and the offer (older clients: Windows PowerShell).
     platform: Platform = DEFAULT_PLATFORM
     shell_kind: ShellKind = DEFAULT_SHELL_KIND
@@ -120,6 +126,11 @@ class DeviceInfo:
     profile_name: str | None = None
     preset: str | None = None
     categories: dict[str, str] | None = None
+    # The server's version of that profile, and what the device said in its offer (§9).
+    permissions_version: int = 0
+    capabilities: tuple[str, ...] = ()
+    profile_version: int | None = None
+    profile_pending: bool = False
 
 
 class Unavailable(Exception):
@@ -141,6 +152,12 @@ class Refused(Exception):
 
 class ActionFailed(Exception):
     """The client tried and said why it couldn't (e.g. the control is gone)."""
+
+
+class ProfileStale(Refused):
+    """The device refused a `shell` decided with a newer permission profile than its copy
+    (`profile_stale`, Anemo Desktop 1.10.0): send it the profile and try once more. A Refused,
+    so callers that don't tell the two apart needn't."""
 
 
 class Unauthenticated(ActionFailed):
@@ -254,7 +271,37 @@ def _fresh_offer(entry: dict[str, str]) -> Offer | None:
         # A hash an older server wrote has neither field: Windows PowerShell, as it was.
         platform=platform_of(entry.get("platform")),
         shell_kind=shell_kind_of(entry.get("shell_kind")),
+        capabilities=tuple(c for c in (entry.get("caps") or "").split(",") if c),
+        profile_version=_int_or_none(entry.get("profile_version")),
+        profile_pending=entry.get("profile_pending") == "1",
     )
+
+
+def _int_or_none(value: str | None) -> int | None:
+    try:
+        return int(value) if value not in (None, "") else None
+    except ValueError:
+        return None
+
+
+# ARGV: conn, then field, value pairs. Sets them if this connection has the device.
+_ANNOTATE = """
+if redis.call('HGET', KEYS[1], 'conn') ~= ARGV[1] then return 0 end
+for i = 2, #ARGV, 2 do redis.call('HSET', KEYS[1], ARGV[i], ARGV[i + 1]) end
+return 1
+"""
+
+
+async def annotate(device_id: uuid.UUID, conn: str, **fields: str) -> None:
+    """Keep more about the connection in its online hash (the capabilities from `hello`,
+    the profile version of the last offer). Best effort: Valkey down means none."""
+    args: list[str | int | float] = [conn]
+    for key, value in fields.items():
+        args += [key, value]
+    try:
+        await _script(_ANNOTATE, device_id, *args)
+    except (RedisError, OSError):
+        log.warning("device state not recorded", extra={"ctx": {"device_id": str(device_id)}})
 
 
 # -- the connection's side (features/devices/ws.py) ---------------------------------------
@@ -481,6 +528,10 @@ async def list_online() -> list[DeviceInfo]:
                     if device.profile_id in profiles
                     else None
                 ),
+                permissions_version=device.permissions_version,
+                capabilities=offer.capabilities if offer else (),
+                profile_version=offer.profile_version if offer else None,
+                profile_pending=offer.profile_pending if offer else False,
             )
         )
     return found
@@ -493,6 +544,8 @@ def _raise_for(data: dict[str, Any]) -> None:
         raise Stopped(error)
     if code == "refused":
         raise Refused(error)
+    if code == "profile_stale":
+        raise ProfileStale(error)
     if code == "unavailable":
         raise Unavailable(error)
     if code == "not_found":

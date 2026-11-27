@@ -132,6 +132,12 @@ class Tool(ABC):
         """What this call would do. Override to add resources and risk."""
         return [Action(capability=self.capability, summary=self.name)]
 
+    async def prepare(self, args: Any, ctx: ToolContext) -> None:
+        """Called just before the permission decision, to fetch what the synchronous
+        `actions()` needs from outside (computer_shell asks the device to analyse its
+        command, spec 25 §6.1). Nothing by default; it must never raise."""
+        return None
+
     @abstractmethod
     async def run(self, args: Any, ctx: ToolContext) -> ToolResult: ...
 
