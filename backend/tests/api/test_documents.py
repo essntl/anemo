@@ -1,7 +1,9 @@
 """Documents: Markdown files with an index, revisions, conflict detection and agent tools."""
 
 import errno
+import os
 import uuid
+from contextlib import contextmanager
 from datetime import timedelta
 
 import pytest
@@ -23,6 +25,7 @@ from tests.api.test_agent import (
 )
 from tests.api.test_shell import new_chat
 from tests.conftest import requires_db
+from tests.querycount import count_statements
 
 pytestmark = requires_db
 
@@ -169,6 +172,24 @@ async def test_index_follows_the_folder(authed, docs):
     assert [d["title"] for d in (await listing(authed))["documents"]] == ["Alpha v2"]
 
 
+async def test_an_unchanged_folder_loads_no_document_rows(authed, docs):
+    for i in range(3):
+        (docs / f"n{i}.md").write_text(f"# Note {i}")
+    assert len((await listing(authed))["documents"]) == 3  # indexed now
+    async with get_sessionmaker()() as db:
+        with count_statements() as sql:
+            await service.reconcile(db)
+    # Only the paths, sizes and times are compared; no full rows (that took ~0.7 s of
+    # every document list with 6,000 documents).
+    full = [s for s in sql.matching("FROM documents") if "documents.title" in s]
+    assert full == [] or all("WHERE" in s for s in full)
+    assert any("documents.mtime" in s for s in sql.matching("FROM documents"))
+    # A change is still found.
+    (docs / "n1.md").write_text("# Note one, edited")
+    titles = {d["title"] for d in (await listing(authed))["documents"]}
+    assert "Note one, edited" in titles
+
+
 async def test_a_file_moving_during_the_listing_is_not_forgotten(authed, docs, monkeypatch):
     (docs / "a.md").write_text("# Alpha")
     (docs / "b.md").write_text("# Beta")
@@ -176,15 +197,26 @@ async def test_a_file_moving_during_the_listing_is_not_forgotten(authed, docs, m
 
     # a.md vanishes between listing the folder and looking at the file (being moved):
     # the scan leaves it out and says it is not complete...
-    path_type = type(docs)
-    real_stat = path_type.stat
+    real_scandir = os.scandir
 
-    def stat(path, *args, **kwargs):
-        if path.name == "a.md":
-            raise FileNotFoundError(errno.ENOENT, "No such file or directory", str(path))
-        return real_stat(path, *args, **kwargs)
+    class Vanished:
+        """A listed entry whose file is gone by the time it is looked at."""
 
-    monkeypatch.setattr(path_type, "stat", stat)
+        def __init__(self, entry):
+            self._entry = entry
+
+        def __getattr__(self, name):
+            return getattr(self._entry, name)
+
+        def stat(self, *args, **kwargs):
+            raise FileNotFoundError(errno.ENOENT, "No such file or directory", self.path)
+
+    @contextmanager
+    def scandir(path):
+        with real_scandir(path) as listing:
+            yield [Vanished(e) if e.name == "a.md" else e for e in listing]
+
+    monkeypatch.setattr(service.os, "scandir", scandir)
     found, _, complete = service._scan()
     assert [f.path for f in found] == ["documents/b.md"] and not complete
     # ...and the listing works, without forgetting the document (or its history).
