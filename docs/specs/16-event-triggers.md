@@ -28,6 +28,7 @@ firing starts a run of it, with every rail spec 02 gives automation runs) or to 
 | Recent password | `require_recent_auth` (rotating a webhook secret) |
 | A sync read in `actions()` | `core.db.read_sync` (the trigger tools' approval text) |
 | Pause all | `AutomationSettings.paused` |
+| Telling the user | `notifications.create` (a chat out of wake-ups) |
 
 ## 3. Events
 
@@ -127,9 +128,10 @@ marks them dispatched, and for each enabled trigger of the type:
 6. **No overlapping runs**: while the automation's run works (or the chat answers), the
    firing waits (`pending_since`, the newest event, the count) and goes out once it
    ends, as one firing however many events came in.
-7. **Limits**: the trigger's `max_per_hour` (default 12, at most 120) and the global
-   ceiling `AutomationSettings.max_trigger_firings_per_hour` (default 60). A firing over
-   either is dropped; the trigger counts it and keeps the reason.
+7. **Limits**: the trigger's `max_per_hour` (default 12, at most 120), the global
+   ceiling `AutomationSettings.max_trigger_firings_per_hour` (default 60) and, for a
+   wake-me, the chat's budget of wake-ups (§4.4). A firing over any is dropped; the
+   trigger counts it and keeps the reason.
 8. **Pause all**: events taken while paused are dropped (as schedules skip what came due
    while paused: no catch-up storm afterwards).
 
@@ -154,7 +156,13 @@ with `options["event"]`. `runtime/history.py` renders the block as text that say
 system added it ("This message is not from the user…"), the trigger's note and the
 payload each in an untrusted-data block. Providers never see the block (it is resolved
 like a page or an attachment), so no provider changed. `MessageOut.event` tells the app
-to show an event card. The chat's answers to it are left out of memory extraction (as
+to show an event card. The turn may set the chat's **next** wake-me (§5, "Who may set
+triggers"), so a chat can follow a piece of work up by itself: a Claude Code job ends and
+wakes the chat, the agent reads `code_status` (which shows an ended job's session id),
+resumes it with `code_start(resume_session=…)`, waits for the new job and ends its turn.
+Nothing in that loop asks the user at the default permissions (`code.run` and a one-shot
+`triggers.wake` go ahead); a stricter level or device profile asks as in any turn, and
+the chain waits for the answer. The chat's answers to it are left out of memory extraction (as
 answers to an attached page are), and compaction names it as an event. The run's
 `request` is the fixed text `(event) <type>`, never the event's summary: the summary
 quotes titles, paths and URIs from outside or from a model, and the request reaches the
@@ -174,14 +182,24 @@ gives M a place to add its own types without touching automations.
   triggers; one whose actor is `chat:<id>` never wakes that chat. Approvals and
   automation failures are emitted as the run's own actor, so a run never wakes itself
   through them either.
-- **Depth**: the worker runs each run inside `caused_at_depth(d)`, where `d` is one more
-  than the depth of the event that started it (or its top run's, for a sub-agent); every
-  event it causes carries that depth. Events at depth 3 or more fire nothing (counted on
-  the trigger as dropped, "too deep"). With the per-trigger and global limits, that caps
-  any chain.
-- Runs started by a trigger (and by a schedule) are not offered `create_trigger`,
-  `update_trigger`, `delete_trigger`, `create_schedule`, `update_schedule` or
-  `delete_schedule` (`registry.toolset_for(event_started=…)`).
+- **Depth** (automations): the worker runs each run inside `caused_at_depth(d)`, where
+  `d` is one more than the depth of the event that started it (or its top run's, for a
+  sub-agent); every event it causes in the worker carries that depth. Events at depth 3
+  or more start no automation (counted on the trigger as dropped, "too deep"). With the
+  per-trigger and global limits, that caps a chain of automations. What a computer
+  reports later is not caused by the worker: a `code_job.ended` the device sends has
+  depth 0, whoever started the job (§10).
+- **A wake-me has no depth cap**: it is there to be set again and again. Its chains end
+  at the chat's **budget**: events wake one conversation at most
+  `AutomationSettings.max_wakes_per_chat_per_day` times (default 25) in any 24 hours,
+  besides the trigger's own hourly limit. The count is of the chat's event runs, so
+  deleting or replacing triggers doesn't reset it. Over it, nothing fires, the drop is
+  counted on the trigger, and the user gets a notification that links to the chat (once a
+  day per trigger, again if the trigger fired in between). The trigger stays on; the
+  dropped event is not kept for later.
+- Runs started by a trigger (and by a schedule) are not offered `create_schedule`,
+  `update_schedule` or `delete_schedule` (`registry.toolset_for(event_started=…)`). For
+  the trigger tools see §5.
 
 ## 5. Tools (`tools/builtin/triggers.py`, `schedules.py`)
 
@@ -193,6 +211,20 @@ gives M a place to add its own types without touching automations.
 | `delete_trigger` | remove one | this chat's: safe; an automation's: moderate |
 | `create_schedule` / `update_schedule` | a `triggers` list (the same fields); a schedule with only triggers gets `{"kind": "manual"}`; `update_schedule`'s list replaces the automation's event triggers (a webhook stays) | as before: always asks, the triggers are in the approval text |
 | `list_schedules` | each automation's triggers | |
+
+**Who may set triggers** (`trigger_access` in `tools/builtin/triggers.py`: the registry
+offers the tools by it, and the tools check it themselves, in `actions()`, so that
+nobody is asked to approve what would be refused, and in `run()`):
+
+| run | `create_trigger`, `update_trigger`, `delete_trigger` |
+| --- | --- |
+| a chat turn the user started (and its sub-agents) | as the permissions say |
+| the chat turn an event started | only this chat's own wake-me triggers (`target: this_chat`; no webhook, as always); `target: automation` and any change to an automation's trigger are refused, whatever the permissions say |
+| a sub-agent of such a turn | not offered, refused |
+| an automation's run (scheduled or event) and its sub-agents | not offered, refused |
+
+Permissions are those of any turn: a one-shot wake-me on an internal event for at most
+24 hours is safe and goes ahead at "Ask for dangerous actions".
 
 Why this shape: wake-me is the common case in a chat and needs no automation, so it is
 `create_trigger` with `target: "this_chat"`, cheap to approve. A new automation that runs
@@ -293,6 +325,13 @@ webhook_url, has_secret, created_at`. Every change is in the audit log.
 - Contact and outward tools still ask in event-started automation runs (the automation's
   `contacts_allowed` rule is unchanged); a wake-me turn is a normal chat run, with the
   chat's permissions.
+- A woken turn can set the next wake-me, so text in an event's data that talks the agent
+  into it can keep a chat going. What bounds this: the data is marked as untrusted; the
+  turn can reach only its own chat's wake-me triggers, never schedules, automations or
+  webhooks; a chat is woken at most 25 times in 24 hours (and the user is told when that
+  stops it), each trigger expires within 30 days, and **Stop waiting** and **Pause all**
+  end it. The budget limits the pace, not the length: a chat that keeps setting new
+  triggers can go on for days at up to 25 turns a day, each paid for like any turn.
 - Creating an automation trigger or a webhook, or changing what or when one fires, asks
   every time whatever the level (`always_ask`).
 - Webhook: §6. `/api/hooks/*` is the only path that has to be reachable from outside
@@ -307,6 +346,14 @@ webhook_url, has_secret, created_at`. Every change is in the audit log.
   workstream's to change (CONTRACTS-round4 §9), and nothing here rules it out: a
   plugin's automation is an ordinary automation, so its triggers would be ordinary rows
   with every rail above. A line is in the roadmap's *Plugins, after version 1*.
+- A chain of **automations** that goes through Claude Code jobs is not capped by depth:
+  the job's end is reported by the computer, with depth 0 and not as the automation's
+  actor. The hourly limits (per trigger and for all) are what limit it. Capping it would
+  need the depth kept on the job (from the run that started it).
+- A job that ends between `code_start` and the `create_trigger` that waits for it is not
+  seen (an event nobody waits for is not stored).
+- The wake-up budget has no control in the app yet: it is changed through
+  `PUT /api/settings/automations`, like the hourly ceiling.
 - **Scripts** can have triggers (the rows and the dispatcher don't care), but the Scripts
   tab has no trigger list yet; they are added through the API or `create_trigger`.
 - A device whose connection only timed out sends no `device.offline`.
@@ -317,6 +364,11 @@ webhook_url, has_secret, created_at`. Every change is in the audit log.
 
 ## 11. Tests
 
+- `tests/api/test_trigger_rewake.py`: a chain of wake-ups past the depth cap, automations
+  still capped by the same event, what a woken turn and its sub-agent may do, the tools'
+  own refusal, approvals as in any turn, the 26th wake-up of a day dropped and announced
+  once, the rolling window, the setting. `tests/api/test_code_control.py`: the whole
+  loop with a computer (job ends, the chat reads it, resumes it, waits again).
 - `tests/unit/test_trigger_matching.py`: the catalogue, filters (validation, any-of,
   case, tags), loop protection and depth, the rate-limit window, cutting data, the HMAC,
   the untrusted rendering.
