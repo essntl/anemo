@@ -54,8 +54,11 @@ test('sketches: draw, autosave with an image, embed in a document', async ({ pag
       expect(doc.sketch.preview_current).toBe(true)
     }).toPass()
 
-    // Listed with the documents, as a drawing.
+    // Listed with the documents, as a drawing. Found by its title, as a person would in a
+    // long list (only the rows in sight are in the page, and other tests add documents).
+    await page.getByRole('textbox', { name: 'Find by title' }).fill(title)
     await expect(page.getByRole('link', { name: new RegExp(title) })).toContainText('Drawing sheet')
+    await page.getByRole('textbox', { name: 'Find by title' }).fill('')
 
     // Embedded in a text document: its image shows, and the file has the sketch's address.
     await page.getByRole('button', { name: 'New', exact: true }).click()

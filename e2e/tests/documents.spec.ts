@@ -69,6 +69,8 @@ test('documents: write, autosave, outside changes, history and delete', async ({
     await page.getByRole('button', { name: 'Delete' }).click()
     await confirmWith(page, 'Delete')
     await page.waitForURL(/\/documents$/)
+    // Looked up by its title, as a person would in a long list (only the rows in sight are in the page).
+    await page.getByRole('textbox', { name: 'Find by title' }).fill(title)
     await expect(page.getByRole('link', { name: title })).toHaveCount(0)
   } finally {
     if (id) await page.request.delete(`/api/documents/${id}`).catch(() => undefined)
