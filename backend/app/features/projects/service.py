@@ -224,6 +224,7 @@ PROMPT_SECTION = """
 This chat belongs to the user's project "{name}". Its files are in the workspace folder
 `{files}/` and its documents in `{documents}/`: prefer those folders for what you read
 and create here. New tasks and calendar events from this chat are filed under this project.
+Throwaway files for this project go in `scratch/{files_slug}/`.
 """
 
 PROMPT_INSTRUCTIONS = """
@@ -238,7 +239,10 @@ def prompt_section(project: Project | None) -> str:
     if project is None:
         return ""
     section = PROMPT_SECTION.format(
-        name=project.name, files=files_path(project), documents=documents_path(project)
+        name=project.name,
+        files=files_path(project),
+        documents=documents_path(project),
+        files_slug=project.slug,
     )
     if project.instructions.strip():
         section += PROMPT_INSTRUCTIONS.format(instructions=project.instructions.strip())

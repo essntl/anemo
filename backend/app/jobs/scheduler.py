@@ -24,6 +24,7 @@ def periodic_tasks() -> list[tuple[str, Callable[[], Awaitable[object]]]]:
     from app.features.conversations import recall as chat_recall
     from app.features.conversations import service as conversations
     from app.features.documents import properties as documents
+    from app.features.files import scratch_clean
     from app.features.notifications import service as notifications
     from app.features.runs import service as runs
     from app.features.triggers import dispatch as triggers
@@ -49,6 +50,7 @@ def periodic_tasks() -> list[tuple[str, Callable[[], Awaitable[object]]]]:
         ("code.continue", code_continue.due),
         ("updates.check", updates.check_if_due),  # about once a day
         ("activity.prune", activity.prune_if_due),  # entries past 90 days, once an hour
+        ("scratch.clean", scratch_clean.clean_if_due),  # old files in scratch/, once an hour
         # Once per worker start: documents changed while Anemo wasn't running.
         ("documents.reconcile", documents.reconcile_on_start),
     ]

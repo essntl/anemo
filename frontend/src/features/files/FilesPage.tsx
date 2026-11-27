@@ -115,6 +115,9 @@ function useMoveToProject(onShowFolder: (path: string) => void) {
   return { run, error: move.error }
 }
 
+/** The workspace folder for agents' throwaway files (backend workspace/scratch.py). */
+const SCRATCH_DIR = 'scratch'
+
 function Row({ entry, selected, onOpen, showPath, onShowFolder }: {
   entry: Entry
   selected: boolean
@@ -160,6 +163,9 @@ function Row({ entry, selected, onOpen, showPath, onShowFolder }: {
       {entry.is_dir ? <Folder className="h-4 w-4 shrink-0 fill-accent/20 text-accent" /> : <File className="h-4 w-4 shrink-0 text-muted" />}
       <button type="button" onClick={onOpen} className="min-w-0 flex-1 truncate py-1.5 text-left">
         {showPath ? entry.path : entry.name}
+        {entry.path === SCRATCH_DIR && (
+          <span className="ml-2 rounded bg-surface-2 px-1.5 py-0.5 text-[11px] text-muted" title={t('Agents’ throwaway files; cleaned automatically')}>{t('temporary')}</span>
+        )}
         {error && <span className="ml-2 text-[12px] text-error">{errorMessage(error)}</span>}
       </button>
       <span className="hidden w-20 text-right text-[12px] text-muted sm:block">{entry.is_dir ? '' : formatSize(entry.size, { kbDecimals: 1 })}</span>
@@ -350,7 +356,9 @@ export function FilesPage() {
   const under = (p: string, parent: string) => p === parent || p.startsWith(`${parent}/`)
   const insideProject = projectFolders.some((f) => under(path, f))
   const listed = searching ? (search.data ?? []) : (folder.data?.entries ?? [])
-  const entries = insideProject ? listed : listed.filter((e) => !projectFolders.some((f) => under(e.path, f)))
+  const shown = insideProject ? listed : listed.filter((e) => !projectFolders.some((f) => under(e.path, f)))
+  // scratch/ (agents' throwaway files) goes last, out of the way.
+  const entries = [...shown.filter((e) => e.path !== SCRATCH_DIR), ...shown.filter((e) => e.path === SCRATCH_DIR)]
   const selectedEntry = openFile ? entries.find((e) => e.path === openFile) ?? {
     name: openFile.split('/').pop() ?? openFile, path: openFile, is_dir: false, size: 0, modified: '', mime: null,
   } : null

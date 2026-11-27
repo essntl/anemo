@@ -11,11 +11,20 @@ to ask the user first.
   moderate   changes things in the usual way: builds, installs, writes files, git commit
   dangerous  hard to undo or hides what runs: rm -r, git push --force, git reset --hard,
              dd, curl ... | sh, eval, $(...) as a command name, sudo, ...
+
+Deletes inside the workspace scratch folder (docs/specs/25-device-permission-profiles.md
+§0) are moderate instead: `rm`, `find ... -delete` and `git clean` whose paths are all
+literal and, resolved against the working folder (the call's cwd plus literal `cd X &&`),
+fall inside `scratch/`. The caller passes a `DeleteScope` that knows where scratch is and
+resolves symlinks (this module does no IO). Anything less certain keeps today's rating.
 """
 
+import posixpath
 import re
 import shlex
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Literal
 
 from app.policy.models import Risk
 
@@ -242,13 +251,32 @@ class ShellRisk:
         return "; ".join(self.reasons)
 
 
-def classify(command: str) -> ShellRisk:
+Where = Literal["inside", "root", "outside"]
+
+
+@dataclass(frozen=True)
+class DeleteScope:
+    """Where deletes need no approval: the workspace scratch folder.
+
+    `cwd` is the command's working folder as an absolute path in the sandbox
+    ("/workspace/notes"). `where` gets an absolute path that may still contain `..` and
+    links, resolves it, and says whether it is strictly inside scratch, scratch itself
+    ("root"), or anywhere else. It must answer "outside" whenever it is unsure.
+    """
+
+    cwd: str
+    where: Callable[[str], Where]
+
+
+def classify(command: str, scope: DeleteScope | None = None) -> ShellRisk:
     result = ShellRisk()
-    _classify(command, result, depth=0)
+    _classify(command, result, depth=0, scope=scope)
     return result
 
 
-def _classify(command: str, result: ShellRisk, depth: int) -> None:
+def _classify(
+    command: str, result: ShellRisk, depth: int, scope: DeleteScope | None = None
+) -> None:
     if depth > MAX_DEPTH:
         result.raise_to("dangerous", "too deeply nested to check")
         return
@@ -268,8 +296,52 @@ def _classify(command: str, result: ShellRisk, depth: int) -> None:
     except ValueError:
         result.raise_to("dangerous", "could not be parsed")
         return
-    for segment, piped in _segments(tokens):
-        _classify_segment(segment, piped, result, depth)
+    cwds = _Cwds(scope.cwd) if scope else None
+    for segment, piped, end in _segments(tokens):
+        here = cwds.current if cwds else None
+        _classify_segment(segment, piped, result, depth, scope=scope, cwds=here)
+        if cwds:
+            cwds.after(segment, piped, end)
+
+
+class _Cwds:
+    """The working folders a command may be in, tracked through literal `cd X &&`.
+
+    Always a superset of the real one: `cd X && rm y` runs rm in X only, but after `;`,
+    `||`, `&` or a subshell's `)` the cd may have failed or been undone, so from there on
+    every folder seen so far counts (a delete must be inside scratch for all of them).
+    `None` in the set is a folder we can't know (`cd $X`, `pushd`, `if cd ...`).
+    """
+
+    def __init__(self, cwd: str) -> None:
+        self.current: set[str | None] = {cwd}
+        self.seen: set[str | None] = {cwd}
+
+    def after(self, segment: list[str], piped: bool, end: str | None) -> None:
+        if any(w in ("cd", "pushd", "popd") for w in segment):
+            target = segment[1] if len(segment) == 2 and segment[0] == "cd" else None
+            if target is not None and _literal_path(target) and not piped and end == "&&":
+                self.current = {_join(c, target) for c in self.current}
+            else:
+                self.current = self.current | {None}
+            self.seen |= self.current
+        if end != "&&":
+            self.current = set(self.seen)
+
+
+def _join(cwd: str | None, path: str | None) -> str | None:
+    if cwd is None or path is None:
+        return None
+    return posixpath.join(cwd, path)
+
+
+def _literal_path(token: str) -> bool:
+    """A path written out in full: no variables, home, globs or brace expansion."""
+    return (
+        bool(token)
+        and not token.startswith(("~", "-"))
+        and not any(ch in token for ch in "$`*?[]{}")
+    )
 
 
 def _strip_heredoc_bodies(command: str) -> str:
@@ -323,25 +395,35 @@ def _tokenize(command: str) -> list[str]:
     return list(lexer)
 
 
-def _segments(tokens: list[str]) -> list[tuple[list[str], bool]]:
-    """Split into simple commands; `piped` marks a command reading a previous one's output."""
-    segments: list[tuple[list[str], bool]] = []
+def _segments(tokens: list[str]) -> list[tuple[list[str], bool, str | None]]:
+    """Split into simple commands; `piped` marks a command reading a previous one's output,
+    and the last item is the separator after it (None at the end). A separator with no
+    command before it (`(`, `)`) gives an empty command, so cwd tracking still sees it."""
+    segments: list[tuple[list[str], bool, str | None]] = []
     current: list[str] = []
     piped = False
     for token in tokens:
         if token in SEPARATORS or (token and set(token) <= set(";&|()\n")):
-            if current:
-                segments.append((current, piped))
+            segments.append((current, piped, token))
             current = []
             piped = token in ("|", "|&")
             continue
         current.append(token)
     if current:
-        segments.append((current, piped))
+        segments.append((current, piped, None))
     return segments
 
 
-def _classify_segment(tokens: list[str], piped: bool, result: ShellRisk, depth: int) -> None:
+def _classify_segment(
+    tokens: list[str],
+    piped: bool,
+    result: ShellRisk,
+    depth: int,
+    scope: DeleteScope | None = None,
+    cwds: set[str | None] | None = None,
+) -> None:
+    if not tokens:
+        return
     words: list[str] = []
     redirect: str | None = None  # the redirect operator whose target comes next
     for tok in tokens:
@@ -362,7 +444,10 @@ def _classify_segment(tokens: list[str], piped: bool, result: ShellRisk, depth: 
         return
     if words[0] in ("for", "select", "case", "in", "esac"):
         return  # loop/case headers: the commands inside are checked on their own
-    words = _unwrap(words, result)
+    unwrapped = _unwrap(words, result)
+    if unwrapped is not words:
+        scope = None  # `xargs rm`, `env -C dir rm`: the paths aren't what they look like
+    words = unwrapped
     if not words:
         return
     name_raw = words[0]
@@ -387,6 +472,9 @@ def _classify_segment(tokens: list[str], piped: bool, result: ShellRisk, depth: 
             result.raise_to("moderate", f"runs a {name} script")
         return
 
+    if scope is not None and cwds and name == name_raw and _scratch_delete(name, args, scope, cwds):
+        result.raise_to("moderate", "deletes inside scratch/")
+        return
     checker = _SPECIFIC.get(name)
     if checker:
         checker(args, result)
@@ -406,7 +494,8 @@ def _check_redirect_target(target: str, result: ShellRisk) -> None:
 
 
 def _unwrap(words: list[str], result: ShellRisk) -> list[str]:
-    """`nice -n 5 timeout 10 rm -rf x` -> `rm -rf x`."""
+    """`nice -n 5 timeout 10 rm -rf x` -> `rm -rf x`. Returns `words` itself when there is
+    no wrapper."""
     for _ in range(10):
         if not words:
             return words
@@ -673,6 +762,108 @@ _SPECIFIC = {
     "sftp": _moderate("transfers files over SSH"),
     "rsync": _check_rsync,
 }
+
+
+# --- deletes inside scratch/ (spec 25 §0) ---------------------------------------------
+
+_FIND_NOT_JUST_DELETE = {
+    "-exec",
+    "-execdir",
+    "-ok",
+    "-okdir",
+    "-fprint",
+    "-fprint0",
+    "-fprintf",
+    "-fls",
+    "-L",
+    "-H",
+    "-follow",
+}
+
+
+def _scratch_delete(name: str, args: list[str], scope: DeleteScope, cwds: set[str | None]) -> bool:
+    """True when this rm / find -delete / git clean deletes only inside scratch/, for every
+    working folder the command may be in."""
+    if name == "rm":
+        paths = _rm_paths(args)
+        return bool(paths) and all(_inside(p, c, scope) for p in paths for c in cwds)
+    if name == "find":
+        starts = _find_starts(args)
+        return starts is not None and all(_inside(p, c, scope) for p in starts for c in cwds)
+    if name == "git":
+        return _git_clean_inside(args, scope, cwds)
+    return False
+
+
+def _rm_paths(args: list[str]) -> list[str]:
+    paths: list[str] = []
+    options_done = False
+    for a in args:
+        if not options_done and a == "--":
+            options_done = True
+        elif options_done or not a.startswith("-"):
+            paths.append(a)
+    return paths
+
+
+def _find_starts(args: list[str]) -> list[str] | None:
+    """The start folders of `find <paths> <tests> -delete`, or None when it does more than
+    delete (runs commands, writes files, follows links) or starts with options."""
+    if "-delete" not in args or any(a in _FIND_NOT_JUST_DELETE for a in args):
+        return None
+    starts: list[str] = []
+    for a in args:
+        if a.startswith("-") or a in ("(", "!", ")"):
+            break
+        starts.append(a)
+    # Without a path find starts in the working folder, which must then be inside scratch
+    # (find never deletes its start folder "." itself).
+    return starts or ["."]
+
+
+def _git_clean_inside(args: list[str], scope: DeleteScope, cwds: set[str | None]) -> bool:
+    folders = set(cwds)
+    i = 0
+    while i < len(args) and args[i].startswith("-"):
+        if args[i] != "-C" or i + 1 >= len(args) or not _literal_path(args[i + 1]):
+            return False  # -c, --git-dir, --work-tree could point anywhere
+        folders = {_join(c, args[i + 1]) for c in folders}
+        i += 2
+    if i >= len(args) or args[i] != "clean":
+        return False
+    paths: list[str] = []
+    rest = args[i + 1 :]
+    after_dashes = False
+    j = 0
+    while j < len(rest):
+        a = rest[j]
+        if after_dashes or not a.startswith("-"):
+            paths.append(a)
+        elif a == "--":
+            after_dashes = True
+        elif a in ("-e", "--exclude"):
+            j += 1  # its pattern
+        j += 1
+    # Without paths git clean works from the working folder down: it must be inside.
+    return all(_inside(p, c, scope) for p in (paths or ["."]) for c in folders)
+
+
+def _inside(path: str, cwd: str | None, scope: DeleteScope) -> bool:
+    """`path` (relative to `cwd`) is strictly inside scratch/. A glob counts when all it can
+    match are children of a folder inside scratch, or of scratch itself (`scratch/*`)."""
+    if cwd is None or not path or path.startswith("~") or any(ch in path for ch in "$`{}"):
+        return False
+    glob_at = next((i for i, ch in enumerate(path) if ch in "*?[]"), None)
+    if glob_at is None:
+        return scope.where(posixpath.join(cwd, path)) == "inside"
+    prefix, rest = path[:glob_at], path[glob_at:]
+    if "/" in rest:
+        return False  # `scratch/*/../..`: a glob in the middle of a path
+    folder, slash, start = prefix.rpartition("/")
+    if (start or rest).startswith("."):
+        return False  # `.*` can match `..`
+    parent = (folder or "/") if slash else "."
+    return scope.where(posixpath.join(cwd, parent)) in ("inside", "root")
 
 
 def max_risk(a: Risk, b: Risk) -> Risk:

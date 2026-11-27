@@ -210,6 +210,9 @@ class FilesSettings(BaseModel):
     # (device_file_get / device_file_put, docs/specs/22-device-files.md). The whole file
     # is held in the worker's memory while it is checked, hence the ceiling.
     device_file_max_mb: int = Field(50, ge=1, le=200)
+    # Files in the workspace's scratch/ folder (agents' throwaway files) older than this
+    # are deleted by the worker (docs/specs/25-device-permission-profiles.md §0).
+    scratch_keep_days: int = Field(7, ge=1, le=365)
 
 
 HEX_COLOUR = r"^#[0-9a-fA-F]{6}$"

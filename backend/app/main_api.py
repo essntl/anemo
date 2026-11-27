@@ -27,12 +27,14 @@ from app.core.redis import close_redis
 from app.features.auth.service import warn_if_plaintext_password
 from app.features.triggers import files_hook
 from app.features.triggers import listener as trigger_listener
+from app.workspace import scratch
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     warn_if_plaintext_password()
     files_hook.install(asyncio.get_running_loop())  # file.created events
+    scratch.ensure()  # the agents' throwaway folder (workspace/scratch.py)
     yield
     await dispose_engine()
     await close_redis()
