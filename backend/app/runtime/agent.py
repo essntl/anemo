@@ -1226,6 +1226,7 @@ async def run_tools(
     """The tools a run is offered, from its snapshot (`run.policy`): the built-in set for
     its kind and settings, its MCP tools, then an automation's allow-list. Also used by
     `python -m app.cli request-size`, to show the request a run sent."""
+    assert run.policy is not None  # the snapshot is taken before the run is driven
     # An event trigger started it (or the run it works for, for a sub-agent).
     top = await db.get(Run, run.root_run_id) if run.root_run_id else run
     event_started = bool((top or run).options.get("event"))
