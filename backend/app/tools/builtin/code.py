@@ -19,19 +19,24 @@ What a job wrote is untrusted content for the model, marked as written by a Clau
 job (tools/untrusted.py); code_status shows a summary, never the whole log.
 """
 
+import hashlib
 import time
+import uuid
 from typing import Any
 
 from pydantic import BaseModel, Field
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_sessionmaker
 from app.core.errors import AppError
 from app.features.code_sessions import control, git, ingest, service, wait
 from app.features.code_sessions.models import TERMINAL, CodeJob, CodeJobEvent
 from app.features.code_sessions.schemas import MODEL, CodeJobOut, ProjectName, RepoName
+from app.features.conversations.models import ChatMessage
 from app.features.devices import service as devices
 from app.features.devices.models import Device
+from app.features.runs.models import Run, ToolCall
 from app.policy.models import Action
 from app.tools.base import Tool, ToolContext, ToolResult
 from app.tools.builtin.computer import known_device
@@ -261,6 +266,10 @@ class StatusInput(JobInput):
         description="Wait up to this many seconds for the job to end before answering "
         "(0: answer now)",
     )
+    full: bool = Field(
+        False,
+        description="Show the job's result even if an earlier call in this chat showed it",
+    )
 
 
 def _subject(name: str, params: Any) -> str:
@@ -325,7 +334,20 @@ def limit_line(job: CodeJobOut) -> str:
     return f"{line}. Auto continue is off: follow it up when the limit has reset."
 
 
-def _status_text(job: CodeJobOut, recent: list[str]) -> str:
+def report_digest(job: CodeJobOut) -> str | None:
+    """A short fingerprint of a job's final report (None while there is none)."""
+    if job.state not in TERMINAL or not job.result_text:
+        return None
+    return hashlib.sha256(job.result_text.encode()).hexdigest()[:16]
+
+
+REPORT_UNCHANGED = (
+    "Result: unchanged since an earlier code_status call in this chat showed it "
+    "(full=true shows it again)."
+)
+
+
+def _status_text(job: CodeJobOut, recent: list[str], *, show_report: bool = True) -> str:
     head = [
         f"Claude Code job {job.id} (the computer's job id {job.job_key}) on {job.device.name}: "
         f"{job.state.replace('_', ' ')}",
@@ -364,7 +386,9 @@ def _status_text(job: CodeJobOut, recent: list[str]) -> str:
             body.append(f"- [{mark}] {_one_line(text or todo.content, 200)}")
     body.append("Last activities:" if recent else "No activity received yet.")
     body += [f"- {line}" for line in recent]
-    if job.state in TERMINAL and job.result_text:
+    if job.state in TERMINAL and job.result_text and not show_report:
+        body.append(REPORT_UNCHANGED)
+    elif job.state in TERMINAL and job.result_text:
         result = job.result_text
         cut = "" if len(result) <= MAX_RESULT else " (cut short)"
         body.append(f"Result ({job.result_subtype or '?'}){cut}:\n{result[:MAX_RESULT]}")
@@ -388,6 +412,35 @@ def wait_note(before: str, after: str, waited_s: float) -> str:
     return f"Wait: still running after {seconds} s."
 
 
+async def report_seen(db: AsyncSession, run_id: uuid.UUID, job_id: str, digest: str) -> bool:
+    """Whether a code_status call the model can still see gave this job's report already.
+
+    What the model sees: its own run, and for a chat's agent (not a sub-agent, whose
+    history is its own) the earlier answers of the chat that are still shown (an answer
+    replaced by Regenerate is not).
+    """
+    shown = ToolCall.result_data.contains({"code_report": {"job": job_id, "digest": digest}})
+    mine = select(ToolCall.id).where(ToolCall.run_id == run_id, shown).limit(1)
+    if await db.scalar(mine) is not None:
+        return True
+    run = await db.get(Run, run_id)
+    if run is None or run.conversation_id is None or run.parent_run_id is not None:
+        return False
+    earlier = (
+        select(ToolCall.id)
+        .join(Run, Run.id == ToolCall.run_id)
+        .join(ChatMessage, ChatMessage.id == Run.assistant_message_id)
+        .where(
+            Run.conversation_id == run.conversation_id,
+            Run.parent_run_id.is_(None),
+            ChatMessage.run_id == Run.id,
+            shown,
+        )
+        .limit(1)
+    )
+    return await db.scalar(earlier) is not None
+
+
 async def _job(ref: str) -> CodeJob | ToolResult:
     async with get_sessionmaker()() as db:
         job = await service.find(db, ref)
@@ -400,7 +453,8 @@ class CodeStatus(Tool):
     name = "code_status"
     description = (
         "How a Claude Code job is doing: its state, todo list, its last activities, branch, "
-        "pull request, turns, duration, API-equivalent cost and, once it ended, its result. "
+        "pull request, turns, duration, API-equivalent cost and, once it ended, its result "
+        "(once per chat; full=true repeats it). "
         "With wait_s it first waits (up to 300 s) until the job ends: better than asking "
         "again and again."
     )
@@ -438,15 +492,24 @@ class CodeStatus(Tool):
                     .limit(RECENT_EVENTS)
                 )
             )
+            digest = report_digest(job) if job is not None else None
+            seen = (
+                digest is not None
+                and not args.full
+                and await report_seen(db, ctx.run_id, str(found.id), digest)
+            )
         if job is None:
             return ToolResult(
                 content=f"There is no Claude Code job “{args.job_id}”.", is_error=True
             )
         recent = activities(list(reversed(rows)))[-ACTIVITIES:]
-        content = _status_text(job, recent)
+        content = _status_text(job, recent, show_report=not seen)
         if args.wait_s:
             content = f"{wait_note(found.state, job.state, waited)}\n{content}"
-        return ToolResult(content=content, data=_data(job.id))
+        data = _data(job.id)
+        if digest is not None and not seen:  # what later calls look for (report_seen)
+            data["code_report"] = {"job": str(found.id), "digest": digest}
+        return ToolResult(content=content, data=data)
 
 
 # -- code_cancel -----------------------------------------------------------------------------

@@ -120,6 +120,12 @@ def _id(value: str) -> uuid.UUID | None:
         return None
 
 
+SUBTASKS = (
+    "Completing a task that has open subtasks: 'finish' them too or 'keep' them open. "
+    "Ask the user if unsure."
+)
+
+
 class ListTasksInput(BaseModel):
     status: TaskStatus | None = Field(None, description="Default: all open tasks")
     project: str | None = Field(None, description="Project name")
@@ -419,11 +425,7 @@ class UpdateTaskInput(BaseModel):
         max_length=MAX_BLOCKERS,
         description="Ids of the tasks it waits on, replacing the old list. [] removes them.",
     )
-    subtasks: SubtasksChoice | None = Field(
-        None,
-        description="Completing a task that has open subtasks: 'finish' them too or 'keep' "
-        "them open. Ask the user if unsure.",
-    )
+    subtasks: SubtasksChoice | None = Field(None, description=SUBTASKS)
     source_url: str | None = Field(None, max_length=1000, description=src.SOURCE_URL)
     properties: dict[str, Any] | None = Field(
         None, max_length=30, description=linking.PROPERTIES_CHANGE
@@ -606,9 +608,7 @@ class TaskChangeInput(BaseModel):
     remind_minutes: int | None = Field(None, ge=0, le=40_320)
     parent_id: str | None = Field(None, description="Make it a subtask of this task")
     clear_parent: bool = Field(False, description="Make a subtask an ordinary task again")
-    subtasks: SubtasksChoice | None = Field(
-        None, description="Completing a task with open subtasks: 'finish' them too or 'keep' them"
-    )
+    subtasks: SubtasksChoice | None = Field(None, description=SUBTASKS)
     properties: dict[str, Any] | None = Field(
         None, max_length=30, description=linking.PROPERTIES_CHANGE
     )

@@ -25,6 +25,7 @@ from app.mcp import client
 from app.policy.models import Action, Risk
 from app.providers.base import ToolSpec
 from app.tools.base import Tool, ToolContext, ToolResult
+from app.tools.schema import compact
 from app.tools.untrusted import untrusted
 
 MAX_NAME = 64  # providers limit tool names to 64 of [a-zA-Z0-9_-]
@@ -47,9 +48,10 @@ def provider_schema(schema: dict[str, Any]) -> dict[str, Any]:
     """The tool's input schema in the shape model providers expect (an object)."""
     if schema.get("type") != "object":
         return {"type": "object", "properties": {}}
-    clean = {k: v for k, v in schema.items() if k not in ("$schema", "$id", "title")}
+    clean = {k: v for k, v in schema.items() if k not in ("$schema", "$id")}
     clean.setdefault("properties", {})
-    return clean
+    # Titles say nothing the property names don't; the nulls stay (tools/schema.py).
+    return compact(clean, keep_nulls=True)
 
 
 def _brief(arguments: dict[str, Any]) -> str:

@@ -106,7 +106,8 @@ class ListFiles(Tool):
 
 class ReadInput(BaseModel):
     path: str = Field(description="File path relative to the workspace root")
-    max_chars: int = Field(20_000, ge=100, le=100_000)
+    start: int = Field(0, ge=0, description="Character offset, to continue a long file")
+    max_chars: int = Field(10_000, ge=100, le=100_000)
 
 
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tif", ".tiff"}
@@ -121,6 +122,19 @@ EXTRACTED_LABELS = {
     "presentation": "presentation",
     "archive": "zip archive",
 }
+
+
+def page(text: str, start: int, max_chars: int) -> tuple[str, str]:
+    """The part of a long text from `start`, and a note on where the rest is ("" when
+    the part is all of it)."""
+    part = text[start : start + max_chars]
+    end = start + len(part)
+    if start == 0 and end >= len(text):
+        return part, ""
+    note = f"\n\n[Characters {start:,}-{end:,} of {len(text):,}."
+    if end < len(text):
+        note += f" Call read_file again with start={end} for more."
+    return part, note + "]"
 
 
 def _extracted_kind(name: str, data: bytes) -> str | None:
@@ -139,7 +153,8 @@ class ReadFile(Tool):
         "Read a file from the workspace. Text files return their content. Images (PNG, "
         "JPEG, GIF, WebP, BMP, TIFF) are shown to you as an image if you can view images. "
         "PDFs, Word (.docx), Excel (.xlsx) and PowerPoint (.pptx) files return their text "
-        "(spreadsheets as CSV per sheet), and zip files the list of files in them."
+        "(spreadsheets as CSV per sheet), and zip files the list of files in them. Long "
+        "files come in parts: call again with `start` to continue."
     )
     capability = "fs.read"
     Input = ReadInput
@@ -168,12 +183,8 @@ class ReadFile(Tool):
         except AppError as exc:
             return ToolResult(content=f"Cannot read {args.path}: {exc.message}", is_error=True)
         rel = fs_guard.relative(fs_guard.resolve(args.path))
-        cut = len(text) > args.max_chars
-        note = f"\n\n[Truncated: showing {args.max_chars} of {len(text)} characters]" if cut else ""
-        return ToolResult(
-            content=f"{rel}:\n{text[: args.max_chars]}{note}",
-            data={"path": rel, "chars": len(text)},
-        )
+        part, note = page(text, args.start, args.max_chars)
+        return ToolResult(content=f"{rel}:\n{part}{note}", data={"path": rel, "chars": len(text)})
 
     async def _read_extracted(self, args: ReadInput, guessed: bool = False) -> ToolResult | None:
         """The text of a PDF, Office file or zip. With `guessed`, None when the file is
@@ -195,10 +206,10 @@ class ReadFile(Tool):
             text, note = await asyncio.to_thread(extract.extract, kind, data)
         except extract.ExtractionError as exc:
             return ToolResult(content=f"Cannot read {rel}: {exc}", is_error=True)
-        cut = len(text) > args.max_chars
+        part, more = page(text, args.start, args.max_chars)
         notes = [n for n in (note,) if n]
-        if cut:
-            notes.append(f"Truncated: showing {args.max_chars} of {len(text)} characters")
+        if more:
+            notes.append(more.strip().strip("[]"))
         if kind != "pdf":
             notes.append(
                 "This is the text only; to change the file itself, use Python in run_shell"
@@ -206,7 +217,7 @@ class ReadFile(Tool):
             )
         tail = "".join(f"\n[{n}]" for n in notes)
         return ToolResult(
-            content=f"{rel} ({EXTRACTED_LABELS[kind]}):\n{text[: args.max_chars]}\n{tail}",
+            content=f"{rel} ({EXTRACTED_LABELS[kind]}):\n{part}\n{tail}",
             data={"path": rel, "chars": len(text)},
         )
 

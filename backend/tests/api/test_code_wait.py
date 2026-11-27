@@ -112,7 +112,9 @@ async def test_the_wait_ends_when_the_job_ends(authed):
     assert first.startswith("Wait: ended after ") and first.endswith("the job ended.")
     assert second.endswith(": done")
     assert "Fixed it" in out.content
-    assert out.data == {"code_job_id": str((await row(KEY)).id)}
+    job_id = str((await row(KEY)).id)
+    assert out.data and out.data["code_job_id"] == job_id
+    assert out.data["code_report"]["job"] == job_id  # the report was shown
     await ws.disconnect()
 
 

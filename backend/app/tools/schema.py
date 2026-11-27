@@ -12,6 +12,9 @@ where an explicit null does something different from leaving the field out (it c
 stored value) keeps its null: the tool names it in `Tool.null_clears`.
 
 The HTTP API's schema (FastAPI, frontend/src/api/openapi.json) is not touched.
+
+An MCP server's schema (tools/mcp_tool.py) loses its titles too, but keeps every null
+(`keep_nulls=True`): what an explicit null means to another program is not known here.
 """
 
 from typing import Any
@@ -23,10 +26,16 @@ _SCHEMA_LISTS = ("anyOf", "oneOf", "allOf", "prefixItems")
 _NULL = {"type": "null"}
 
 
-def compact(schema: dict[str, Any], *, keep_null: frozenset[str] = frozenset()) -> dict[str, Any]:
+def compact(
+    schema: dict[str, Any],
+    *,
+    keep_null: frozenset[str] = frozenset(),
+    keep_nulls: bool = False,
+) -> dict[str, Any]:
     """A copy of `schema` without titles, and with `anyOf [T, null]` + `default: null`
-    written as T. `keep_null`: top-level properties that keep their null."""
-    out = _compact(schema)
+    written as T. `keep_null`: top-level properties that keep their null; `keep_nulls`:
+    every null stays (only the titles go)."""
+    out = _compact(schema, keep_nulls=keep_nulls)
     for name, prop in (out.get("properties") or {}).items():
         if name in keep_null:
             original = schema["properties"][name]
@@ -35,7 +44,7 @@ def compact(schema: dict[str, Any], *, keep_null: frozenset[str] = frozenset()) 
     return out
 
 
-def _compact(schema: Any, *, collapse: bool = True) -> Any:
+def _compact(schema: Any, *, collapse: bool = True, keep_nulls: bool = False) -> Any:
     if not isinstance(schema, dict):
         return schema
     out: dict[str, Any] = {}
@@ -43,16 +52,16 @@ def _compact(schema: Any, *, collapse: bool = True) -> Any:
         if key == "title" and isinstance(value, str):
             continue
         if key in _SCHEMA_MAPS and isinstance(value, dict):
-            out[key] = {name: _compact(sub) for name, sub in value.items()}
+            out[key] = {name: _compact(sub, keep_nulls=keep_nulls) for name, sub in value.items()}
         elif key in _SCHEMA_VALUES:
             if key == "additionalProperties" and value is True:
                 continue  # the JSON Schema default: any extra keys
-            out[key] = _compact(value)
+            out[key] = _compact(value, keep_nulls=keep_nulls)
         elif key in _SCHEMA_LISTS and isinstance(value, list):
-            out[key] = [_compact(sub) for sub in value]
+            out[key] = [_compact(sub, keep_nulls=keep_nulls) for sub in value]
         else:
             out[key] = value
-    return _without_null(out) if collapse else out
+    return _without_null(out) if collapse and not keep_nulls else out
 
 
 def _without_null(schema: dict[str, Any]) -> dict[str, Any]:

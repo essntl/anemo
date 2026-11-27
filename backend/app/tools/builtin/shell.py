@@ -69,16 +69,14 @@ def _tail(text: str, limit: int) -> str:
 class RunShell(Tool):
     name = "run_shell"
     description = (
-        "Run a bash command in an isolated Linux sandbox (Debian with git, python3, pip, "
-        "node/npm, curl, jq, ripgrep, sqlite3, make, zip/unzip). Python has pandas, openpyxl "
-        "(Excel), python-docx (Word), python-pptx (PowerPoint), reportlab and pypdf (PDF) and "
-        "matplotlib (charts) for reading and making files. The workspace is at /workspace "
-        "and `cwd` is relative to it. Stdin is closed, so commands must not prompt (use "
-        "flags like -y). "
-        "There is no internet unless network=true. SSH works with network=true: `ssh "
-        "user@host 'command'` uses the agent's own key (no passwords; the user adds that key "
-        "to their server) and host.docker.internal is the Docker host; also scp and rsync. "
-        "Long output is shortened. Prefer the file tools for reading and editing single files."
+        "Run a bash command in an isolated Linux sandbox (Debian; git, python3, pip, "
+        "node/npm, curl, jq, ripgrep, sqlite3, make, zip). Python has pandas, openpyxl, "
+        "python-docx, python-pptx, reportlab, pypdf and matplotlib for Office files, PDFs and "
+        "charts. The workspace is /workspace; `cwd` is relative to it. Stdin is closed: "
+        "commands must not prompt (use -y). No internet unless network=true; then ssh, scp "
+        "and rsync use the agent's own key (no passwords; the user adds it to their server) "
+        "and host.docker.internal is the Docker host. Long output is shortened. For one "
+        "file, prefer the file tools."
     )
     capability = "shell.exec"
     extra_capabilities = ("shell.network",)
