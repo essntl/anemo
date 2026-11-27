@@ -164,5 +164,18 @@ size is shown, from 85 %).
 
 ## 6. Measurements
 
-See the PR: a simulated chat of 60 turns (fake provider), first request per turn, with and
-without auto-compact at 50k tokens.
+A simulated chat on the fake provider (agent mode, every built-in tool), 60 turns, each
+user message ~2,000 characters and its answer as long; estimated tokens (characters / 4)
+of the first request of each turn, system prompt and tools included:
+
+| | turn 1 | turn 10 | turn 30 | turn 60 | largest | all 60 answers |
+| --- | --- | --- | --- | --- | --- | --- |
+| no compaction | 22.4k | 32.3k | 54.2k | 87.0k | 87.0k | 3.28M |
+| auto-compact at 50k | 22.4k | 32.3k | 54.1k | **37.8k** | 71.6k | **2.61M** (−20 %) |
+
+One compaction (at turn 46); the history part of turn 60 is 15.9k instead of 65.1k
+tokens. The fake model's summary is short (the `Decision:` lines); a real one is a few
+thousand tokens. A longer chat saves more: after a compaction every request starts
+small again. The history of the API chats grows only by messages and answers' text
+(§1), so with real models the 250k default is reached by long chats with big pastes,
+documents or many turns.
