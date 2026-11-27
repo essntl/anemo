@@ -10570,6 +10570,18 @@ export interface components {
             conversation_id: string | null;
             /** Tool Name */
             tool_name: string;
+            /** Conversation Title */
+            conversation_title?: string | null;
+            /**
+             * Options
+             * @default []
+             */
+            options: string[];
+            /**
+             * Multiple
+             * @default false
+             */
+            multiple: boolean;
         };
         /** PermissionDiffOut */
         PermissionDiffOut: {
