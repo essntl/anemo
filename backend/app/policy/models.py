@@ -5,7 +5,7 @@ A policy is a list of rules over *capabilities* (strings like "fs.write" or
 Actions; the engine (policy/engine.py) turns each Action into allow / ask / deny.
 """
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -84,6 +84,10 @@ class Action(BaseModel):
     # policy (Trusted (legacy)). An `ask` from it is never skipped by a run grant.
     device_decision: Decision | None = None
     device_reason: str | None = None
+    # For an approval of a command on a computer (spec 25 §6.2): the device, the analysis'
+    # rule and effects, the folder "This folder" and "The next hour" would cover, and which
+    # of the buttons may be offered. Shown by the approval card; never used to decide.
+    device: dict[str, Any] | None = None
 
 
 class Grant(BaseModel):

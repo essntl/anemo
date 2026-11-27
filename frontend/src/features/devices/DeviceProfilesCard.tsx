@@ -7,6 +7,8 @@ import { Select } from '@/components/ui/Select'
 import { Switch } from '@/components/ui/Switch'
 import { toast } from '@/components/ui/toast'
 import { plural, t } from '@/lib/i18n'
+import { useModels } from '@/features/providers/api'
+import { useSaveSection, useSettings } from '@/features/settings/api'
 import { type CategoryLevel, type DeviceProfile, useChangeProfile, useCopyProfile, useDeleteProfile, useDeviceProfiles } from './api'
 import { CATEGORIES, LEVEL_LABELS, levelsFor, profileName } from './permissionLabels'
 
@@ -73,6 +75,32 @@ function ProfileRow({ profile }: { profile: DeviceProfile }) {
   )
 }
 
+/**
+ * The model of the relevance check (spec 25 §7): a separate, cheap model that may only turn an
+ * allowed command into a question. Default: the background model.
+ */
+function RelevanceModel() {
+  const settings = useSettings()
+  const models = useModels()
+  const save = useSaveSection('devices')
+  const section = settings.data?.devices
+  if (!section) return null
+  const usable = (models.data ?? []).filter((m) => m.enabled && m.provider_enabled)
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 py-3">
+      <div className="min-w-0">
+        <div className="text-[13px] font-medium">{t('Model of the relevance check')}</div>
+        <div className="text-[12px] text-muted">
+          {t('It sees only your last messages and the command, and can only turn an allowed command into a question. If it doesn’t answer in 4 seconds, the command goes ahead.')}
+        </div>
+      </div>
+      <Select className="w-56" aria-label={t('Model of the relevance check')} value={section.relevance_model_id ?? ''}
+        onValueChange={(v) => save.mutate({ ...section, relevance_model_id: v || null })}
+        options={[{ value: '', label: t('The background model') }, ...usable.map((m) => ({ value: m.id, label: m.display_name }))]} />
+    </div>
+  )
+}
+
 /** Settings → Devices → Device profiles: the built-in presets (copy only) and your own profiles. */
 export function DeviceProfilesCard() {
   const profiles = useDeviceProfiles()
@@ -83,6 +111,7 @@ export function DeviceProfilesCard() {
         description={t('What agents may do on a computer. Built-in profiles can be copied, then changed; a change applies at once to every device that uses the profile, and asks for your password.')} />
       <CardBody className="flex flex-col divide-y divide-border py-1">
         {profiles.data.map((p) => <ProfileRow key={p.id} profile={p} />)}
+        <RelevanceModel />
       </CardBody>
     </Card>
   )

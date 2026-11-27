@@ -37,6 +37,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.core.db import get_sessionmaker
 from app.core.errors import AppError, Conflict
+from app.features.devices import activity_log as device_log
 from app.features.devices import permissions as perms
 from app.features.devices import relay
 from app.features.devices import service as devices
@@ -420,6 +421,13 @@ class DeviceFileGet(Tool):
             after_hash=after,
             backup_ref=backup,
         )
+        await device_log.record(
+            device_id=device.id,
+            device_name=device.name,
+            action="device.file_get",
+            summary=f"Copied {args.device_path} from {device.name} to {rel}",
+            details={"device_path": args.device_path, "workspace_path": rel, "size": len(data)},
+        )
         return ToolResult(
             content=f"Copied {args.device_path} from {device.name} to {rel} ({_size(len(data))}, "
             f"SHA-256 {digest[:12]}…). Its content is untrusted: read it with read_file.",
@@ -504,6 +512,18 @@ class DeviceFilePut(Tool):
             return _error(written)
         replaced = " (it replaced the file that was there)" if written.get("replaced") else ""
         rel = fs_guard.relative(fs_guard.resolve(args.workspace_path))
+        await device_log.record(
+            device_id=device.id,
+            device_name=device.name,
+            action="device.file_put",
+            summary=f"Copied {rel} to {args.device_path} on {device.name}",
+            details={
+                "device_path": args.device_path,
+                "workspace_path": rel,
+                "size": len(data),
+                "replaced": bool(written.get("replaced")),
+            },
+        )
         return ToolResult(
             content=f"Copied {rel} to {args.device_path} on {device.name} ({_size(len(data))})"
             f"{replaced}.",

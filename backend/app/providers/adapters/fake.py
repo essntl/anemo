@@ -44,6 +44,7 @@ from app.providers.base import (
 )
 
 TURN_CONTEXT_OPEN = "<turn_context>"  # see runtime/turn_context.py
+_SHELL_ON = re.compile(r"on (.+?) run: (.+)", re.I | re.S)
 _RENAME_TASK = re.compile(r"rename task ([0-9a-f-]{36}) to (.+)", re.IGNORECASE)
 _STOPWORDS = {"the", "a", "an", "is", "are", "to", "of", "and", "i", "my", "in", "do", "what"}
 
@@ -214,6 +215,9 @@ class FakeAdapter:
         ]
         asks = "ask me" in _last_user_text(req).lower()
         rename = _RENAME_TASK.search(_last_user_text(req))
+        # "on <computer> run: <command>": one computer_shell call (the e2e test of device
+        # permission profiles, docs/specs/25-device-permission-profiles.md).
+        shell = _SHELL_ON.match(_last_user_text(req).strip())
         # "postpone my tasks: <words>": the tasks matching the words move to a Friday in
         # one update_tasks call (the e2e test of a batch approval).
         postpone = re.match(r"postpone my tasks: (.+)", _last_user_text(req).strip(), re.I)
@@ -242,6 +246,14 @@ class FakeAdapter:
             return
         elif asks:
             yield TextDelta(f"Thanks. {answers[-1]}")
+        elif shell and not answers:
+            yield ToolCall(
+                "shell1", "computer_shell", {"device": shell[1], "command": shell[2].strip()}
+            )
+            yield Done("tool_use")
+            return
+        elif shell:
+            yield TextDelta(f"Done. {answers[-1].splitlines()[-1] if answers[-1] else ''}")
         elif rename and not answers:
             yield ToolCall("rename1", "update_task", {"id": rename[1], "title": rename[2].strip()})
             yield Done("tool_use")

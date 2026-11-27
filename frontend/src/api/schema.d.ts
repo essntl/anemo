@@ -664,6 +664,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Devices Settings */
+        put: operations["put_devices_settings_api_settings_devices_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/audit": {
         parameters: {
             query?: never;
@@ -3864,6 +3881,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/devices/{device_id}/grants/{grant_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Grant
+         * @description Revoke a "the next hour" grant at once (only tightens, so no password needed).
+         */
+        delete: operations["revoke_grant_api_devices__device_id__grants__grant_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/devices": {
         parameters: {
             query?: never;
@@ -5891,6 +5928,7 @@ export interface components {
             code: components["schemas"]["CodeSettings"];
             images: components["schemas"]["ImageSettings"];
             plugins: components["schemas"]["PluginSettings"];
+            devices: components["schemas"]["DeviceSettings"];
         };
         /** AppearanceAssetOut */
         AppearanceAssetOut: {
@@ -7761,7 +7799,9 @@ export interface components {
              * @default once
              * @enum {string}
              */
-            scope: "once" | "run";
+            scope: "once" | "run" | "folder" | "hour" | "command";
+            /** Folder */
+            folder?: string | null;
             /** Reason */
             reason?: string | null;
             plan?: components["schemas"]["PlanIn"] | null;
@@ -8079,6 +8119,14 @@ export interface components {
         DeviceRenameIn: {
             /** Name */
             name: string;
+        };
+        /**
+         * DeviceSettings
+         * @description Settings › Devices (docs/specs/25-device-permission-profiles.md §7).
+         */
+        DeviceSettings: {
+            /** Relevance Model Id */
+            relevance_model_id?: string | null;
         };
         /** DeviceTrustIn */
         DeviceTrustIn: {
@@ -15708,6 +15756,41 @@ export interface operations {
             };
         };
     };
+    put_devices_settings_api_settings_devices_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_audit_api_audit_get: {
         parameters: {
             query?: {
@@ -15746,7 +15829,7 @@ export interface operations {
             query?: {
                 actor_kind?: ("user" | "assistant" | "automation" | "script" | "plugin" | "trigger" | "external") | null;
                 actor_ref?: string | null;
-                object_type?: ("task" | "event" | "document" | "file" | "project") | null;
+                object_type?: ("task" | "event" | "document" | "file" | "project" | "device") | null;
                 object_id?: string | null;
                 since?: string | null;
                 until?: string | null;
@@ -23095,6 +23178,38 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DevicePermissionsOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_grant_api_devices__device_id__grants__grant_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+                grant_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

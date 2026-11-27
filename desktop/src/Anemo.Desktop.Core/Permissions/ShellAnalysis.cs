@@ -3,7 +3,8 @@ using System.Text.Json.Nodes;
 namespace Anemo.Desktop.Core.Permissions;
 
 /// <summary>One thing a command does to a path (spec 25 §5.2).</summary>
-public sealed record ShellEffect(EffectKind Kind, string Path, bool Recursive, string? WorkFolder, bool Recycle);
+/// <param name="Protected">The protected folder's level when the effect lands in one (<c>hard</c>, <c>deny</c>, <c>ask</c>).</param>
+public sealed record ShellEffect(EffectKind Kind, string Path, bool Recursive, string? WorkFolder, bool Recycle, string? Protected = null);
 
 /// <summary>
 /// What the analyser made of a command (§5.2): the verdict, the effects, what it couldn't tell,
@@ -17,6 +18,15 @@ public sealed record ShellAnalysis(
     bool Network,
     int ProfileVersion)
 {
+    /// <summary>
+    /// What "This folder" and "The next hour" of the approval would cover (§6.2): the deepest
+    /// folder holding every change, and its parent. Null where only Once may be offered (the
+    /// command can't be read, it touches a protected folder, or the folder would be one).
+    /// </summary>
+    public string? Folder { get; init; }
+
+    public string? ParentFolder { get; init; }
+
     /// <summary>The command could not be read with certainty: only Once or "this exact command" covers it (§6.2).</summary>
     public bool Opaque => Unknown.Count > 0;
 
@@ -38,7 +48,10 @@ public sealed record ShellAnalysis(
             ["recursive"] = e.Recursive,
             ["work_folder"] = e.WorkFolder,
             ["recycle"] = e.Recycle,
+            ["protected"] = e.Protected,
         }).ToArray()),
+        ["folder"] = Folder,
+        ["parent_folder"] = ParentFolder,
         ["unknown"] = new JsonArray(Unknown.Take(20).Select(u => (JsonNode)JsonValue.Create(u)!).ToArray()),
         ["rule"] = Rule,
         ["network"] = Network,

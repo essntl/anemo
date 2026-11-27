@@ -36,6 +36,7 @@ from app.features.code_sessions.models import TERMINAL, CodeJob, CodeJobEvent
 from app.features.code_sessions.schemas import MODEL, CodeJobOut, ProjectName, RepoName
 from app.features.conversations import compaction as chat_compaction
 from app.features.conversations.models import ChatMessage
+from app.features.devices import activity_log as device_log
 from app.features.devices import service as devices
 from app.features.devices.models import Device
 from app.features.runs.models import Run, ToolCall
@@ -259,6 +260,13 @@ class CodeStart(Tool):
                 )
         except AppError as exc:
             return _error(exc)
+        await device_log.record(
+            device_id=device.id,
+            device_name=device.name,
+            action="device.code_start",
+            summary=f"Started a Claude Code job on {device.name} in {args.project}",
+            details={"project": args.project, "prompt": args.prompt[:2000], "job_id": str(job.id)},
+        )
         return ToolResult(
             content=f"Started Claude Code job {job.id} on {device.name} (the computer's job id "
             f"{job.job_key}) in {job.dir or job.project}. It runs on its own: check it with "
@@ -592,6 +600,13 @@ class CodeCancel(Tool):
                 job = await control.cancel_job(db, found.id)
         except AppError as exc:
             return _error(exc)
+        await device_log.record(
+            device_id=device.id,
+            device_name=device.name,
+            action="device.code_cancel",
+            summary=f"Cancelled Claude Code job {job.id} on {device.name}",
+            details={"job_id": str(job.id)},
+        )
         state = job.state.replace("_", " ")
         return ToolResult(content=f"Claude Code job {job.id} is {state} now.", data=_data(job.id))
 

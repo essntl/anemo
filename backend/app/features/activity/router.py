@@ -18,7 +18,7 @@ from app.features.provenance.schemas import ActorOut
 router = APIRouter(prefix="/activity", tags=["activity"])
 
 ActorKind = Literal["user", "assistant", "automation", "script", "plugin", "trigger", "external"]
-ObjectType = Literal["task", "event", "document", "file", "project"]
+ObjectType = Literal["task", "event", "document", "file", "project", "device"]
 
 
 class ActivityOut(BaseModel):

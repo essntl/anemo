@@ -322,3 +322,34 @@ Written by the job that built this spec; each PR group adds its own part.
 - *The confirmation* is a Windows balloon notification; clicking it opens a Yes/No question. While a loosening waits, a `shell` decided with the newer version is refused as stale, so nothing new applies until it is confirmed. The settings page shows "Waiting for confirmation on <device>".
 - *macOS (no analyser):* on Scoped, a zsh/bash command the regex rating doesn't call safe asks; read-only commands go through (§10).
 - The corpus (`desktop/tests/…/PowerShellCorpusTests.cs`) has 190+ commands. It parses with Windows PowerShell 5.1 on Windows and pwsh 7 on the Linux CI. `&&` is a parse error in 5.1 and a chain in 7; the corpus entry asks on both.
+
+**Group C (approvals and grants)**
+- The approval of a computer command carries `Action.device`: the device, the analysis' rule and effects, the folder and its parent, and which buttons may be offered.
+  - The folder and its parent are computed **on the device**: the deepest folder holding every change. It is never a drive root, never inside a protected folder, and never a folder that holds an ask-protected one (the user folder, Windows, AppData). So a click can't make `C:\Users\artem` or `C:\Users` a work folder.
+  - The server offers **Once / This folder / The next hour** only for a Scoped (`folders`) command the device could read, in such a folder.
+  - It offers **Once / this exact command for the next hour** for a command the device couldn't read.
+  - Otherwise it offers only **Once**.
+  - "Allow for this run" is not offered for device commands. The API refuses `run`, and any scope or folder that wasn't offered (`scope_not_offered`, `folder_not_offered`).
+- "This folder" adds the folder to the device's work folders (`added_from: approval:<date>`, Recycle Bin on) in the same transaction as the approval. The device gets its new profile right after. The approved command is sent with the new `profile_version`; a device that hasn't synced yet answers `profile_stale`, and the server syncs it and tries once more.
+- "The next hour" and "this exact command" are `device_grants` rows (60 min), kept by the server only. `computer_shell.prepare()` loads them; they are never loaded in an automation run.
+  - A folder grant covers a command only when the device could read it, none of its effects touch a protected folder, and every write, delete and run is in that folder.
+  - The command is then sent with `approval: {id, scope: "hour"}`, so the device accepts it.
+- Grants are listed in Settings › Devices › Permissions with **Revoke** (`DELETE /api/devices/{id}/grants/{grant_id}`). Revoking only tightens, so it needs no password.
+- The e2e test (`e2e/tests/device-permissions.spec.ts`) uses the fake device of `fakeDevice.ts` (now with `hello.capabilities`). Its analysis is a stand-in for the four cases; the real analyser is covered by the Desktop corpus.
+
+**Group D (relevance check, Recycle Bin, activity log, automations)**
+- *Relevance check:* it runs in `computer_shell.prepare()` once the device allowed a command with a delete, a recursive change, or a write to a folder this run hasn't changed yet.
+  - The model is Settings › Devices › "Model of the relevance check" (`devices.relevance_model_id`). The default is the background model (Settings › Models › Background tasks, usually the cheapest), then the chat model.
+  - It has 4 s and fails open; the log line is "relevance check unavailable".
+  - A "no" asks with its reason. That approval offers only Once, because the device itself allowed the command, so a folder grant would mean nothing.
+  - "The chat hasn't touched yet" is tracked per run, not per chat.
+- *Recycle Bin:* the Remove-Item proxy is a function, so the aliases (`rm`, `del`, `ri`, `erase`, `rd`, `rmdir`) reach it. It moves items with `Microsoft.VisualBasic.FileIO.FileSystem` and `SendToRecycleBin`.
+  - Windows doesn't say what the Recycle Bin of a drive will hold, so "too large" means more than 5% of the drive's size (the default limit is about that). Such an item is refused with an error, never deleted for good.
+  - The `shell` result now carries `recycled` and `work_folder`.
+  - `device_file_put` doesn't delete anything (replacing a file asks as "dangerous", as before), so it has no Recycle Bin step.
+  - "Restore from Recycle Bin" as an Activity action is left for later: Windows has no stable API to restore a single item by path, and the entry says "recycle bin", so it can be restored there.
+- *Activity log:* `features/devices/activity_log.py` writes one entry (`object_type: device`) per shell command, file copy, act, and Claude Code start or cancel, auto-allowed ones included.
+  - A shell entry has the device, the command (2,000 characters), the working folder, the verdict, the rule, the approval or grant, the relevance result, "recycle bin"/"permanent" for deletes, the exit code, and the run.
+  - Entries can't be undone.
+  - The Activity page has the filter "On computers".
+- *Automations:* `refresh()` turns an Unrestricted computer into Scoped categories for an automation run, unless "Unrestricted for automations" is on. `shell.analyze` and `shell` carry `automation: true`, so the device analyses with the same rule. Hour grants and "this exact command" are never loaded for automation runs, and `contacts_people` works as before.

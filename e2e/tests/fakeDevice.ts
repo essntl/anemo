@@ -74,6 +74,8 @@ export class FakeComputer {
     baseURL: string,
     name: string,
     trust: 'trusted' | 'watched' = 'trusted',
+    /** Anemo Desktop 1.10.0's permission profiles (device-contracts.md §9): `profiles`, `shell.analyze`. */
+    hello: { version?: string; capabilities?: string[] } = {},
   ): Promise<FakeComputer> {
     const made = await request.post('/api/devices', { data: { name, kind: 'computer', trust } })
     if (!made.ok()) throw new Error(`adding the device failed: ${made.status()} ${await made.text()}`)
@@ -95,7 +97,10 @@ export class FakeComputer {
       }
       ws.addEventListener('message', onMessage)
     })
-    ws.send(JSON.stringify({ type: 'hello', token: device.token, kind: 'computer', version: '1.1.0', last_id: null }))
+    ws.send(JSON.stringify({
+      type: 'hello', token: device.token, kind: 'computer', version: hello.version ?? '1.1.0', last_id: null,
+      ...(hello.capabilities ? { capabilities: hello.capabilities } : {}),
+    }))
     await welcome
     const computer = new FakeComputer(request, device.id, name, ws)
     computer.send({ type: 'device.offer', control: false, shell: false, code: true })
@@ -107,7 +112,7 @@ export class FakeComputer {
   }
 
   /** Sends an offer: what this computer lets Anemo do (sharing jobs is always on here). */
-  offer(fields: { control?: boolean; code_start?: boolean; code_input?: boolean }) {
+  offer(fields: { control?: boolean; shell?: boolean; code_start?: boolean; code_input?: boolean; profile_version?: number }) {
     this.send({ type: 'device.offer', control: false, shell: false, code: true, ...fields })
   }
 

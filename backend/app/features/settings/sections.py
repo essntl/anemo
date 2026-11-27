@@ -417,6 +417,14 @@ class PluginSettings(BaseModel):
     disabled_all: bool = False
 
 
+class DeviceSettings(BaseModel):
+    """Settings › Devices (docs/specs/25-device-permission-profiles.md §7)."""
+
+    # The model of the relevance check; None: the background model (Settings > Models >
+    # Background tasks, usually the cheapest), then the chat model.
+    relevance_model_id: uuid.UUID | None = None
+
+
 @dataclass(frozen=True)
 class SectionSpec:
     model: type[BaseModel]
@@ -447,4 +455,5 @@ SECTIONS: dict[str, SectionSpec] = {
     "code": SectionSpec(CodeSettings),
     "images": SectionSpec(ImageSettings, sensitive=True),
     "plugins": SectionSpec(PluginSettings),
+    "devices": SectionSpec(DeviceSettings),
 }

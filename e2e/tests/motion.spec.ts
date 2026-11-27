@@ -19,6 +19,12 @@ test('dialogs, dropdowns and the search palette animate when they close', async 
   // "Visible" is about the page's layout; the opening animation starts with the next frame
   // the browser draws. Closing before that frame would skip it, so wait for it.
   await expect.poll(seen).toEqual(expect.arrayContaining(['pop-in', 'fade-in']))
+  // The notes editor is loaded lazily and mounts a moment after the dialog. On a slow runner
+  // drawing it can take longer than a closed dialog may linger (EXIT_LIMIT_MS), so a dialog
+  // closed meanwhile is removed before its closing animation starts. Wait until the editor
+  // is there and two frames have been drawn.
+  await expect(page.getByRole('dialog').getByRole('textbox', { name: 'Notes' })).toBeVisible()
+  await page.evaluate(() => new Promise((drawn) => requestAnimationFrame(() => requestAnimationFrame(drawn))))
   expect(await seen()).not.toContain('pop-out')
   await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog')).toHaveCount(0)

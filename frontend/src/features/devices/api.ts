@@ -144,3 +144,13 @@ export function useDeleteProfile() {
     onSuccess: () => qc.invalidateQueries({ queryKey: deviceProfilesKey }),
   })
 }
+
+/** Revokes a "the next hour" grant at once. */
+export function useRevokeGrant(deviceId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (grantId: string) =>
+      unwrap(await api.DELETE('/api/devices/{device_id}/grants/{grant_id}', { params: { path: { device_id: deviceId, grant_id: grantId } } })),
+    onSuccess: () => qc.invalidateQueries({ queryKey: devicePermissionsKey(deviceId) }),
+  })
+}

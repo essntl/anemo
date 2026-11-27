@@ -9,7 +9,7 @@ import { Select } from '@/components/ui/Select'
 import { Switch } from '@/components/ui/Switch'
 import { toast } from '@/components/ui/toast'
 import { dateLocale, t } from '@/lib/i18n'
-import { type DevicePermissions, type DeviceProfile, type WorkFolder, useDevicePermissions, useDeviceProfiles, useSetPermissions } from './api'
+import { type DevicePermissions, type DeviceProfile, type WorkFolder, useDevicePermissions, useDeviceProfiles, useRevokeGrant, useSetPermissions } from './api'
 import { CATEGORIES, LEVEL_LABELS, PRESETS, PROTECTED_LABELS, PROTECTED_LEVEL_LABELS, profileName } from './permissionLabels'
 
 function addedFrom(value: string): string {
@@ -39,6 +39,7 @@ function PermissionsForm({ deviceId, deviceName, current, profiles }: {
   profiles: DeviceProfile[]
 }) {
   const save = useSetPermissions()
+  const revoke = useRevokeGrant(deviceId)
   const [folders, setFolders] = useState<WorkFolder[]>(current.work_folders)
   const [newPath, setNewPath] = useState('')
   const profile = current.profile
@@ -136,6 +137,7 @@ function PermissionsForm({ deviceId, deviceName, current, profiles }: {
             <div key={g.id} className="flex items-center gap-2 text-[12.5px]">
               <code className="min-w-0 flex-1 truncate font-mono">{g.folder ?? t('one exact command')}</code>
               <span className="text-muted">{t('until {time}', { time: new Date(g.expires_at).toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit' }) })}</span>
+              <Button size="sm" variant="ghost" onClick={() => revoke.mutate(g.id, { onError: quietReauth })}>{t('Revoke')}</Button>
             </div>
           ))}
         </section>
