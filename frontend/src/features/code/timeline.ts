@@ -21,6 +21,39 @@
  *   command_lifecycle, control_request, control_response → nothing (bookkeeping of §15)
  */
 import type { Schemas } from '@/api/client'
+import { t } from '@/lib/i18n'
+
+/** The text inside <tag>…</tag> (the first one), trimmed; null when it isn't there. */
+function tagText(text: string, tag: string): string | null {
+  const match = new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`).exec(text)
+  return match ? match[1].trim() : null
+}
+
+/**
+ * Text Claude Code itself puts into the conversation as a user turn, not the user's words:
+ * - `<task-notification>` (a background command or task finished): a notice made from its
+ *   summary and status, e.g. 'Background command "Run CI" completed (exit code 0)';
+ * - `<system-reminder>` alone: nothing to show (notice null);
+ * - local command output (`<local-command-stdout>`, `<command-name>` …): a notice with it.
+ * Null for anything else (the user's own text).
+ */
+export function injectedText(text: string): { notice: string | null } | null {
+  const trimmed = text.trim()
+  if (trimmed.startsWith('<task-notification>')) {
+    const summary = tagText(trimmed, 'summary')
+    const status = tagText(trimmed, 'status')
+    if (summary) return { notice: status && !summary.toLowerCase().includes(status.toLowerCase()) ? `${summary} (${status})` : summary }
+    return { notice: status ? t('A background task ended: {status}', { status }) : t('A background task ended') }
+  }
+  if (/^<system-reminder>[\s\S]*<\/system-reminder>$/.test(trimmed)) return { notice: null }
+  const output = tagText(trimmed, 'local-command-stdout') ?? tagText(trimmed, 'local-command-stderr')
+  const command = tagText(trimmed, 'command-name')
+  if (output !== null || command !== null) {
+    const line = [command, output].filter(Boolean).join(': ')
+    return { notice: line.length > 300 ? `${line.slice(0, 299)}…` : line || null }
+  }
+  return null
+}
 
 export type CodeEvent = Schemas['CodeEventOut']
 
@@ -147,6 +180,9 @@ export type TimelineItem =
   | (Base & { kind: 'user'; text: string })
   /** A message sent while the job ran, taken in here (`at`: when its echo arrived). */
   | (Base & { kind: 'message'; text: string; at: string })
+  // Something Claude Code itself put in as a user turn (a background command finished, a
+  // local command's output): a quiet line, never the user's own message.
+  | (Base & { kind: 'notice'; text: string })
   | (Base & { kind: 'tool'; call: ToolCall })
   | (Base & { kind: 'raw'; text: string })
   /** An event too large to keep, of which only its type is left (§6 step 4). */
@@ -248,7 +284,10 @@ export function buildTimeline(events: readonly CodeEvent[]): TimelineItem[] {
           // Claude Code's echo of what it read on stdin: the prompt first, then each message.
           replays += 1
           const text = blocksOf(e).map((b) => str(b.text) ?? '').join('\n')
-          if (replays > 1 && text.trim()) into.push({ kind: 'message', key: key(), seq, trimmed, text, at: ev.created_at })
+          const injected = injectedText(text)
+          if (injected) {
+            if (injected.notice) into.push({ kind: 'notice', key: key(), seq, trimmed, text: injected.notice })
+          } else if (replays > 1 && text.trim()) into.push({ kind: 'message', key: key(), seq, trimmed, text, at: ev.created_at })
           break
         }
         const blocks = blocksOf(e)
@@ -272,7 +311,10 @@ export function buildTimeline(events: readonly CodeEvent[]): TimelineItem[] {
             }
           } else if (b.type === 'text') {
             const text = str(b.text) ?? ''
-            if (text.trim()) into.push({ kind: 'user', key: key(), seq, trimmed, text })
+            const injected = injectedText(text)
+            if (injected) {
+              if (injected.notice) into.push({ kind: 'notice', key: key(), seq, trimmed, text: injected.notice })
+            } else if (text.trim()) into.push({ kind: 'user', key: key(), seq, trimmed, text })
           }
         }
         break

@@ -305,6 +305,8 @@ function Item({ item, depth }: { item: TimelineItem; depth: number }) {
       return <Thinking text={item.text} />
     case 'user':
       return <div className="px-2 py-1"><p className="whitespace-pre-wrap break-words rounded-lg bg-surface-2 px-2.5 py-1.5 text-[12.5px] text-muted">{item.text}</p>{mark}</div>
+    case 'notice':
+      return <Quiet><span className="break-words">{item.text}</span></Quiet>
     case 'message':
       return (
         // The user's own message, on the right as in a chat, with when Claude Code took it in.

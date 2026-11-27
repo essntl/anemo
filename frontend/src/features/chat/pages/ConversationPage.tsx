@@ -52,6 +52,7 @@ import { EventCard } from '../components/EventCard'
 import { AssistantMessage, UserBubble } from '../components/MessageBubble'
 import { CompactionDivider } from '../components/CompactionDivider'
 import { contextWarning, parseCompact } from '../compaction'
+import { useChatCommands } from '../useChatCommands'
 import { Composer } from '../components/Composer'
 import { useChatModel } from '../chatModel'
 import { ChatOptionsSheet } from '../components/ChatOptionsSheet'
@@ -209,6 +210,30 @@ function Conversation() {
   const canEditLast = !activeRunId && answerIsLast && lastUser && !lastUser.event && lastAssistant && lastAssistant.seq === lastUser.seq + 1
   const project = projects.data?.find((p) => p.id === conversation.data?.project_id)
   const warning = contextWarning(chatContext.data)
+  const sendMessage = (text: string, attachmentIds: string[] = [], referenceIds: string[] = [], skillId: string | null = null) =>
+    question
+      ? answer.mutateAsync({ approvalId: question.approval!.id, decision: 'approve', answer: text })
+      : paused && activeRunId
+        ? resume.mutateAsync({ runId: activeRunId, message: text })
+        : parseCompact(text) && !attachmentIds.length
+          // /compact [focus]: summarizes the chat, sends no message.
+          ? compact.mutateAsync({ conversationId, focus: parseCompact(text)?.focus ?? null })
+          : send.mutateAsync({ conversationId, text, modelId: modelOverride, attachmentIds, referenceIds, mode, profileId, skillId })
+  const lastMessage = list[list.length - 1]
+  // The slash commands: the same state as the controls under the box (one source of truth).
+  const commands = useChatCommands({
+    conversation: conversation.data,
+    modelId,
+    defaultModelId,
+    setModel: setModelOverride,
+    mode,
+    setMode: setModeOverride,
+    profileId,
+    setProfile: setProfileOverride,
+    canRetry: !activeRunId && answerIsLast,
+    lastSeq: lastMessage?.seq ?? null,
+    compact: (focus) => sendMessage(`/compact ${focus}`.trim()),
+  })
   const actionError = send.error ?? compact.error ?? regenerate.error ?? selectVersion.error ?? cancel.error ?? resume.error ?? editLast.error ?? branch.error ?? answer.error
   // A paused agent run: a message resumes it (the agent reads the message first).
   const paused = Boolean(activeRunId) && live.status === 'paused'
@@ -401,16 +426,8 @@ function Conversation() {
           // An answer to the agent, or a message to resume with, is text.
           filesOnly={!question && !paused}
           onSkillChange={(skill) => skill?.mode === 'agent' && setModeOverride('agent')}
-          onSend={(text, attachmentIds, referenceIds, skillId) =>
-            question
-              ? answer.mutateAsync({ approvalId: question.approval!.id, decision: 'approve', answer: text })
-              : paused && activeRunId
-                ? resume.mutateAsync({ runId: activeRunId, message: text })
-                : parseCompact(text) && !attachmentIds.length
-                  // /compact [focus]: summarizes the chat, sends no message.
-                  ? compact.mutateAsync({ conversationId, focus: parseCompact(text)?.focus ?? null })
-                  : send.mutateAsync({ conversationId, text, modelId: modelOverride, attachmentIds, referenceIds, mode, profileId, skillId })
-          }
+          onSend={sendMessage}
+          commands={!question && !paused ? commands : undefined}
           onStop={() => activeRunId && cancel.mutate(activeRunId)}
           controls={{
             mode: <ModeSwitch mode={mode} onChange={setModeOverride} />,

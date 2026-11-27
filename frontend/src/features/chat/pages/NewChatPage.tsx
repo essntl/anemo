@@ -112,20 +112,21 @@ export function NewChatPage() {
   const qc = useQueryClient()
   const settings = useSettings()
   const setup = useSetupStatus()
-  const [modelId, setModelId] = useState<string | null>(null)
-  const [modeOverride, setModeOverride] = useState<Mode | null>(null)
+  const started = useLocation().state as NewChatState | null
+  const [modelId, setModelId] = useState<string | null>(started?.modelId ?? null)
+  const [modeOverride, setModeOverride] = useState<Mode | null>(started?.mode ?? null)
   // "Ask the assistant" on a document opens a new chat about it: the agent can read
   // (and, if allowed, edit) the file, so Agent mode is preselected.
   const [params] = useSearchParams()
   const aboutDoc = params.get('doc')
   // Started from elsewhere with attachments already made ("Ask about this sketch").
-  const startedWith = (useLocation().state as NewChatState | null)?.attachments
+  const startedWith = started?.attachments
   const mode: Mode = modeOverride ?? (aboutDoc ? 'agent' : (settings.data?.general.default_chat_mode ?? 'chat'))
   // A chat started while a project is chosen belongs to it, and starts with its defaults.
   const scope = useScope()
   const project = scope.kind === 'project' ? scope.project : null
   const chatModel = useChatModel(modelId ?? project?.default_model_id ?? settings.data?.models.chat ?? null)
-  const [profileOverride, setProfileId] = useState<string | null | undefined>(undefined)
+  const [profileOverride, setProfileId] = useState<string | null | undefined>(started?.profileId)
   const profileId = profileOverride !== undefined ? profileOverride : (project?.default_profile_id ?? null)
   // A temporary chat is deleted five minutes after its last message (?temporary=1 starts one).
   const [temporary, setTemporary] = useState(params.get('temporary') === '1')

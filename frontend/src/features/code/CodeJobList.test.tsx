@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -158,9 +158,19 @@ describe('the usage indicator', () => {
     expect(within(bar).getByText('91%')).toBeTruthy()
     expect(within(bar).getByText('25%')).toBeTruthy()
     expect(within(bar).getByText(/^resets /)).toBeTruthy()
-    expect(within(bar).getByText(/^as of /)).toBeTruthy()
+    // When it was measured is in the popup, not in the row.
+    expect(within(bar).queryByText(/as of /)).toBeNull()
     const meters = within(bar).getAllByRole('meter')
     expect(meters[0].getAttribute('aria-valuenow')).toBe('91')
+    const button = within(bar).getByRole('button')
+    expect(screen.queryByRole('tooltip')).toBeNull()
+    fireEvent.focus(button) // a keyboard reaches it too; a tap is a click
+    const popup = screen.getByRole('tooltip')
+    expect(popup).toHaveTextContent(/Measured 5 min.? ago/)
+    expect(popup).toHaveTextContent('Weekly')
+    expect(popup.textContent?.match(/resets /g)?.length).toBe(2)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('tooltip')).toBeNull()
     // One computer: its name isn't repeated.
     expect(within(bar).queryByText('Desk PC')).toBeNull()
   })
