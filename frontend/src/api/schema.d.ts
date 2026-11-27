@@ -5942,6 +5942,15 @@ export interface components {
              * @default 50
              */
             glass_strength: number;
+            /**
+             * Full Width
+             * @default false
+             */
+            full_width: boolean;
+            /** Full Width Pages */
+            full_width_pages?: {
+                [key: string]: boolean;
+            };
         };
         /** AppendTo */
         AppendTo: {
@@ -8822,6 +8831,22 @@ export interface components {
             name: string;
             /** Commit */
             commit: string;
+        };
+        /**
+         * GridPlace
+         * @description Where a widget sits on Home's free grid (full width, Settings > Appearance): the
+         *     column and row of its top-left cell and how many it spans (12 columns, rows of
+         *     half a slot).
+         */
+        GridPlace: {
+            /** X */
+            x: number;
+            /** Y */
+            y: number;
+            /** W */
+            w: number;
+            /** H */
+            h: number;
         };
         /** GroupUndoOut */
         GroupUndoOut: {
@@ -14012,7 +14037,9 @@ export interface components {
         };
         /**
          * WidgetLayout
-         * @description One widget on the Home page. `w` columns and `h` rows (1-3 each).
+         * @description One widget on the Home page. `w` columns and `h` rows (1-3 each) in the usual
+         *     slots; `grid`: its place on the free grid, None until Home is first arranged there
+         *     (the browser then works it out from the slots, so nothing moves).
          */
         WidgetLayout: {
             /** Id */
@@ -14041,6 +14068,7 @@ export interface components {
             options?: {
                 [key: string]: string | null;
             };
+            grid?: components["schemas"]["GridPlace"] | null;
         };
         /**
          * WorkspaceSettings

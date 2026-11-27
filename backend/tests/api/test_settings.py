@@ -32,6 +32,8 @@ async def test_settings_have_defaults(authed):
         },
         "glass": False,
         "glass_strength": 50,
+        "full_width": False,
+        "full_width_pages": {},
     }
     assert body["profile"] == {"display_name": "", "avatar_id": None}
     assert body["general"]["default_chat_mode"] == "chat"
@@ -66,7 +68,15 @@ async def test_focus_home_and_files_sections(authed):
     assert body["files"] == {"show_documents_folder": False, "device_file_max_mb": 50}
 
     layout = [
-        {"id": "focus", "w": 2, "h": 1, "hidden": False, "pinned": False, "options": {}},
+        {
+            "id": "focus",
+            "w": 2,
+            "h": 1,
+            "hidden": False,
+            "pinned": False,
+            "options": {},
+            "grid": None,
+        },
         {
             "id": "briefing",
             "w": 1,
@@ -74,6 +84,7 @@ async def test_focus_home_and_files_sections(authed):
             "hidden": True,
             "pinned": False,
             "options": {"automation_id": None},
+            "grid": None,
         },
     ]
     r = await authed.put("/api/settings/home", json={"layout": layout})
@@ -82,7 +93,17 @@ async def test_focus_home_and_files_sections(authed):
     assert home == {"layout": layout, "mobile_layout": []}
 
     # Phones keep a layout of their own.
-    mobile = [{"id": "music", "w": 1, "h": 1, "hidden": False, "pinned": False, "options": {}}]
+    mobile = [
+        {
+            "id": "music",
+            "w": 1,
+            "h": 1,
+            "hidden": False,
+            "pinned": False,
+            "options": {},
+            "grid": None,
+        }
+    ]
     r = await authed.put("/api/settings/home", json={"layout": layout, "mobile_layout": mobile})
     assert r.status_code == 200
     home = (await authed.get("/api/settings")).json()["home"]
@@ -93,6 +114,36 @@ async def test_focus_home_and_files_sections(authed):
     assert r.status_code == 422
     r = await authed.put("/api/settings/focus", json={"focus_minutes": 0})
     assert r.status_code == 422
+
+
+async def test_home_free_grid_places(authed):
+    """Full width: a widget keeps its place on the free grid next to its slot size."""
+    place = {"x": 4, "y": 2, "w": 8, "h": 3}
+    layout = [{"id": "focus", "w": 1, "h": 2, "grid": place}, {"id": "music", "w": 1, "h": 1}]
+    r = await authed.put("/api/settings/home", json={"layout": layout})
+    assert r.status_code == 200, r.text
+    saved = (await authed.get("/api/settings")).json()["home"]["layout"]
+    assert saved[0]["grid"] == place and saved[0]["w"] == 1
+    assert saved[1]["grid"] is None  # not arranged on the grid yet
+
+    # 12 columns: it can't start past the last one or span more than all of them.
+    for bad in ({**place, "x": 12}, {**place, "w": 13}, {**place, "h": 0}, {**place, "y": -1}):
+        r = await authed.put("/api/settings/home", json={"layout": [{"id": "focus", "grid": bad}]})
+        assert r.status_code == 422, bad
+
+
+async def test_full_width_and_its_page_choices(authed):
+    r = await authed.put(
+        "/api/settings/appearance",
+        json={"full_width": True, "full_width_pages": {"chat": False, "home": True}},
+    )
+    assert r.status_code == 200, r.text
+    saved = (await authed.get("/api/settings")).json()["appearance"]
+    assert saved["full_width"] is True
+    assert saved["full_width_pages"] == {"chat": False, "home": True}
+
+    r = await authed.put("/api/settings/appearance", json={"full_width_pages": {"stats": True}})
+    assert r.status_code == 422  # only the pages with a button of their own
 
 
 async def test_language_is_a_general_setting(authed):
