@@ -1245,7 +1245,9 @@ class ComputerShell(Tool):
             )
         timeout = min(args.timeout_s, ctx.limits.max_shell_timeout_s)
         fields: dict[str, Any] = {"command": args.command, "timeout_s": timeout}
-        fields.update(await _decision_fields(ctx, device, args.command))
+        known = _known(ctx, args.device)
+        if known is not None and "profiles" in (known.get("capabilities") or []):
+            fields.update(await _decision_fields(ctx, device, args.command))
         result = await _send(ctx, device, "shell", fields, timeout + SHELL_GRACE_S)
         if isinstance(result, _Stale):
             # The device's copy of its profile is older than what this was decided with:
