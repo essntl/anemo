@@ -414,6 +414,12 @@ on the same files. Sub-folders are groups; images you drop in go to
   and *Unarchive* are in the row menu. Titles wrap to two lines, a start several titles
   share is fainter, and each row shows its status, type and age. Drag the list's edge
   to make it wider. These choices are remembered on the device, per project.
+- **Tidy up** (the sparkles button over the list) asks the background model about the
+  documents in view (up to 200, not the archived ones). It may suggest types, statuses
+  and existing tags, archiving what looks finished, a clearer title, or a move into an
+  existing folder. You tick the changes you want and apply them. Each one is a normal
+  revision or move, so Activity can undo it. A new title changes the document's
+  title, not its file name, so links and paths keep working.
 - **Agents** can list, read, search, create and edit documents. Reading follows the
   file-read permission and the folder access for `documents`; writing has its own
   category, *Edit documents* (asks by default). Their changes are in the history

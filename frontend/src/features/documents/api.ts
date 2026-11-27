@@ -244,3 +244,32 @@ export function useArchiveDocument() {
     },
   })
 }
+
+export type TidyOut = Schemas['TidyOut']
+export type TidySuggestion = Schemas['TidySuggestionOut']
+export type TidyChange = Schemas['TidyChange']
+/** At most this many documents are looked at in one go (the server's limit). */
+export const TIDY_MAX = 200
+
+/** Tidy up: the model's checked suggestions for these documents. Changes nothing. */
+export function useTidySuggestions() {
+  return useMutation({
+    mutationFn: async (v: { ids: string[]; within: string | null }) =>
+      unwrap(await api.POST('/api/documents/tidy', { body: { document_ids: v.ids, within: v.within } })),
+  })
+}
+
+/** Makes the chosen tidy-up changes (a revision or a move each, undoable in Activity). */
+export function useApplyTidy() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (v: { changes: (TidyChange & { document_id: string })[]; within: string | null }) =>
+      unwrap(await api.POST('/api/documents/tidy/apply', { body: { changes: v.changes, within: v.within } })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: documentsKey })
+      void qc.invalidateQueries({ queryKey: ['document'] })
+      void qc.invalidateQueries({ queryKey: ['properties'] })
+      void qc.invalidateQueries({ queryKey: ['views'] })
+    },
+  })
+}
