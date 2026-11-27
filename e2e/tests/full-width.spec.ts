@@ -11,7 +11,8 @@ import { login, signOutAfterEach, useHomeLayout } from './helpers'
  */
 
 signOutAfterEach()
-test.use({ viewport: { width: 1440, height: 1000 } })
+// Tall enough that no drag comes near the bottom edge, where the page scrolls along.
+test.use({ viewport: { width: 1440, height: 1400 } })
 
 type Saved = { id: string; grid: { x: number; y: number; w: number; h: number } | null; hidden: boolean }
 
