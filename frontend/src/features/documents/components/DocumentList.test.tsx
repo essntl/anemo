@@ -67,6 +67,12 @@ describe('the list of documents', () => {
     expect(screen.queryByText('Meeting notes')).toBeNull()
     expect(screen.getByText('Uncategorized')).toBeInTheDocument()
   })
+
+  it('Uncategorized with no project folders lists everything, top level included', () => {
+    show({ outside: [] })
+    expect(screen.getAllByRole('link')).toHaveLength(4)
+    expect(screen.getByText('Shopping list')).toBeInTheDocument()
+  })
 })
 
 describe('a new sketch', () => {

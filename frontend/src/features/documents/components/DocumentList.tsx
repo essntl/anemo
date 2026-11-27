@@ -32,14 +32,15 @@ export function DocumentList({ currentFolder, projectFolder, projectName, outsid
 
   const everything = documents.data?.documents
   const q = query.trim().toLowerCase()
-  // A key for the folders (a new array each render; folder names have no '|' in them).
-  const outsideKey = outside?.join('|')
+  // A key for the folders (a new array each render). JSON keeps an empty list empty:
+  // joined with a separator, [] came back as [''], which hid every top-level document.
+  const outsideKey = outside && JSON.stringify(outside)
   // Worked out again only when the documents, the place or the search change: the list
   // below keeps its measured rows between renders.
   const { all, rows } = useMemo(() => {
     const docs = everything ?? []
     const within = (folder: string, parent: string) => folder === parent || folder.startsWith(`${parent}/`)
-    const away = outsideKey?.split('|')
+    const away = outsideKey === undefined ? undefined : (JSON.parse(outsideKey) as string[])
     const all = projectFolder
       ? docs.filter((d) => within(d.folder, projectFolder))
       : away
