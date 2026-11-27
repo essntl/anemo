@@ -869,8 +869,8 @@ async def test_what_the_client_sends_is_capped(fake):
     ctx = await _ctx(fake)
     result = await LOOK.run(computer.LookInput(device="VM"), ctx)
     assert "[c299]" in result.content and "[c300]" not in result.content
-    assert result.content.count("y") <= 40_000 + 100 and "cut off" in result.content
-    assert len(result.content) < 40_000 + 300 * 2 * 310 + 2_000
+    assert result.content.count("y") <= 12_000 + 100 and "cut off" in result.content
+    assert len(result.content) < 12_000 + 300 * 2 * 310 + 2_000
 
     fake.answer = {"windows": [{"ref": f"w{i}", "title": long, "app": "a"} for i in range(500)]}
     result = await LOOK.run(computer.LookInput(device="VM", what="windows"), ctx)
@@ -887,6 +887,10 @@ async def test_window_ref_is_sent_only_for_a_window_and_shell_time_is_capped(fak
 
     fake.add("VM", "trusted", shell=True)
     ctx = await _ctx(fake, limits=Limits(max_shell_timeout_s=100))
+    # A look is at the window in front unless the whole screen is asked for: on several
+    # monitors the whole screen is a strip too small to read.
+    await LOOK.run(computer.LookInput(device="VM"), ctx)
+    assert fake.sent[-1][2] == {"what": "window"}
     await LOOK.run(computer.LookInput(device="VM", what="screen", window_ref="w2"), ctx)
     assert fake.sent[-1][2] == {"what": "screen"}
     await LOOK.run(computer.LookInput(device="VM", what="window", window_ref="w2"), ctx)
