@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mutate = vi.fn()
+const revoke = vi.fn()
 const profiles = [
   { id: 'p-scoped', name: 'Scoped', preset: 'scoped', categories: { see: 'allow', act: 'ask', shell: 'folders', files: 'folders', code: 'ask' }, relevance_check: true, devices: 1, description: '' },
   { id: 'p-watched', name: 'Watched', preset: 'watched', categories: { see: 'policy', act: 'ask', shell: 'deny', files: 'deny', code: 'deny' }, relevance_check: false, devices: 0, description: '' },
@@ -20,12 +21,13 @@ const permissions = {
   ],
   automations_unrestricted: false,
   version: 3,
-  grants: [],
+  grants: [{ id: 'g1', folder: 'C:\Users\a\Pictures', command_hash: null, expires_at: '2030-01-01T10:00:00Z' }],
 }
 vi.mock('./api', () => ({
   useDevicePermissions: () => ({ data: permissions, isError: false }),
   useDeviceProfiles: () => ({ data: profiles }),
   useSetPermissions: () => ({ mutate, isPending: false }),
+  useRevokeGrant: () => ({ mutate: revoke, isPending: false }),
 }))
 
 const { DevicePermissionsPanel } = await import('./DevicePermissions')
@@ -62,6 +64,13 @@ describe('Settings → Devices → Permissions', () => {
         ],
       },
     }, expect.anything())
+  })
+
+  it('revokes a grant for the next hour', async () => {
+    render(<DevicePermissionsPanel deviceId="d1" deviceName="Main PC" />)
+    expect(screen.getByText('C:\Users\a\Pictures')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Revoke' }))
+    expect(revoke).toHaveBeenCalledWith('g1', expect.anything())
   })
 
   it('switches the automation switch at once', async () => {

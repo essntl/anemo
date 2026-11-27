@@ -20,6 +20,9 @@ from app.core.errors import AppError, Conflict, NotFound
 from app.events import bus
 from app.features.activity import service as activity
 from app.features.audit import service as audit
+from app.features.devices import profiles as device_profiles
+from app.features.devices import service as devices_service
+from app.features.devices.models import Device
 from app.features.runs import service
 from app.features.runs.models import Approval, FileChange, Run, ToolCall
 from app.features.runs.router import PlanIn
@@ -162,13 +165,68 @@ async def list_approvals(
 class DecisionIn(BaseModel):
     decision: Literal["approve", "deny"]
     # "run": also allow the same kind of action (same capability, same folder) for the
-    # rest of this run without asking again.
-    scope: Literal["once", "run"] = "once"
+    # rest of this run without asking again. For a command on a computer (spec 25 §6.2):
+    # "folder" makes the folder a work folder of that device, "hour" allows writes,
+    # deletes and runs there for the next hour, "command" this exact command for an hour.
+    scope: Literal["once", "run", "folder", "hour", "command"] = "once"
+    # "folder" and "hour": the call's folder or its parent ("use the parent folder").
+    folder: str | None = Field(None, max_length=400)
     reason: str | None = Field(None, max_length=500)
     # Plan reviews: the steps as edited by the user (omit to accept the plan as proposed).
     plan: PlanIn | None = None
     # Questions: "approve" with the user's answer; "deny" leaves the choice to the agent.
     answer: str | None = Field(None, max_length=4000)
+
+
+def _device_options(call: ToolCall) -> dict[str, Any] | None:
+    """What a computer call's approval offers (Action.device, spec 25 §6.2), if any."""
+    for action in call.actions:
+        device = action.get("device")
+        if isinstance(device, dict):
+            return device
+    return None
+
+
+async def _device_scope(
+    db: AsyncSession, approval: Approval, call: ToolCall, body: DecisionIn
+) -> Device | None:
+    """Once / This folder / The next hour (spec 25 §6.2): only what the call offered, and
+    only for its own folder or that folder's parent. Doesn't commit."""
+    options = _device_options(call)
+    if options is None or body.scope not in (options.get("scopes") or []):
+        raise AppError("That choice isn't offered for this action", code="scope_not_offered")
+    device = await db.get(Device, uuid.UUID(str(options.get("device_id"))))
+    if device is None:
+        raise NotFound("Device not found")
+    if body.scope == "command":
+        await device_profiles.add_grant(
+            db,
+            device,
+            folder=None,
+            command_hash=str(options.get("command_hash")),
+            approval_id=approval.id,
+        )
+        return None
+    offered = [f for f in (options.get("folder"), options.get("parent_folder")) if f]
+    folder = body.folder or (offered[0] if offered else None)
+    if folder is None or folder not in offered:
+        raise AppError("That folder isn't offered for this action", code="folder_not_offered")
+    approval.scope = body.scope
+    if body.scope == "hour":
+        await device_profiles.add_grant(
+            db, device, folder=folder, command_hash=None, approval_id=approval.id
+        )
+        return None
+    # "This folder": a work folder of that device from now on, until removed in Settings.
+    await device_profiles.set_permissions(
+        db,
+        device,
+        work_folders=device_profiles.with_work_folder(device, folder),
+        ip=None,
+        audit_action="device.work_folder_added",
+        commit=False,
+    )
+    return device  # its new profile goes to it once this is committed
 
 
 def grant_for(call: ToolCall) -> Grant:
@@ -214,6 +272,7 @@ async def decide_approval(
     if run.status != "waiting_approval":
         raise Conflict("The run is no longer waiting for approval", code="run_not_waiting")
 
+    synced: Device | None = None
     approval.status = "approved" if body.decision == "approve" else "denied"
     approval.scope = body.scope if body.decision == "approve" else None
     approval.reason = body.reason
@@ -230,7 +289,14 @@ async def decide_approval(
         if body.decision == "approve" and body.plan is not None:
             call.args = {"steps": [s.model_dump() for s in body.plan.steps]}
     elif body.decision == "approve" and body.scope == "run":
+        if _device_options(call) is not None:
+            raise AppError(
+                "A command on a computer can't be allowed for the whole run",
+                code="scope_not_offered",
+            )
         run.grants = [*run.grants, grant_for(call).model_dump()]
+    elif body.decision == "approve" and body.scope in ("folder", "hour", "command"):
+        synced = await _device_scope(db, approval, call, body)
     audit.record(
         db,
         f"approval.{approval.status}",
@@ -250,6 +316,8 @@ async def decide_approval(
         run.id, "approval.resolved", {"approval_id": str(approval.id), "status": approval.status}
     )
     await service.set_status(db, run, "queued")  # commits
+    if synced is not None:
+        await devices_service.permissions_changed(synced)
     await bus.publish_global(
         "approval.decided",
         {"approval_id": str(approval.id), "run_id": str(run.id), "decision": body.decision},

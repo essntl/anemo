@@ -238,5 +238,18 @@ const messages: Messages = {
   "Hide the items": "Скрыть элементы",
   "Show the {n} item | Show all {n} items": "Показать {n} элемент | Показать все {n} элемента | Показать все {n} элементов",
   "Items in this batch": "Элементы этой группы изменений",
+  "Anemo Desktop on {device}: {rule}": "Anemo Desktop на «{device}»: {rule}",
+  "Folder:": "Папка:",
+  "It can’t tell: {what}": "Не удаётся определить: {what}",
+  "Make {folder} a work folder of {device}, until you remove it in Settings": "Сделать {folder} рабочей папкой на «{device}», пока вы не уберёте её в настройках",
+  "The next hour": "Ближайший час",
+  "This exact command for the next hour": "Именно эту команду на час",
+  "This folder": "Эту папку",
+  "Writes, deletes and programs in {folder} on {device}, in every chat, for 60 minutes": "Запись, удаление и программы в {folder} на «{device}», в каждом чате, в течение 60 минут",
+  "deletes": "удаляет",
+  "reads": "читает",
+  "runs a program in": "запускает программу в",
+  "use the parent folder": "взять родительскую папку",
+  "writes": "записывает",
 }
 export default messages

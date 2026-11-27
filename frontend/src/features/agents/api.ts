@@ -49,7 +49,9 @@ export function useDecide(runId: string) {
     mutationFn: async (v: {
       approvalId: string
       decision: 'approve' | 'deny'
-      scope?: 'once' | 'run'
+      scope?: 'once' | 'run' | 'folder' | 'hour' | 'command'
+      /** "This folder" and "The next hour" on a computer: the call's folder or its parent. */
+      folder?: string
       reason?: string
       /** Plan reviews: the steps as edited by the user. */
       plan?: { title: string; status?: 'pending' | 'in_progress' | 'done' | 'skipped' }[]
@@ -65,6 +67,7 @@ export function useDecide(runId: string) {
             reason: v.reason ?? null,
             plan: v.plan ? { steps: v.plan.map((s) => ({ title: s.title, status: s.status ?? 'pending' })) } : null,
             answer: v.answer ?? null,
+            folder: v.folder ?? null,
           },
         }),
       ),
