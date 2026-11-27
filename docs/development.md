@@ -38,6 +38,14 @@ KEEP=1 sh e2e/run-isolated.sh       # leave it running to look around
 E2E_BROWSER=1 sh e2e/run-isolated.sh  # also test the agents' browser
 ```
 
+The specs run in 4 Playwright workers (`E2E_WORKERS` to change it), all against the same
+single-user app, so a test must not change what other tests rely on. Keep a change private
+(`newAgentChatWithLevels` gives one chat its own permission levels instead of changing
+Settings) or, for what exists once (the focus timer, the Home layout), take its lock
+(`useStoppedTimer`, `useHomeLayout`; `e2e/tests/appLock.ts`). A test that checks the Island
+calls `ignoreAppEvents` first, so other tests' agent alerts don't show up in it. Look things
+up by name, not with `.first()` on a shared list.
+
 You can also point the tests at a running install
 (`cd e2e && E2E_PASSWORD=<password> npx playwright test`). Tests that need a model
 only run if the fake provider (`ENABLE_FAKE_PROVIDER=true`) is added there, and skip

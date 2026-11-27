@@ -86,7 +86,9 @@ function useMoveToProject(onShowFolder: (path: string) => void) {
   const projects = useProjects()
   const move = useMove()
   const run = async (entry: Entry) => {
-    const active = (projects.data ?? []).filter((p) => !p.archived)
+    // Clicked before the projects have loaded: wait for them, or the list would be empty.
+    const all = projects.data ?? (await projects.refetch()).data ?? []
+    const active = all.filter((p) => !p.archived)
     const isDocument = entry.path === 'documents' || entry.path.startsWith('documents/')
     const folderOf = (p: (typeof active)[number]) => (isDocument ? p.documents_path : p.files_path)
     const chosen = await chooseDialog({
