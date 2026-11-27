@@ -1,7 +1,15 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
+import { listRows } from '../listRows'
+
+// jsdom lays nothing out: give the list a window's height, so the rows in sight are drawn.
+beforeAll(() => {
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(600)
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(300)
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(50) // each row
+})
 
 const doc = (id: string, title: string, folder: string, kind = 'markdown') => ({
   id, title, folder, kind, path: `documents/${folder ? `${folder}/` : ''}${id}.md`, updated_at: '2026-11-10T10:00:00Z', word_count: 10, last_editor: 'user',
@@ -20,6 +28,24 @@ const show = (props: Partial<Parameters<typeof DocumentList>[0]>, address = '/do
   render(<MemoryRouter initialEntries={[address]}><DocumentList currentFolder="" {...props} /></MemoryRouter>)
 
 describe('the list of documents', () => {
+  it('draws only the rows in sight of a long list, folders before their documents', () => {
+    const many = Array.from({ length: 6000 }, (_, i) => doc(`n${i}`, `Note ${i}`, i % 2 ? 'odd' : ''))
+    const rows = listRows(many as never) // the fixtures leave out what the list does not show
+    expect(rows).toHaveLength(6001) // one folder heading
+    expect(rows[0]).toMatchObject({ kind: 'doc', key: 'n0' })
+    expect(rows[3000]).toMatchObject({ kind: 'folder', folder: 'odd' })
+
+    documents.push(...many)
+    try {
+      show({})
+      const links = screen.getAllByRole('link')
+      expect(links.length).toBeGreaterThan(5)
+      expect(links.length).toBeLessThan(60) // not 6004
+    } finally {
+      documents.splice(4)
+    }
+  })
+
   it('All lists every document', () => {
     show({})
     expect(screen.getAllByRole('link')).toHaveLength(4)
