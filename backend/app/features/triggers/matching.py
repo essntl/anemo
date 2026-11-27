@@ -3,7 +3,8 @@ are tested on their own (tests/unit/test_trigger_matching.py).
 
   check_filter()   a filter is valid for its event type (raises ValueError)
   matches()        the event's data passes the filter
-  loop_reason()    the event was caused by the trigger's own automation or chat
+  loop_reason()    the event was caused by the trigger's own automation or chat, or
+                   an automation's chain of firings is too long
   over_limit()     the trigger fired too often in the last hour
 """
 
@@ -12,10 +13,11 @@ from typing import Any
 
 from app.features.triggers.catalogue import EventType
 
-MAX_DEPTH = 3  # events this many firings deep fire nothing
+MAX_DEPTH = 3  # events this many firings deep fire no automation
 MAX_FILTER_VALUES = 20
 MAX_FILTER_TEXT = 300
 HOUR = timedelta(hours=1)
+DAY = timedelta(hours=24)  # the window of a chat's wake-up budget
 
 
 def _scalar(value: Any) -> bool:
@@ -79,9 +81,10 @@ def loop_reason(
     conversation_id: str | None = None,
 ) -> str | None:
     """Why the event must not fire this trigger, or None. An automation's own runs never
-    fire its triggers; a chat's own runs never wake it; and a chain of firings stops at
-    MAX_DEPTH."""
-    if depth >= MAX_DEPTH:
+    fire its triggers; a chat's own runs never wake it; and a chain of firings starts no
+    automation from MAX_DEPTH on. A chat's wake-me has no depth cap (it is there to be
+    set again and again): the dispatcher gives each chat a budget of wake-ups instead."""
+    if automation_id and depth >= MAX_DEPTH:
         return f"too deep: {depth} firings led to this event"
     if automation_id and actor_ref.startswith(f"automation:{automation_id}/"):
         return "caused by this automation's own run"

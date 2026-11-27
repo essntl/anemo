@@ -25950,6 +25950,13 @@
             "minimum": 1.0,
             "title": "Max Trigger Firings Per Hour",
             "default": 60
+          },
+          "max_wakes_per_chat_per_day": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Max Wakes Per Chat Per Day",
+            "default": 25
           }
         },
         "type": "object",
