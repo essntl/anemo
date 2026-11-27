@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { CornerDownRight, Timer, Trash2, X } from 'lucide-react'
 import { errorMessage } from '@/api/client'
@@ -9,7 +9,6 @@ import { Field, Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { cn } from '@/lib/cn'
 import { plural, t } from '@/lib/i18n'
-import { RichEditor } from '@/features/documents/components/RichEditor'
 import { tidyMarkdown } from '@/features/documents/markdown'
 import { useFocusOnTask } from '@/features/focus/focusOnTask'
 import { LinksPanel } from '@/features/links/LinksPanel'
@@ -38,6 +37,12 @@ import { REMINDER_OPTIONS } from '../dates'
 import { askAboutSubtasks, openSubtasksLeft, parentCandidates } from '../relations'
 import { repeatOptions } from '../repeat'
 import { BlockedByEditor, ChecklistEditor, SubtaskList } from './TaskStructure'
+
+// The notes editor (Tiptap, ~500 kB) loads when a task is opened, not with every page
+// that can open one (Home, Tasks, Calendar).
+const RichEditor = lazy(() =>
+  import('@/features/documents/components/RichEditor').then((m) => ({ default: m.RichEditor })),
+)
 
 const NEW_PROJECT = '__new__'
 
@@ -192,8 +197,10 @@ export function TaskDialog({ task, defaults, onClose, onOpenTask, panel }: TaskD
           </div>
           <div className="md:-ml-1"><ChecklistEditor items={checklist} onChange={setChecklist} /></div>
           {/* Stored as Markdown, like documents. An empty editor gives an empty text. */}
-          <RichEditor variant="notes" className="md:-ml-3 md:flex-1" label={t('Notes')} initial={task?.description ?? ''} onOpenAppLink={openLink}
-            onChange={(markdown) => setDescription(markdown.trim() ? tidyMarkdown(markdown) : '')} />
+          <Suspense fallback={<div className="min-h-24 md:-ml-3 md:flex-1" />}>
+            <RichEditor variant="notes" className="md:-ml-3 md:flex-1" label={t('Notes')} initial={task?.description ?? ''} onOpenAppLink={openLink}
+              onChange={(markdown) => setDescription(markdown.trim() ? tidyMarkdown(markdown) : '')} />
+          </Suspense>
         </div>
         </div>
 
