@@ -13,17 +13,16 @@ import { formatWhen } from '@/lib/format'
 import { msg, t } from '@/lib/i18n'
 import { DeviceCodeCard } from './DeviceCodeCard'
 import { DeviceFilesCard } from './DeviceFilesCard'
-import { type Device, type DeviceKind, type DeviceTrust, useAddDevice, useDeleteDevice, useDevices, useRenameDevice, useSetTrust } from './api'
+import { DevicePermissionsPanel } from './DevicePermissions'
+import { DeviceProfilesCard } from './DeviceProfilesCard'
+import { PRESETS, profileName } from './permissionLabels'
+import { type Device, type DeviceKind, useAddDevice, useDeleteDevice, useDeviceProfiles, useDevices, useRenameDevice, useSetPermissions } from './api'
 
 const KINDS = [
   { value: 'computer' as const, label: msg('Computer') },
   { value: 'phone' as const, label: msg('Phone') },
 ]
 
-const TRUST = [
-  { value: 'watched' as const, label: msg('Watched'), hint: msg('Every click and keystroke asks first; no PowerShell. For your own PC and laptop.') },
-  { value: 'trusted' as const, label: msg('Trusted'), hint: msg('As your Agent Permissions say, PowerShell included. For the agent’s own VM.') },
-]
 
 /** The token just made: shown once, here, until Done. */
 function NewDevice({ name, kind, token, onDone }: { name: string; kind: DeviceKind; token: string; onDone: () => void }) {
@@ -66,14 +65,18 @@ function AddDevice({ onAdded }: { onAdded: (made: { name: string; kind: DeviceKi
   const add = useAddDevice()
   const [name, setName] = useState('')
   const [kind, setKind] = useState<DeviceKind>('computer')
-  const [trust, setTrust] = useState<DeviceTrust>('watched')
+  const profiles = useDeviceProfiles()
+  const watched = profiles.data?.find((p) => p.preset === 'watched')
+  const [chosen, setChosen] = useState<string | null>(null)
+  const profileId = chosen ?? watched?.id ?? null
+  const profile = profiles.data?.find((p) => p.id === profileId)
   const nameId = useId()
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) return
     add.mutate(
-      { name: name.trim(), kind, trust: kind === 'computer' ? trust : 'watched' },
+      { name: name.trim(), kind, trust: 'watched', ...(kind === 'computer' && profileId ? { profile_id: profileId } : {}) },
       {
         onSuccess: (made) => {
           onAdded({ name: made.name, kind: made.kind, token: made.token })
@@ -98,12 +101,12 @@ function AddDevice({ onAdded }: { onAdded: (made: { name: string; kind: DeviceKi
         <Segmented<DeviceKind> label={t('Kind')} className="self-start" value={kind} onChange={setKind}
           options={KINDS.map((k) => ({ value: k.value, label: t(k.label) }))} />
       </div>
-      {kind === 'computer' && (
+      {kind === 'computer' && profiles.data && profileId && (
         <div className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-medium">{t('Trust')}</span>
-          <Segmented<DeviceTrust> label={t('Trust')} className="self-start" value={trust} onChange={setTrust}
-            options={TRUST.map((o) => ({ value: o.value, label: t(o.label) }))} />
-          <span className="text-[12px] text-muted">{t(TRUST.find((o) => o.value === trust)!.hint)}</span>
+          <span className="text-[13px] font-medium">{t('Permission profile')}</span>
+          <Select className="sm:max-w-xs" aria-label={t('Permission profile')} value={profileId} onValueChange={setChosen}
+            options={profiles.data.map((p) => ({ value: p.id, label: profileName(p) }))} />
+          {profile?.preset && PRESETS[profile.preset] && <span className="text-[12px] text-muted">{t(PRESETS[profile.preset].description)}</span>}
         </div>
       )}
       <div>
@@ -120,7 +123,9 @@ function AddDevice({ onAdded }: { onAdded: (made: { name: string; kind: DeviceKi
 
 function DeviceRow({ device }: { device: Device }) {
   const rename = useRenameDevice()
-  const setTrust = useSetTrust()
+  const setPermissions = useSetPermissions()
+  const profiles = useDeviceProfiles()
+  const [open, setOpen] = useState(false)
   const remove = useDeleteDevice()
   const Icon = device.kind === 'phone' ? Smartphone : Monitor
 
@@ -130,10 +135,10 @@ function DeviceRow({ device }: { device: Device }) {
     rename.mutate({ id: device.id, name: name.trim() }, { onError: (err) => toast({ message: errorMessage(err) }) })
   }
 
-  const changeTrust = (trust: string) => {
-    if (trust === device.trust) return
-    setTrust.mutate(
-      { id: device.id, trust: trust as DeviceTrust },
+  const changeProfile = (profileId: string) => {
+    if (profileId === device.profile_id) return
+    setPermissions.mutate(
+      { id: device.id, change: { profile_id: profileId } },
       { onError: (err) => { if (!(err instanceof ApiError && err.code === 'reauth_required')) toast({ message: errorMessage(err) }) } },
     )
   }
@@ -164,12 +169,16 @@ function DeviceRow({ device }: { device: Device }) {
         </div>
       </div>
       {device.kind === 'computer' && (
-        <Select variant="pill" aria-label={t('Trust of “{name}”', { name: device.name })} value={device.trust}
-          onValueChange={changeTrust} disabled={setTrust.isPending}
-          options={TRUST.map((o) => ({ value: o.value, label: t(o.label) }))} />
+        <Select variant="pill" aria-label={t('Profile of “{name}”', { name: device.name })} value={device.profile_id}
+          onValueChange={changeProfile} disabled={setPermissions.isPending || !profiles.data}
+          options={(profiles.data ?? [{ id: device.profile_id, name: device.profile_name, preset: null }]).map((p) => ({ value: p.id, label: profileName(p) }))} />
+      )}
+      {device.kind === 'computer' && (
+        <Button size="sm" variant="ghost" aria-expanded={open} onClick={() => setOpen(!open)}>{t('Permissions')}</Button>
       )}
       <Button size="sm" variant="ghost" onClick={() => void askRename()}>{t('Rename')}</Button>
       <Button size="sm" variant="ghost" onClick={() => void askDelete()}>{t('Delete')}</Button>
+      {open && <div className="basis-full"><DevicePermissionsPanel deviceId={device.id} deviceName={device.name} /></div>}
     </div>
   )
 }
@@ -183,7 +192,7 @@ export function DevicesSettingsPage() {
     <div className="flex flex-col gap-(--card-gap)">
       <Card>
         <CardHeader title={t('Devices')}
-          description={t('Your Windows computers (Anemo Desktop) and phones (Anemo Voice). Each has its own token and, for computers, its own trust level. Changing the trust level asks for your password.')} />
+          description={t('Your computers (Anemo Desktop) and phones (Anemo Voice). Each has its own token and, for computers, a permission profile and work folders. Changing them asks for your password.')} />
         <CardBody className="flex flex-col gap-4">
           {made ? <NewDevice {...made} onDone={() => setMade(null)} /> : <AddDevice onAdded={setMade} />}
         </CardBody>
@@ -196,6 +205,7 @@ export function DevicesSettingsPage() {
         </Card>
       )}
       {devices.isError && <p className="text-[13px] text-error">{errorMessage(devices.error)}</p>}
+      <DeviceProfilesCard />
       <DeviceFilesCard />
       <DeviceCodeCard />
     </div>

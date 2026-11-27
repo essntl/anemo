@@ -301,3 +301,12 @@ Written by the job that built this spec; each PR group adds its own part.
 - `find … -delete` counts only without `-exec`/`-ok`/`-fprint*` and without `-L`/`-H`/`-follow`; `git clean` only with plain `-C <literal>` before it (no `-c`, `--git-dir`, `--work-tree`).
 - If `scratch/` itself has been replaced by a link, nothing counts as inside.
 - *Files page:* the Files list is one folder at a time, so `scratch/` is a folder row (collapsed by nature), listed last with a "temporary" badge. The age is Settings › Workspace › "Keep scratch files" (`files.scratch_keep_days`, 7 days). Folders the clean-up emptied go too; an empty folder an agent just made stays until it is old.
+
+**Group A (profiles, migration, UI; behaviour unchanged)**
+- *Work folders, protected-folder overrides, the automation switch and the version live on the device, not on the profile* (`devices.work_folders`, `protected_overrides`, `automations_unrestricted`, `permissions_version`). Paths are per computer, and presets can't be edited, so "This folder" on a device that uses the Scoped preset must not change every Scoped device. The profile holds the category levels and the relevance switch. `profile.sync` sends the two together as the device's effective profile (`features/devices/profiles.py: effective`).
+- Category levels are `allow`, `ask`, `deny`, `folders` (decided by the work folders: shell and files) and `policy` (no device layer: Trusted (legacy)). Until the device has the analyser (group B), `folders` is left to the policy, as Trusted (legacy) does (§6.1 fallback). So nothing is looser than a trusted device today.
+- *Watched `see` is `policy`, not `ask`.* A watched device let the agent look as the Agent Permissions said, and §11 A asks for every existing test to stay green with behaviour unchanged. A custom profile can still set `see: ask`.
+- A device profile's `ask` is never lifted by "allow for this run" (`engine.evaluate`); the one-hour grants of §6.2 come in group C.
+- The turn-context line keeps "watched" / "trusted" for the two profiles the migration gives, so nothing changes for existing devices. Other profiles read `profile Scoped (writes only in work folders)`.
+- Settings › Device profiles is a card on the Devices page, not a page of its own. Starting a Claude Code job asks when the profile's `code` is `ask`. Cancelling only stops work, so it follows the policy alone (the call names a job, not a device).
+- Profile and permission changes need the password again (`require_recent_auth`), like the old trust level.
