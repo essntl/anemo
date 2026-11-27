@@ -110,3 +110,18 @@ async def test_an_automation_starts_when_due_not_on_the_next_tick(authed, monkey
         assert late < 2.5  # it was up to 30 s
     finally:
         await worker.close()
+
+
+async def test_the_heartbeat_touches_the_file_the_healthcheck_reads(tmp_path, monkeypatch):
+    from app import main_worker
+
+    alive = tmp_path / "alive"
+    monkeypatch.setattr(main_worker, "ALIVE_FILE", alive)
+    stop = asyncio.Event()
+    beat = asyncio.create_task(main_worker.heartbeat_loop("test-host:1", stop))
+    try:
+        await _wait_for(lambda: _true(alive.exists()), 3)
+    finally:
+        stop.set()
+        await beat
+    assert time.time() - alive.stat().st_mtime < 5
