@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { contentKey, downloadUrl, type Entry, useFileContent, useSaveFile } from '../api'
 import { useShortcut } from '@/hooks/useShortcut'
 import { t } from '@/lib/i18n'
-import { CodeEditor } from './CodeEditor'
+import { CodeEditor } from './LazyCodeEditor'
 
 const IMAGE = /\.(png|jpe?g|gif|webp)$/i
 
