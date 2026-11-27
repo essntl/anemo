@@ -94,15 +94,21 @@ test('files and documents go into a project without typing a path', async ({ pag
     // A file: into the project's files.
     await writeFile(page.request, `${base}/plan.txt`)
     // The list of projects arrives late (as on a busy server): the dialog still offers them.
-    await page.route('**/api/projects', async (route) => {
-      await new Promise((r) => setTimeout(r, 1500))
-      await route.continue()
-    })
+    // Only the first request is held back. The list is also refetched whenever another test
+    // changes a project or task (`tasks.changed`), and a request still held back when the page
+    // goes elsewhere is cancelled by the navigation: continue() then throws "already handled".
+    await page.route(
+      '**/api/projects',
+      async (route) => {
+        await new Promise((r) => setTimeout(r, 1500))
+        await route.continue().catch(() => undefined) // the page may have moved on meanwhile
+      },
+      { times: 1 },
+    )
     await page.goto(`/files?path=${base}`)
     await rowAction(page, 'plan.txt', 'Move to a project')
     await page.getByRole('dialog').getByRole('option', { name: new RegExp(name) }).click()
     await expect(page.getByText(`Moved to ${name}.`)).toBeVisible()
-    await page.unroute('**/api/projects')
     const inProject = (await (await page.request.get('/api/files', { params: { path: project.files_path } })).json()) as { entries: { name: string }[] }
     expect(inProject.entries.map((e) => e.name)).toContain('plan.txt')
 
