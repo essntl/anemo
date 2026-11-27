@@ -3,11 +3,11 @@
 # Added with COMPOSE_FILE=docker-compose.yml:.github/ci/compose-cache.yml. Services that
 # share an image share a scope. The backend job's dev image: compose-cache-dev.yml.
 x-backend-cache: &backend-cache
-  cache_from: [type=gha,scope=backend]
-  cache_to: [type=gha,scope=backend,mode=max]
+  cache_from: ["type=gha,scope=backend"]
+  cache_to: ["type=gha,scope=backend,mode=max"]
 x-sandbox-cache: &sandbox-cache
-  cache_from: [type=gha,scope=sandbox]
-  cache_to: [type=gha,scope=sandbox,mode=max]
+  cache_from: ["type=gha,scope=sandbox"]
+  cache_to: ["type=gha,scope=sandbox,mode=max"]
 
 services:
   migrate: { build: *backend-cache }
@@ -17,13 +17,13 @@ services:
   sandbox-net: { build: *sandbox-cache }
   mcp-host:
     build:
-      cache_from: [type=gha,scope=mcp-host]
-      cache_to: [type=gha,scope=mcp-host,mode=max]
+      cache_from: ["type=gha,scope=mcp-host"]
+      cache_to: ["type=gha,scope=mcp-host,mode=max"]
   browser:
     build:
-      cache_from: [type=gha,scope=browser]
-      cache_to: [type=gha,scope=browser,mode=max]
+      cache_from: ["type=gha,scope=browser"]
+      cache_to: ["type=gha,scope=browser,mode=max"]
   claude-runner:
     build:
-      cache_from: [type=gha,scope=claude-runner]
-      cache_to: [type=gha,scope=claude-runner,mode=max]
+      cache_from: ["type=gha,scope=claude-runner"]
+      cache_to: ["type=gha,scope=claude-runner,mode=max"]
