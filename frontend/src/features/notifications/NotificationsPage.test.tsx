@@ -7,7 +7,7 @@ import type { InProgressItem } from './useInProgress'
 
 const iso = (hoursAgo: number) => new Date(Date.now() - hoursAgo * 3_600_000).toISOString()
 const note = (id: string, title: string, over: Record<string, unknown> = {}) => ({
-  id, title, body: '', level: 'info', kind: 'agent', link: null, read_at: null, created_at: iso(0.1), ...over,
+  id, title, body: '', level: 'info', kind: 'agent', link: null, read_at: null, created_at: iso(0), ...over, // now: always Today, even just after midnight
 })
 
 const mocks = vi.hoisted(() => ({
