@@ -163,4 +163,14 @@ with a button that tidies it up.
 
 ## § Deviations
 
-*(Filled in at the end.)*
+From the brief, in the first PR (features 1–4):
+
+- **Pinned** is sorted like the other groups (by the chosen sort), not in the order the
+  documents were pinned. The API still returns the most recent pin first.
+- **The age** uses narrow units except for months: a narrow month is "2m" in English,
+  the same as minutes, so months read "2 mths".
+- **Word count and "saved from the browser"** are no longer in the row, because the
+  brief asked for chips and an age instead. A sketch is marked by its icon, with
+  "Drawing sheet" kept for screen readers.
+- **Archive and Unarchive** are only in the row menu, as asked. The document's own menu
+  has Pin but not Archive, because its properties bar already sets the status.
