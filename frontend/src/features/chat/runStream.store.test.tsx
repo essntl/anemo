@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { act, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { type RunStore, type RunView, shallowEqual, useRunSelector, useRunStore } from './runStream'
@@ -29,18 +30,24 @@ describe('a run store: each part re-renders only for its own changes', () => {
 
   it('a text delta re-renders what shows the text, not what shows the status', () => {
     const renders = { page: 0, status: 0, text: 0 }
-    let store: RunStore | null = null
+    const rendered = (part: keyof typeof renders) => {
+      renders[part] += 1
+    }
+    const held: { store: RunStore | null } = { store: null }
     function Status({ s }: { s: RunStore }) {
-      renders.status++
+      rendered('status')
       return <span>{useRunSelector(s, status, shallowEqual).status}</span>
     }
     function Text({ s }: { s: RunStore }) {
-      renders.text++
+      rendered('text')
       return <p>{useRunSelector(s, text)}</p>
     }
     function Page() {
-      renders.page++
-      store = useRunStore('run-1')
+      rendered('page')
+      const store = useRunStore('run-1')
+      useEffect(() => {
+        held.store = store
+      })
       return <><Status s={store} /><Text s={store} /></>
     }
     const { container } = render(<Page />)
@@ -55,6 +62,6 @@ describe('a run store: each part re-renders only for its own changes', () => {
     act(() => FakeSource.last!.emit('run.status', { status: 'running' }))
     expect(container.querySelector('span')?.textContent).toBe('running')
     expect(renders.page).toBe(before.page)
-    expect(store!.get().text).toBe('Hello there!')
+    expect(held.store?.get().text).toBe('Hello there!')
   })
 })
