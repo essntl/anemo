@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button'
 import { useIslandVisible } from '@/features/island/islandStore'
 import { DESKTOP, useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
+import { FullWidthToggle } from '@/features/appearance/fullWidth'
 import { msg, t } from '@/lib/i18n'
 import type { DocumentContent } from '../api'
 import type { SaveState } from '../useAutosave'
@@ -86,6 +87,7 @@ export function DocumentHeader({ list, heading, children }: { list?: ListToggle;
           </Button>
         )}
         {stacked ? <span className="flex-1" /> : heading}
+        <FullWidthToggle page="documents" />
         {children}
       </div>
       {stacked && <div className="-mt-1 flex h-10 items-center gap-2 px-3">{heading}</div>}

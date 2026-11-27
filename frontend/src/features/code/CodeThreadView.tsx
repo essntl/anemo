@@ -22,6 +22,7 @@ import { toast } from '@/components/ui/toast'
 import { useIslandVisible } from '@/features/island/islandStore'
 import { DESKTOP, useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
+import { useFullWidth } from '@/features/appearance/useFullWidth'
 import { formatCost, formatCount, formatDuration, formatWhen } from '@/lib/format'
 import { t } from '@/lib/i18n'
 import { AGENT_PARAM, type AgentInfo, MAIN, agentTree, agentsOf, eventsOfAgent } from './agents'
@@ -381,6 +382,7 @@ const NO_AGENTS: AgentInfo[] = []
 
 /** The thread of the job `jobId`. `backTo` is the list's address (narrow screens show a back link). */
 export function CodeThreadView({ jobId, backTo }: { jobId: string; backTo: string }) {
+  const fullWidth = useFullWidth('code')
   const detail = useCodeJob(jobId)
   const data = detail.data
   const thread = useMemo(() => {
@@ -425,7 +427,7 @@ export function CodeThreadView({ jobId, backTo }: { jobId: string; backTo: strin
           <div data-testid="code-thread-column" className="flex min-h-0 min-w-0 flex-1 flex-col">
             <div className="relative min-h-0 flex-1">
               <div ref={scroller} className="h-full overflow-y-auto overscroll-contain">
-                <div ref={content} className="mx-auto max-w-3xl px-2 pb-6 pt-4 md:px-6">
+                <div ref={content} className={cn('mx-auto px-2 pb-6 pt-4 md:px-6', fullWidth ? 'full-width max-w-none md:px-8' : 'max-w-3xl')}>
                   {detail.isPending && <DelayedLoading className="p-2 text-[13px]" />}
                   {detail.isError && (
                     <div className="p-2 text-[13px]">

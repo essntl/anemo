@@ -11,6 +11,8 @@ import { promptDialog } from '@/components/ui/dialogs'
 import { refreshTimeline, useDecide, useTimeline } from '@/features/agents/api'
 import { pendingQuestion } from '@/features/agents/question'
 import { useShellOutput } from '@/features/agents/shellOutput'
+import { FullWidthToggle } from '@/features/appearance/fullWidth'
+import { useFullWidth } from '@/features/appearance/useFullWidth'
 import { useBrowserStatus } from '@/features/browser/api'
 import { BrowserView } from '@/features/browser/BrowserView'
 import { DESKTOP, useMediaQuery } from '@/hooks/useMediaQuery'
@@ -118,6 +120,8 @@ function Conversation() {
   const island = useIslandVisible((s) => s.visible)
   const wide = useMediaQuery(WIDE)
   const desktop = useMediaQuery(DESKTOP)
+  // Settings > Appearance > Full width, or this page's own button.
+  const fullWidth = useFullWidth('chat')
   const [browserOpen, setBrowserOpen] = useState(false)
   // The run panel beside the chat (wide screens), remembered on this device.
   const [runPanel, setRunPanel] = useState(() => { try { return localStorage.getItem(RUN_PANEL) === "1" } catch { return false } })
@@ -290,6 +294,7 @@ function Conversation() {
   const showRunPanel = runPanel && wide && Boolean(panelRunId) && !browserOpen
   const tools = (
     <>
+      <FullWidthToggle page="chat" />
       {panelRunId && wide && (
         <Button size="icon" variant={showRunPanel ? "secondary" : "ghost"} aria-label={t('Run details')} aria-pressed={showRunPanel}
           title={t('The run’s plan and changed files')} onClick={() => { if (browserOpen) { setBrowserOpen(false); if (runPanel) return } toggleRunPanel() }}>
@@ -348,7 +353,7 @@ function Conversation() {
           clipped in here; otherwise it lands on the page under the chat and makes it scroll. */}
       <ReportActivity stream={stream} running={Boolean(activeRunId) && !paused && !question} />
       <div ref={scrollRef} className="relative min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex max-w-3xl flex-col gap-(--msg-gap) px-3 py-5 md:px-6 md:py-8">
+        <div className={cn('mx-auto flex flex-col gap-(--msg-gap) px-3 py-5 md:px-6 md:py-8', fullWidth ? 'full-width max-w-none md:px-10' : 'max-w-3xl')}>
           {conversation.data?.branched_from_id && (
             <Link to={`/c/${conversation.data.branched_from_id}`}
               className="flex items-center gap-1.5 self-center rounded-full bg-surface-2 px-3 py-1 text-[12px] text-muted hover:text-text">
@@ -438,7 +443,7 @@ function Conversation() {
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-3xl px-3 pb-2 md:px-6 md:pb-6">
+      <div className={cn('mx-auto w-full px-3 pb-2 md:px-6 md:pb-6', fullWidth ? 'max-w-none md:px-10' : 'max-w-3xl')}>
         {actionError && <p className="mb-2 text-center text-[13px] text-error">{errorMessage(actionError)}</p>}
         {warning && !activeRunId && <p className="mb-2 text-center text-[12px] text-muted">{warning}</p>}
         {/* What the agent waits for stays in sight here, whatever the chat is scrolled to. */}

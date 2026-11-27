@@ -112,5 +112,7 @@ const messages: Messages = {
   "{project}: tasks by status": "{project}: завдання за статусом",
   "No tasks match these filters.": "Немає завдань, що відповідають цим фільтрам.",
   "{n} open | {n} open": "{n} відкрите | {n} відкриті | {n} відкритих",
+  "{name}, {w} by {h}, at column {x}, row {y}. Arrow keys move it, Shift and arrows resize it.": "{name}, {w} на {h}, у стовпці {x}, рядку {y}. Стрілки переміщують його, Shift зі стрілками змінює розмір.",
+  "Drag a widget anywhere on the grid and its corner to resize it; widgets in the way move down. With the keyboard, focus a widget and use the arrow keys to move it by a cell, Shift and the arrows to resize it. Phones keep their own layout.": "Перетягуйте віджет будь-куди на сітці, а його кут – щоб змінити розмір; віджети на шляху зсуваються вниз. З клавіатури: перейдіть на віджет і переміщуйте його стрілками на одну клітинку, а з Shift змінюйте розмір. У телефонів свій макет.",
 }
 export default messages

@@ -108,8 +108,21 @@ class MusicSettings(BaseModel):
     server_audio: bool = True
 
 
+class GridPlace(BaseModel):
+    """Where a widget sits on Home's free grid (full width, Settings > Appearance): the
+    column and row of its top-left cell and how many it spans (12 columns, rows of
+    half a slot)."""
+
+    x: int = Field(ge=0, le=11)
+    y: int = Field(ge=0, le=200)
+    w: int = Field(ge=1, le=12)
+    h: int = Field(ge=1, le=12)
+
+
 class WidgetLayout(BaseModel):
-    """One widget on the Home page. `w` columns and `h` rows (1-3 each)."""
+    """One widget on the Home page. `w` columns and `h` rows (1-3 each) in the usual
+    slots; `grid`: its place on the free grid, None until Home is first arranged there
+    (the browser then works it out from the slots, so nothing moves)."""
 
     id: str = Field(min_length=1, max_length=40)
     w: int = Field(1, ge=1, le=3)
@@ -119,6 +132,7 @@ class WidgetLayout(BaseModel):
     pinned: bool = False
     # Widget-specific choices, e.g. which automation the Briefing shows.
     options: dict[str, str | None] = Field(default_factory=dict, max_length=10)
+    grid: GridPlace | None = None
 
 
 class HomeSettings(BaseModel):
@@ -236,6 +250,10 @@ class AppearanceBackground(BaseModel):
     animate_on_phones: bool = False
 
 
+# The pages with a full-width button of their own.
+FullWidthPage = Literal["home", "chat", "documents", "tasks", "code"]
+
+
 class AppearanceSettings(BaseModel):
     """Settings > Appearance; applied in the browser (frontend/src/features/appearance)."""
 
@@ -254,6 +272,11 @@ class AppearanceSettings(BaseModel):
     # How strong the glass is: more blur and more see-through (the panel never drops
     # under 70 % opaque, 65 % in dark; frontend/src/features/appearance/apply.ts).
     glass_strength: int = Field(50, ge=0, le=100)
+    # Content uses the whole window width instead of the centred column (Home gets its
+    # free grid). `full_width_pages`: pages switched with their own button, which keep
+    # that choice whatever this says.
+    full_width: bool = False
+    full_width_pages: dict[FullWidthPage, bool] = Field(default_factory=dict)
 
 
 class ProfileSettings(BaseModel):

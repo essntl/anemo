@@ -126,6 +126,12 @@ const messages: Messages = {
   "The sidebar, cards, dialogs and the message box let the background show through, blurred.": "Крізь бічну панель, картки, діалоги й поле повідомлення видно розмите тло.",
   "Your system asks for less transparency, so panels stay solid on this device. Other devices still use glass.": "Ваша система просить менше прозорості, тож на цьому пристрої панелі лишаються суцільними. Інші пристрої й далі показують скло.",
   "Transparency": "Прозорість",
+  "Full width": "На всю ширину",
+  "Back to the centred column": "Повернути колонку по центру",
+  "Use the full width of the window": "Використати всю ширину вікна",
+  "Content uses the whole window instead of a centred column: Home becomes a free grid, chats give tables, code and diagrams more room (text keeps a readable line length). Phones are not changed.": "Вміст займає все вікно замість колонки по центру: Головна стає вільною сіткою, у чатах таблиці, код і діаграми отримують більше місця (текст зберігає зручну довжину рядка). На телефонах нічого не змінюється.",
+  "{n} page has its own choice, made with the button in its header. | {n} pages have their own choice, made with the button in their header.": "{n} сторінка має власний вибір, зроблений кнопкою в її заголовку. | {n} сторінки мають власний вибір, зроблений кнопкою в їхньому заголовку. | {n} сторінок мають власний вибір, зроблений кнопкою в їхньому заголовку.",
+  "Use this setting everywhere": "Застосувати це налаштування всюди",
 }
 
 export default messages

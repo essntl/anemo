@@ -24108,6 +24108,27 @@
             "minimum": 0.0,
             "title": "Glass Strength",
             "default": 50
+          },
+          "full_width": {
+            "type": "boolean",
+            "title": "Full Width",
+            "default": false
+          },
+          "full_width_pages": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "propertyNames": {
+              "enum": [
+                "home",
+                "chat",
+                "documents",
+                "tasks",
+                "code"
+              ]
+            },
+            "type": "object",
+            "title": "Full Width Pages"
           }
         },
         "type": "object",
@@ -31947,6 +31968,43 @@
           "commit"
         ],
         "title": "GitTag"
+      },
+      "GridPlace": {
+        "properties": {
+          "x": {
+            "type": "integer",
+            "maximum": 11.0,
+            "minimum": 0.0,
+            "title": "X"
+          },
+          "y": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 0.0,
+            "title": "Y"
+          },
+          "w": {
+            "type": "integer",
+            "maximum": 12.0,
+            "minimum": 1.0,
+            "title": "W"
+          },
+          "h": {
+            "type": "integer",
+            "maximum": 12.0,
+            "minimum": 1.0,
+            "title": "H"
+          }
+        },
+        "type": "object",
+        "required": [
+          "x",
+          "y",
+          "w",
+          "h"
+        ],
+        "title": "GridPlace",
+        "description": "Where a widget sits on Home's free grid (full width, Settings > Appearance): the\ncolumn and row of its top-left cell and how many it spans (12 columns, rows of\nhalf a slot)."
       },
       "GroupUndoOut": {
         "properties": {
@@ -45658,6 +45716,16 @@
             "type": "object",
             "maxProperties": 10,
             "title": "Options"
+          },
+          "grid": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GridPlace"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -45665,7 +45733,7 @@
           "id"
         ],
         "title": "WidgetLayout",
-        "description": "One widget on the Home page. `w` columns and `h` rows (1-3 each)."
+        "description": "One widget on the Home page. `w` columns and `h` rows (1-3 each) in the usual\nslots; `grid`: its place on the free grid, None until Home is first arranged there\n(the browser then works it out from the slots, so nothing moves)."
       },
       "WorkspaceSettings": {
         "properties": {

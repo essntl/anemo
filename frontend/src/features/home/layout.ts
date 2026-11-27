@@ -23,6 +23,24 @@ export interface WidgetLayout {
   /** "Needs you" shows even when there is nothing (otherwise it hides itself). */
   pinned?: boolean
   options?: Record<string, string | null>
+  /** Its place on the free grid (full width, gridPlaces.ts); none until Home is arranged there. */
+  grid?: GridPlace | null
+}
+
+export interface GridPlace {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+/** A saved grid place, if it is one (numbers in the server's limits). */
+function gridPlace(raw: unknown): GridPlace | null {
+  const g = raw as Partial<GridPlace> | null | undefined
+  if (!g || typeof g !== 'object') return null
+  const n = (v: unknown, min: number, max: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, Math.round(v))) : null)
+  const x = n(g.x, 0, 11), y = n(g.y, 0, 200), w = n(g.w, 1, 12), h = n(g.h, 1, 12)
+  return x === null || y === null || w === null || h === null ? null : { x, y, w: Math.min(w, 12 - x), h }
 }
 
 export const MAX_SPAN = 3
@@ -99,11 +117,12 @@ export function normalizeLayout(saved: unknown): WidgetLayout[] {
       hidden: !!r!.hidden,
       pinned: !!r!.pinned,
       options: r!.options && typeof r!.options === 'object' ? { ...r!.options } : {},
+      grid: gridPlace(r!.grid),
     })
   }
   for (const w of DEFAULT_LAYOUT) {
     if (seen.has(w.id)) continue
-    const added = { ...w, hidden: !!w.hidden, pinned: false, options: {} }
+    const added = { ...w, hidden: !!w.hidden, pinned: false, options: {}, grid: null }
     const after = ADDED_AFTER[w.id]
     const at = after ? out.findIndex((x) => x.id === after) : -1
     if (at >= 0) out.splice(at + 1, 0, added)

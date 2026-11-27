@@ -16,7 +16,12 @@ import { useShortcut } from '@/hooks/useShortcut'
 import { dateLocale, t } from '@/lib/i18n'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
+import { FullWidthToggle } from '@/features/appearance/fullWidth'
+import { useFullWidth } from '@/features/appearance/useFullWidth'
 import { useOffPages } from '@/features/settings/navigation'
+import { cn } from '@/lib/cn'
+import { FreeGrid, type FreeGridActions } from './FreeGrid'
+import { firstFree, moveTo, placesOf, toFullGrid, withPlaces } from './gridPlaces'
 import { moveWidget, patchWidget, resetLayout, resizeWidget, widgetAvailable, type WidgetLayout } from './layout'
 import { useHomeLayout } from './useHomeLayout'
 import { useNeedsYou } from './useNeedsYou'
@@ -55,11 +60,35 @@ export function HomePage() {
   useShortcut('home.edit', () => setEditing((x) => !x))
   useShortcut('home.stopEditing', () => setEditing(false), editing)
   const now = new Date(useNow())
+  // Settings > Appearance > Full width (or this page's own button): the free grid.
+  const fullWidth = useFullWidth('home')
+  const off = (w: WidgetLayout) => !!w.hidden || !widgetAvailable(w.id, offPages)
+  // "Needs you" hides itself while empty (unless pinned).
+  const showsNow = (item: WidgetLayout) => item.id !== 'needs' || !!item.pinned || (needs.ready && needs.rows.length > 0)
+  const gridPlacesOf = (l: WidgetLayout[]) => placesOf(l, off, (w) => !showsNow(w))
 
   const actions: GridActions = {
     move: (id, to) => update((l) => moveWidget(l, id, to)),
     resize: (id, w, h) => update((l) => resizeWidget(l, id, w, h)),
     setHidden: (id, hidden) => update((l) => patchWidget(l, id, { hidden })),
+  }
+
+  // The free grid saves every widget's place on its first change, so the others stay
+  // where they are shown (until then they follow the slots, gridPlaces.placesOf).
+  const onGrid = (l: WidgetLayout[]) => l.filter((w) => !off(w)).map((w) => w.id)
+  const gridActions: FreeGridActions = {
+    place: (id, place, cols) => update((l) => withPlaces(l, moveTo(gridPlacesOf(l), onGrid(l), id, toFullGrid(place, cols)))),
+    setHidden: (id, hidden) => update((l) => {
+      const placed = withPlaces(l, gridPlacesOf(l))
+      if (hidden) return patchWidget(placed, id, { hidden })
+      // Back where it was (what is there now moves down), or the first free spot of its slot size.
+      const places = gridPlacesOf(placed)
+      const item = placed.find((w) => w.id === id)!
+      const taken = [...places].filter(([other]) => other !== id).map(([, p]) => p)
+      const place = item.grid ?? firstFree({ w: Math.min(item.w, 3) * 4, h: item.h * 2 }, taken)
+      const shown = patchWidget(placed, id, { hidden: false })
+      return withPlaces(shown, moveTo(places, onGrid(shown), id, place))
+    }),
   }
 
   function render(item: WidgetLayout) {
@@ -88,13 +117,16 @@ export function HomePage() {
       <Button size="sm" variant="primary" icon={<Check className="h-4 w-4" />} onClick={() => setEditing(false)}>{t('Done')}</Button>
     </div>
   ) : (
-    <Button size="icon" variant="ghost" aria-label={t('Edit layout')} title={t('Edit layout (E)')} onClick={() => setEditing(true)}>
-      <LayoutGrid className="h-4 w-4" />
-    </Button>
+    <div className="flex items-center gap-1">
+      <FullWidthToggle page="home" />
+      <Button size="icon" variant="ghost" aria-label={t('Edit layout')} title={t('Edit layout (E)')} onClick={() => setEditing(true)}>
+        <LayoutGrid className="h-4 w-4" />
+      </Button>
+    </div>
   )
 
   return (
-    <div className="mx-auto max-w-6xl p-4 md:px-8 md:pb-8 md:pt-2">
+    <div className={cn('mx-auto p-4 md:px-8 md:pb-8 md:pt-2', fullWidth ? 'max-w-none' : 'max-w-6xl')}>
       {phone && <PageHeader title={t('Home')}>{tools}</PageHeader>}
       <div className="mb-4 flex items-center gap-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-0.5">
@@ -112,11 +144,17 @@ export function HomePage() {
         <p className="mb-3 text-[13px] text-muted">
           {phone
             ? t('Drag a widget by its grip to move it. This is the phone layout: wider screens keep their own.')
-            : t('Drag a widget to move it and its corner to resize it. With the keyboard, focus a widget and use the arrow keys to move it, Shift and the arrows to resize it. This is the layout for wider screens: phones keep their own.')}
+            : fullWidth
+              ? t('Drag a widget anywhere on the grid and its corner to resize it; widgets in the way move down. With the keyboard, focus a widget and use the arrow keys to move it by a cell, Shift and the arrows to resize it. Phones keep their own layout.')
+              : t('Drag a widget to move it and its corner to resize it. With the keyboard, focus a widget and use the arrow keys to move it, Shift and the arrows to resize it. This is the layout for wider screens: phones keep their own.')}
         </p>
       )}
 
-      {ready && (
+      {ready && fullWidth && (
+        <FreeGrid layout={layout} places={gridPlacesOf(layout)} editing={editing} actions={gridActions} render={render}
+          available={(item) => widgetAvailable(item.id, offPages)} shown={showsNow} />
+      )}
+      {ready && !fullWidth && (
         <WidgetGrid layout={layout} editing={editing} actions={actions} render={render}
           available={(item) => widgetAvailable(item.id, offPages)}
           shown={(item) => item.id !== 'needs' || !!item.pinned || (needs.ready && needs.rows.length > 0)} />

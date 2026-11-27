@@ -69,7 +69,7 @@ const png = (name: string, size = 100) => new File([new Uint8Array(size)], name,
 
 // `coarse`: a touch screen (the only media query the follow-up box asks).
 const media = vi.hoisted(() => ({ coarse: false }))
-vi.mock('@/hooks/useMediaQuery', () => ({ useMediaQuery: () => media.coarse }))
+vi.mock('@/hooks/useMediaQuery', () => ({ DESKTOP: '(min-width: 768px)', useMediaQuery: () => media.coarse }))
 
 const { CancelJobButton, FollowUpBox, FromChat } = await import('./controls')
 const { useCodeQueue } = await import('./queueStore')

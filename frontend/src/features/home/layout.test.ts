@@ -19,8 +19,8 @@ describe('home layout', () => {
     ]
     const out = normalizeLayout(saved)
     expect(out.slice(0, 2)).toEqual([
-      { id: 'music', w: 3, h: 2, hidden: false, pinned: false, options: {} },
-      { id: 'focus', w: 3, h: 1, hidden: true, pinned: false, options: {} },
+      { id: 'music', w: 3, h: 2, hidden: false, pinned: false, options: {}, grid: null },
+      { id: 'focus', w: 3, h: 1, hidden: true, pinned: false, options: {}, grid: null },
     ])
     expect(out.map((w) => w.id).sort()).toEqual([...WIDGET_IDS].sort())
     expect(out).toHaveLength(WIDGET_IDS.length)
