@@ -79,3 +79,33 @@ class DocumentRevision(Base, IdMixin):
     actor_ref: Mapped[str | None] = mapped_column(String(ACTOR_REF_LENGTH))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class DocumentPin(Base, IdMixin):
+    """A document pinned to the top of the Documents list: outside projects
+    (`project_id` None) or in one project. One pin per document and place."""
+
+    __tablename__ = "document_pins"
+    __table_args__ = (
+        Index(
+            "uq_document_pins_project",
+            "document_id",
+            "project_id",
+            unique=True,
+            postgresql_where=text("project_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_document_pins_global",
+            "document_id",
+            unique=True,
+            postgresql_where=text("project_id IS NULL"),
+        ),
+    )
+
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE")
+    )
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE")
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -122,6 +122,21 @@ export function formatAgo(iso: string, now = new Date()): string {
   return rtf.format(Math.round(seconds / unit[1]), unit[0])
 }
 
+/**
+ * How old something is, as short as it gets, for a crowded list row: "now", "5m", "3h",
+ * "2d", "3w", "4 mths", "2y" (Intl narrow units, so "2 д" and the like in other languages).
+ */
+export function formatAge(iso: string, now = new Date()): string {
+  const seconds = Math.max(0, Math.round((now.getTime() - new Date(iso).getTime()) / 1000))
+  if (seconds < 60) return t('now')
+  const steps: [string, number][] = [['minute', 60], ['hour', 3600], ['day', 86_400], ['week', 604_800], ['month', 2_629_800], ['year', 31_557_600]]
+  let unit = steps[0]
+  for (const step of steps) if (seconds >= step[1]) unit = step
+  const amount = Math.floor(seconds / unit[1])
+  // A narrow month is "2m" in English, the same as minutes: months are spelled a little longer.
+  return new Intl.NumberFormat(dateLocale(), { style: 'unit', unit: unit[0], unitDisplay: unit[0] === 'month' ? 'short' : 'narrow' }).format(amount)
+}
+
 /** A full date and time, e.g. for a tooltip: "12 Sep 2026, 14:03". */
 export function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString(dateLocale(), { dateStyle: 'medium', timeStyle: 'short' })

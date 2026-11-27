@@ -2509,6 +2509,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/documents/pins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Pins
+         * @description The documents pinned to the top of the list: in a project, or outside projects.
+         */
+        get: operations["list_pins_api_documents_pins_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Pin
+         * @description Pin or unpin a document in a project (or outside projects). Returns that place's pins.
+         */
+        put: operations["set_pin_api_documents__document_id__pin_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/documents/assets": {
         parameters: {
             query?: never;
@@ -10564,6 +10604,21 @@ export interface components {
              * @default
              */
             body: string;
+        };
+        /** PinIn */
+        PinIn: {
+            /**
+             * Project Id
+             * @description The project; None outside projects
+             */
+            project_id?: string | null;
+            /** Pinned */
+            pinned: boolean;
+        };
+        /** PinsOut */
+        PinsOut: {
+            /** Document Ids */
+            document_ids: string[];
         };
         /** PlanIn */
         PlanIn: {
@@ -19851,6 +19906,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DocumentContent"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_pins_api_documents_pins_get: {
+        parameters: {
+            query?: {
+                project_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PinsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_pin_api_documents__document_id__pin_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PinIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PinsOut"];
                 };
             };
             /** @description Validation Error */

@@ -6,7 +6,7 @@
  * answer may write it): that opens the document, keeping any #… that points at a part
  * of it.
  */
-import { useEffect, useState } from 'react'
+import { type CSSProperties, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { useScope } from '@/app/projectStore'
@@ -14,6 +14,8 @@ import { useProjects } from '@/features/tasks/api'
 import { FileText } from 'lucide-react'
 import { api, unwrap } from '@/api/client'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { ResizeHandle } from '@/components/ui/ResizeHandle'
+import { useResizableWidth } from '@/hooks/useResizableWidth'
 import { cn } from '@/lib/cn'
 import { t } from '@/lib/i18n'
 import { useDocuments } from './api'
@@ -51,6 +53,8 @@ function DocumentByPath({ address }: { address: string }) {
 
 /** Browser storage: "0" while the document list beside an open document is put away. */
 const LIST = 'anemo.docList'
+/** Browser storage: the list's width (dragged at its edge), from `md` up. */
+const WIDTH = 'anemo.docList.width'
 
 export function DocumentsPage() {
   const params = useParams()
@@ -72,12 +76,15 @@ export function DocumentsPage() {
     try { localStorage.setItem(LIST, listOpen ? '0' : '1') } catch { /* no storage: just not remembered */ }
     setListOpen(!listOpen)
   }
+  const width = useResizableWidth(WIDTH, { initial: 240, min: 200, max: 480 })
 
   return (
     // From `md` up the list and the editor are one panel on the ground, like the sidebar.
     <div className="flex h-full md:mx-3 md:mb-3 md:h-[calc(100%-0.75rem)] md:overflow-hidden md:rounded-panel md:border md:border-border md:bg-surface md:shadow-soft">
       {/* Beside an open document the list can be put away (the button in the editor's header). */}
-      <aside className={cn('w-full shrink-0 border-r border-border md:w-60', address && 'hidden', address && listOpen && 'md:block')}>
+      <aside style={{ '--doc-list-w': `${width.width}px` } as CSSProperties}
+        className={cn('relative w-full shrink-0 border-r border-border md:w-(--doc-list-w)', address && 'hidden', address && listOpen && 'md:block')}>
+        <ResizeHandle size={width} label={t('Width of the document list')} className="hidden md:block" />
         <SuggestionsReview />
         <TagSuggestionsReview />
         <BrokenLinks />

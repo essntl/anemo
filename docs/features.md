@@ -406,6 +406,14 @@ on the same files. Sub-folders are groups; images you drop in go to
 - **History:** every document keeps its last 50 versions (your autosaves within
   10 minutes count as one), marked as yours, an agent's, or made outside the app.
   Restoring one keeps the current text in the history.
+- **The list** groups documents by folder, type, status or last change (Today, This
+  week, This month, Older) and sorts them by title or last change; each group folds and
+  shows its count. Pinned documents come first (pin from a row's menu, a right-click or
+  the document's menu; pins sync, and a project has its own). Archived documents (status
+  *archived* or *done*) fold into *Archived* at the bottom, which can be hidden; *Archive*
+  and *Unarchive* are in the row menu. Titles wrap to two lines, a start several titles
+  share is fainter, and each row shows its status, type and age. Drag the list's edge
+  to make it wider. These choices are remembered on the device, per project.
 - **Agents** can list, read, search, create and edit documents. Reading follows the
   file-read permission and the folder access for `documents`; writing has its own
   category, *Edit documents* (asks by default). Their changes are in the history

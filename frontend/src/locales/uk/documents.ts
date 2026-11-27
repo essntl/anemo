@@ -138,5 +138,22 @@ const messages: Messages = {
   "Document text": "Текст документа",
   "The image could not be added": "Не вдалося додати зображення",
   // Task statuses shown in the link picker (labels defined in features/tasks/api.ts).
+  "Width of the document list": "Ширина списку документів",
+  "Unpin": "Відкріпити",
+  "Pin to the top": "Закріпити вгорі",
+  "“{title}” is active again.": "«{title}» знову активний.",
+  "“{title}” is archived.": "«{title}» в архіві.",
+  "Group by folder": "Групувати за текою",
+  "Group by type": "Групувати за типом",
+  "Group by status": "Групувати за статусом",
+  "Group by last change": "Групувати за останньою зміною",
+  "Sort": "Сортування",
+  "Sort by title": "Сортувати за назвою",
+  "Sort by last change": "Сортувати за останньою зміною",
+  "Show archived documents": "Показати архівні документи",
+  "Hide archived documents": "Сховати архівні документи",
+  "Last changed by an agent": "Востаннє змінено агентом",
+  "No type": "Без типу",
+  "No status": "Без статусу",
 }
 export default messages

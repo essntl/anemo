@@ -1,4 +1,4 @@
-import { dayLabel, formatAgo, formatCost, formatCount, formatDateTime, formatDuration, formatWhen } from './format'
+import { dayLabel, formatAge, formatAgo, formatCost, formatCount, formatDateTime, formatDuration, formatWhen } from './format'
 
 describe('formatters', () => {
   it('says how long ago a time was', () => {
@@ -11,6 +11,19 @@ describe('formatters', () => {
     expect(ago(3 * 86_400)).toMatch(/3 days/)
     expect(ago(3 * 31_557_600)).toMatch(/3 yr/)
     expect(formatDateTime(now.toISOString())).toMatch(/2026/)
+  })
+
+  it('says how old something is in a few characters, for a list row', () => {
+    const now = new Date(2026, 9, 10, 9, 0)
+    const age = (seconds: number) => formatAge(new Date(now.getTime() - seconds * 1000).toISOString(), now)
+    expect(age(10)).toBe('now')
+    expect(age(5 * 60)).toBe('5m')
+    expect(age(3 * 3600)).toBe('3h')
+    expect(age(2 * 86_400)).toBe('2d')
+    expect(age(15 * 86_400)).toBe('2w')
+    expect(age(70 * 86_400)).toMatch(/^2 mths?$/) // not "2m", which would read as minutes
+    expect(age(3 * 31_557_600)).toBe('3y')
+    expect(age(-60)).toBe('now') // a clock a little ahead
   })
 
   it('names the day a date falls on', () => {
