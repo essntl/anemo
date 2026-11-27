@@ -248,6 +248,32 @@ Design: [docs/specs/04-dictation.md](specs/04-dictation.md).
   `SKILL.md`-style files (front matter with `name` and `description`, then Markdown)
   or write your own; export turns them back into such files.
 
+## Commands in the message box
+
+In an open chat, **/** lists built-in commands first, then the skills. They change the
+chat's settings or act on it, never send a message, and say what they did in a small
+note; the controls under the box show the same state.
+
+| Command | What it does |
+| --- | --- |
+| `/model [name]` | the chat's model (a list filtered as you type: `/model opus`, `/model g55`) |
+| `/effort [level]` | how hard the model thinks (models that can reason) |
+| `/mode chat\|agent` | Chat or Agent mode |
+| `/permissions [profile]` | the agent profile, with its permissions (Agent mode) |
+| `/new` | a new chat in the same project, with the same model, mode and profile |
+| `/project [name]` | move the chat to a project |
+| `/rename <title>` | rename the chat |
+| `/branch` | continue in a copy of the chat |
+| `/retry` | answer the last message again |
+| `/compact [focus]` | summarize the chat so far ([Long chats](#long-chats-compact)) |
+| `/voice` | dictate the message |
+| `/help` | every command and skill |
+
+Arrows choose, Enter applies, Esc closes; on a phone, tap. `/model` and `/effort` are
+marked *re-reads this chat*: the next answer reads the whole chat again (on the Claude
+subscription the session starts again), so it costs more once. A skill with the name of
+a command is still in the menu's Skills group.
+
 ## Skills as slash commands
 
 Type **/** at the start of a message (or use the **/** button) and pick a skill: the

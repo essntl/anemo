@@ -7,6 +7,7 @@ import { Lingering } from '@/components/ui/Lingering'
 import { MESSAGE_BOX, MESSAGE_BOX_BORDER, MESSAGE_TEXT, SendButton } from '@/components/ui/MessageBox'
 import { toast } from '@/components/ui/toast'
 import { DictationButton } from '@/features/dictation/DictationButton'
+import { dictation } from '@/features/dictation/dictationStore'
 import { useDictationMessageBox } from '@/features/dictation/useDictationMessageBox'
 import { type Skill, useSlashSkills } from '@/features/profiles/api'
 import { matchesShortcut, SHORTCUTS } from '@/features/shortcuts/registry'
@@ -17,6 +18,7 @@ import { localSkills, matchSkills, slashQuery, typedCommand } from '@/features/s
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
 import { t } from '@/lib/i18n'
+import { COMMANDS, type CommandHost, type CommandOption, type CommandSpec, commandOf, matchCommands, matchOptions } from '../commands'
 import { LIST_MAX, type MenuPlacement, placeMenu, visibleArea } from '../menuPlacement'
 import { canReadClipboard, clipboardImages, isTextField, pastedFiles } from '../pastedFiles'
 import { MAX_ATTACHMENTS, type UploadedAttachment, useAttachments } from '../useAttachments'
@@ -58,7 +60,16 @@ interface ComposerProps {
   onSkillChange?: (skill: Skill | null) => void
   /** Take the focus when shown (not on touch screens). Default true; off for a chat beside something you type in. */
   autoFocus?: boolean
+  /** Built-in slash commands (/model, /rename, …), offered before the skills (features/chat/commands.ts). */
+  commands?: CommandHost
 }
+
+/** One line of the / menu: a command, a choice for one, a command to run with what was typed, or a skill. */
+type MenuEntry =
+  | { kind: 'command'; spec: CommandSpec }
+  | { kind: 'option'; spec: CommandSpec; option: CommandOption }
+  | { kind: 'run'; spec: CommandSpec; arg: string }
+  | { kind: 'skill'; skill: Skill & { command?: string } }
 
 /** One control under the text box: a model picker, the reasoning level, a profile. */
 export interface ComposerControl {
@@ -112,6 +123,7 @@ const MAX_HEIGHT = 240
 
 export function Composer({
   handle, onSend, onStop, running, disabled, filesOnly = true, placeholder, initialText, initialAttachments, controls, conversationId, skills: skillsOn = true, onSkillChange, autoFocus = true,
+  commands: commandHost,
 }: ComposerProps) {
   const [text, setText] = useState(initialText ?? '')
   const [dragging, setDragging] = useState(false)
@@ -165,7 +177,22 @@ export function Composer({
   const [carried, setCarried] = useState('')
   const query = skill ? null : slashQuery(text)
   const matches = query === null ? [] : matchSkills(slashSkills, query)
-  const menuOpen = query !== null && dismissed !== text && slashSkills.length > 0
+  // Commands first: what the page has, as the composer shows them.
+  const available = commandHost && !skill ? COMMANDS.filter((c) => commandHost.names.includes(c.name)) : []
+  const typedCommandLine = available.length ? commandOf(available, text) : null
+  let entries: MenuEntry[] = []
+  if (typedCommandLine) {
+    const { spec, arg } = typedCommandLine
+    entries = spec.arg === 'choice'
+      ? matchOptions(commandHost?.options(spec.name) ?? [], arg).map((option) => ({ kind: 'option', spec, option }))
+      : [{ kind: 'run', spec, arg }]
+  } else if (query !== null) {
+    entries = [
+      ...matchCommands(available, query).map((spec): MenuEntry => ({ kind: 'command', spec })),
+      ...matches.map((s): MenuEntry => ({ kind: 'skill', skill: s })),
+    ]
+  }
+  const menuOpen = (query !== null || typedCommandLine !== null) && dismissed !== text && (slashSkills.length > 0 || available.length > 0)
   const menuId = useId()
   const chosen = skillsOn ? skill : null
   // Above the box where it fits, else where there is room (the new chat screen has the box
@@ -199,9 +226,45 @@ export function Composer({
   }
   useImperativeHandle(handle, () => ({ useSkill: (next) => chooseSkill(next, slashQuery(text) === null ? text : carried) }))
 
+  /** Run a command: nothing is sent; the page says what changed in a small confirmation. */
+  const runCommand = (spec: CommandSpec, value: string) => {
+    setActive(0)
+    if (spec.name === 'help') {
+      setText('/') // the menu with every command and skill
+      return
+    }
+    const before = text
+    setText('')
+    if (spec.name === 'voice') {
+      void dictation.start(textRef.current)
+      return
+    }
+    void Promise.resolve()
+      .then(() => commandHost?.run(spec.name, value))
+      .then((said) => { if (said) toast({ message: said, duration: 2500 }) })
+      .catch(() => setText((now) => now || before)) // the page shows why; the command comes back
+    textRef.current?.focus()
+  }
+
+  const chooseEntry = (entry: MenuEntry) => {
+    if (entry.kind === 'skill') chooseSkill(entry.skill)
+    else if (entry.kind === 'option') runCommand(entry.spec, entry.option.value)
+    else if (entry.kind === 'run') {
+      if (entry.spec.arg === 'text' && !entry.arg.trim()) return // /rename needs a title
+      runCommand(entry.spec, entry.arg.trim())
+    } else if (entry.spec.arg === 'none') runCommand(entry.spec, '')
+    else {
+      // Its choices (or its text) come next.
+      setText(`/${entry.spec.name} `)
+      setActive(0)
+      textRef.current?.focus()
+    }
+  }
+
   const onChange = (value: string) => {
-    // "/study " typed or pasted in full: the same as choosing it from the menu.
-    const typed = !skill && skillsOn ? typedCommand(slashSkills, value) : null
+    // "/study " typed or pasted in full: the same as choosing it from the menu (a command
+    // of the same name wins; the skill stays in the menu's Skills group).
+    const typed = !skill && skillsOn && !commandOf(available, value) ? typedCommand(slashSkills, value) : null
     if (typed) chooseSkill(typed.skill, typed.rest || carried)
     else if (carried && slashQuery(value) === null) {
       // The slash was deleted or the menu left otherwise: the earlier text comes back.
@@ -255,7 +318,7 @@ export function Composer({
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (menuOpen && !e.nativeEvent.isComposing) {
-      const count = matches.length
+      const count = entries.length
       if (e.key === 'ArrowDown' && count) {
         e.preventDefault()
         setActive((active + 1) % count)
@@ -268,7 +331,12 @@ export function Composer({
       }
       if ((e.key === 'Enter' || e.key === 'Tab') && !e.shiftKey && count) {
         e.preventDefault()
-        chooseSkill(matches[Math.min(active, count - 1)])
+        chooseEntry(entries[Math.min(active, count - 1)])
+        return
+      }
+      // A command never goes out as a message, even when nothing matches what follows it.
+      if (e.key === 'Enter' && !e.shiftKey && typedCommandLine) {
+        e.preventDefault()
         return
       }
       if (e.key === 'Escape') {
@@ -391,31 +459,65 @@ export function Composer({
           className={cn('pop absolute inset-x-0 z-30 overflow-hidden rounded-card border border-border bg-card shadow-float',
             placement.below ? 'top-full mt-2' : 'bottom-full mb-2')}>
           <div className="flex items-center justify-between px-3 pb-1 pt-2.5 text-[11.5px] font-medium uppercase tracking-wide text-subtle">
-            {t('Skills')}
+            {typedCommandLine ? `/${typedCommandLine.spec.name}` : available.length ? t('Commands and skills') : t('Skills')}
             <span className="hidden normal-case tracking-normal md:inline">{t('↑↓ to choose · Enter to use · Esc to close')}</span>
           </div>
-          <div ref={listRef} id={menuId} role="listbox" aria-label={t('Skills')} className="overflow-y-auto p-1.5 pt-0"
+          <div ref={listRef} id={menuId} role="listbox" aria-label={available.length ? t('Commands and skills') : t('Skills')} className="overflow-y-auto p-1.5 pt-0"
             style={{ maxHeight: placement.listMax }}>
-            {matches.map((s, i) => (
-              <div key={s.id} id={`${menuId}-${i}`} role="option" aria-selected={i === active}
-                onMouseDown={(e) => e.preventDefault()} // keep the focus in the text box
-                onMouseEnter={() => setActive(i)}
-                onClick={() => chooseSkill(s)}
-                className={cn('flex cursor-pointer items-center gap-3 rounded-control px-2.5 py-2 pointer-coarse:py-2.5',
-                  i === active ? 'bg-surface-hover' : '')}>
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">
-                  <SkillIcon name={s.icon} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-[13.5px] font-medium">{s.name}</span>
-                    <span className="font-mono text-[12px] text-subtle">/{s.command ?? s.slug}</span>
+            {entries.map((entry, i) => {
+              const first = entries.findIndex((x) => (x.kind === 'skill') === (entry.kind === 'skill'))
+              const heading = available.length > 0 && !typedCommandLine && i === first
+                ? (entry.kind === 'skill' ? t('Skills') : t('Commands')) : null
+              return (
+                <Fragment key={entry.kind === 'skill' ? `s:${entry.skill.id}` : entry.kind === 'option' ? `o:${entry.option.value}` : `c:${entry.spec.name}`}>
+                  {heading && <div className="px-2.5 pb-0.5 pt-1.5 text-[11px] font-medium text-subtle" aria-hidden>{heading}</div>}
+                  <div id={`${menuId}-${i}`} role="option" aria-selected={i === active}
+                    onMouseDown={(e) => e.preventDefault()} // keep the focus in the text box
+                    onMouseEnter={() => setActive(i)}
+                    onClick={() => chooseEntry(entry)}
+                    className={cn('flex cursor-pointer items-center gap-3 rounded-control px-2.5 py-2 pointer-coarse:py-2.5',
+                      i === active ? 'bg-surface-hover' : '')}>
+                    {entry.kind === 'skill' ? (
+                      <>
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">
+                          <SkillIcon name={entry.skill.icon} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-[13.5px] font-medium">{entry.skill.name}</span>
+                            <span className="font-mono text-[12px] text-subtle">/{entry.skill.command ?? entry.skill.slug}</span>
+                          </div>
+                          <div className="truncate text-[12.5px] text-muted">{entry.skill.hint || entry.skill.description}</div>
+                        </div>
+                      </>
+                    ) : entry.kind === 'option' ? (
+                      <div className="flex min-w-0 flex-1 items-baseline gap-2">
+                        <span className="truncate text-[13.5px] font-medium">{entry.option.label}</span>
+                        {entry.option.detail && <span className="shrink-0 text-[12px] text-subtle">{entry.option.detail}</span>}
+                      </div>
+                    ) : (
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline gap-2">
+                          <span className="font-mono text-[13px] font-medium">/{entry.spec.name}</span>
+                          {entry.spec.placeholder && entry.kind === 'command' && (
+                            <span className="font-mono text-[12px] text-subtle">‹{t(entry.spec.placeholder)}›</span>
+                          )}
+                          {entry.spec.rereads && <span className="shrink-0 rounded-full bg-surface-2 px-1.5 text-[11px] text-muted">{t('re-reads this chat')}</span>}
+                        </div>
+                        <div className="truncate text-[12.5px] text-muted">
+                          {entry.kind === 'run' && entry.arg.trim() ? `${t(entry.spec.hint)}: ${entry.arg.trim()}` : t(entry.spec.hint)}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="truncate text-[12.5px] text-muted">{s.hint || s.description}</div>
-                </div>
-              </div>
-            ))}
-            {matches.length === 0 && <p className="px-2.5 py-2 text-[13px] text-muted">{t('No skill matches “/{query}”.', { query: query ?? '' })}</p>}
+                </Fragment>
+              )
+            })}
+            {entries.length === 0 && (
+              <p className="px-2.5 py-2 text-[13px] text-muted">
+                {typedCommandLine ? t('Nothing matches “{query}”.', { query: typedCommandLine.arg }) : t('No skill matches “/{query}”.', { query: query ?? '' })}
+              </p>
+            )}
           </div>
           <Link to="/settings/skills" onMouseDown={(e) => e.preventDefault()}
             className="flex items-center gap-2 border-t border-border px-4 py-2 text-[12.5px] text-muted hover:bg-surface-hover hover:text-text">
@@ -455,7 +557,7 @@ export function Composer({
           role={menuOpen ? 'combobox' : undefined}
           aria-expanded={menuOpen ? true : undefined}
           aria-controls={menuOpen ? menuId : undefined}
-          aria-activedescendant={menuOpen && matches.length ? `${menuId}-${Math.min(active, matches.length - 1)}` : undefined}
+          aria-activedescendant={menuOpen && entries.length ? `${menuId}-${Math.min(active, entries.length - 1)}` : undefined}
           className={cn(MESSAGE_TEXT, 'pointer-events-auto',
             resting && 'placeholder:overflow-hidden placeholder:text-ellipsis placeholder:whitespace-nowrap')}
         />

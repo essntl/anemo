@@ -47,6 +47,7 @@ import { TemporaryLabel } from '../temporary'
 import { LiveTiming } from '../components/AnswerTiming'
 import { EventCard } from '../components/EventCard'
 import { AssistantMessage, UserBubble } from '../components/MessageBubble'
+import { useChatCommands } from '../useChatCommands'
 import { Composer } from '../components/Composer'
 import { useChatModel } from '../chatModel'
 import { ChatOptionsSheet } from '../components/ChatOptionsSheet'
@@ -192,6 +193,27 @@ function Conversation() {
   // The last message can be edited when it is the one the last answer replied to.
   const canEditLast = !activeRunId && lastUser && !lastUser.event && lastAssistant && lastAssistant.seq === lastUser.seq + 1
   const project = projects.data?.find((p) => p.id === conversation.data?.project_id)
+  const sendMessage = (text: string, attachmentIds: string[] = [], referenceIds: string[] = [], skillId: string | null = null) =>
+    question
+      ? answer.mutateAsync({ approvalId: question.approval!.id, decision: 'approve', answer: text })
+      : paused && activeRunId
+        ? resume.mutateAsync({ runId: activeRunId, message: text })
+        : send.mutateAsync({ conversationId, text, modelId: modelOverride, attachmentIds, referenceIds, mode, profileId, skillId })
+  const lastMessage = list[list.length - 1]
+  // The slash commands: the same state as the controls under the box (one source of truth).
+  const commands = useChatCommands({
+    conversation: conversation.data,
+    modelId,
+    defaultModelId,
+    setModel: setModelOverride,
+    mode,
+    setMode: setModeOverride,
+    profileId,
+    setProfile: setProfileOverride,
+    canRetry: !activeRunId && Boolean(lastAssistant) && lastMessage?.id === lastAssistant?.id,
+    lastSeq: lastMessage?.seq ?? null,
+    compact: (focus) => sendMessage(`/compact ${focus}`.trim()),
+  })
   const actionError = send.error ?? regenerate.error ?? selectVersion.error ?? cancel.error ?? resume.error ?? editLast.error ?? branch.error ?? answer.error
   // A paused agent run: a message resumes it (the agent reads the message first).
   const paused = Boolean(activeRunId) && live.status === 'paused'
@@ -380,13 +402,8 @@ function Conversation() {
           // An answer to the agent, or a message to resume with, is text.
           filesOnly={!question && !paused}
           onSkillChange={(skill) => skill?.mode === 'agent' && setModeOverride('agent')}
-          onSend={(text, attachmentIds, referenceIds, skillId) =>
-            question
-              ? answer.mutateAsync({ approvalId: question.approval!.id, decision: 'approve', answer: text })
-              : paused && activeRunId
-                ? resume.mutateAsync({ runId: activeRunId, message: text })
-                : send.mutateAsync({ conversationId, text, modelId: modelOverride, attachmentIds, referenceIds, mode, profileId, skillId })
-          }
+          onSend={sendMessage}
+          commands={!question && !paused ? commands : undefined}
           onStop={() => activeRunId && cancel.mutate(activeRunId)}
           controls={{
             mode: <ModeSwitch mode={mode} onChange={setModeOverride} />,
