@@ -22,6 +22,7 @@ job (tools/untrusted.py); code_status shows a summary, never the whole log.
 import hashlib
 import time
 import uuid
+from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -33,12 +34,13 @@ from app.core.errors import AppError
 from app.features.code_sessions import control, git, ingest, service, wait
 from app.features.code_sessions.models import TERMINAL, CodeJob, CodeJobEvent
 from app.features.code_sessions.schemas import MODEL, CodeJobOut, ProjectName, RepoName
+from app.features.conversations import compaction as chat_compaction
 from app.features.conversations.models import ChatMessage
 from app.features.devices import service as devices
 from app.features.devices.models import Device
 from app.features.runs.models import Run, ToolCall
 from app.policy.models import Action
-from app.tools.base import Tool, ToolContext, ToolResult
+from app.tools.base import COMPACTED_AT, Tool, ToolContext, ToolResult
 from app.tools.builtin.computer import known_device
 from app.tools.untrusted import untrusted, untrusted_note
 
@@ -417,14 +419,20 @@ async def report_seen(db: AsyncSession, run_id: uuid.UUID, job_id: str, digest: 
 
     What the model sees: its own run, and for a chat's agent (not a sub-agent, whose
     history is its own) the earlier answers of the chat that are still shown (an answer
-    replaced by Regenerate is not).
+    replaced by Regenerate is not). Not what came before a compaction (the run's, or the
+    chat's newest summary): that is only in the summary now.
     """
+    run = await db.get(Run, run_id)
+    if run is None:
+        return False
     shown = ToolCall.result_data.contains({"code_report": {"job": job_id, "digest": digest}})
+    after = await _compacted_at(db, run)
+    if after is not None:
+        shown = shown & (ToolCall.created_at > after)
     mine = select(ToolCall.id).where(ToolCall.run_id == run_id, shown).limit(1)
     if await db.scalar(mine) is not None:
         return True
-    run = await db.get(Run, run_id)
-    if run is None or run.conversation_id is None or run.parent_run_id is not None:
+    if run.conversation_id is None or run.parent_run_id is not None:
         return False
     earlier = (
         select(ToolCall.id)
@@ -439,6 +447,19 @@ async def report_seen(db: AsyncSession, run_id: uuid.UUID, job_id: str, digest: 
         .limit(1)
     )
     return await db.scalar(earlier) is not None
+
+
+async def _compacted_at(db: AsyncSession, run: Run) -> datetime | None:
+    """The newest compaction this run's model input went through: its own context's, or
+    the chat's summary."""
+    times = []
+    if stamp := run.options.get(COMPACTED_AT):
+        times.append(datetime.fromisoformat(stamp))
+    if run.conversation_id is not None:
+        summary = await chat_compaction.latest(db, run.conversation_id)
+        if summary is not None:
+            times.append(summary.created_at)
+    return max(times, default=None)
 
 
 async def _job(ref: str) -> CodeJob | ToolResult:

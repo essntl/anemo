@@ -183,6 +183,7 @@ const messages: Messages = {
   "skills": "навыки",
   "<1m": "<1 мин",
   "{n}m": "{n} мин",
+  "A large request: about {tokens} tokens (tools {tools}, earlier messages {messages})": "Большой запрос: около {tokens} токенов (инструменты {tools}, предыдущие сообщения {messages})",
   "Older steps were summarized to keep the context small": "Более ранние шаги сжаты до сводки, чтобы уменьшить контекст",
   "{from} was unavailable{reason}, switched to {to}": "{from}: недоступно{reason}, переключено на {to}",
   "Resumed after an interruption": "Возобновлено после прерывания",

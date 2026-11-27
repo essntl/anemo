@@ -11790,6 +11790,8 @@ export interface components {
              * @default 0
              */
             compactions: number;
+            /** First Request Tokens */
+            first_request_tokens?: number | null;
         };
         /** SaveOut */
         SaveOut: {

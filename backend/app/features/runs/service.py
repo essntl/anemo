@@ -32,6 +32,7 @@ DURABLE_EVENTS = {
     "run.fallback",
     "message.completed",
     "context.compacted",
+    "request.large",  # the first request was large (runtime/agent.py, LARGE_REQUEST_TOKENS)
 }
 
 

@@ -21,6 +21,7 @@ decided here, by code, from the policy snapshot taken when the run started.
 """
 
 import asyncio
+import json
 import logging
 import time
 import uuid
@@ -55,6 +56,7 @@ from app.providers.base import (
     ReasoningEffort,
     TextBlock,
     ToolResultBlock,
+    ToolSpec,
     ToolUseBlock,
     Usage,
 )
@@ -72,6 +74,7 @@ from app.runtime.agent_finalize import after_answer, finalize, notify_question, 
 from app.runtime.agent_prompt import build_system_prompt
 from app.runtime.agent_snapshot import resolve_models, session_key_for, snapshot_run
 from app.runtime.history import (
+    CHARS_PER_TOKEN,
     estimate_tokens,
     history_cap,
     latest_user_attachment_kinds,
@@ -82,6 +85,7 @@ from app.runtime.history import (
     trim_to_budget,
 )
 from app.runtime.lifecycle import drive_until_stopped, effort_for
+from app.runtime.screenshots import without_old_screenshots
 from app.runtime.streaming import (
     RequestBuilder,
     StreamProgress,
@@ -89,7 +93,7 @@ from app.runtime.streaming import (
     stream_with_fallback,
 )
 from app.tools import mcp_tool, registry
-from app.tools.base import Tool, ToolContext, ToolResult
+from app.tools.base import COMPACTED_AT, Tool, ToolContext, ToolResult
 from app.tools.builtin import computer
 from app.tools.builtin.ask import AskUserInput, clean_options
 from app.tools.builtin.plan import PlanInput
@@ -104,6 +108,9 @@ INVALID_JSON_KEY = "__invalid_json__"
 DONE_TOOL_STATUSES = ("succeeded", "failed", "denied", "cancelled", "interrupted")
 # Compact when the context is this full; keep this share of it as recent messages.
 COMPACT_AT = 0.75
+# A first request over this many tokens (estimated) is pointed out in the run's timeline,
+# with what made it big: tool specs, system prompt or earlier messages.
+LARGE_REQUEST_TOKENS = 50_000
 KEEP_RECENT = 0.35
 KEEP_RECENT_FORCED = 0.2
 
@@ -365,11 +372,15 @@ class AgentRun:
                     return f"limit:{limit}"
                 transcript = await self._inject_notes(db, run, transcript)
                 transcript = await self._maybe_compact(db, run, transcript, KEEP_RECENT)
+                # Older screenshots are not sent again (runtime/screenshots.py).
+                sent = without_old_screenshots(transcript)
                 rendered = {
-                    vision: await resolve_attachments(db, transcript, self._render_caps(vision))
+                    vision: await resolve_attachments(db, sent, self._render_caps(vision))
                     for vision in {bool(m.capabilities.get("vision")) for m in self.candidates}
                 }
                 had_text = bool(run.totals.get("text"))
+                if "first_request_tokens" not in run.totals:
+                    await self._note_request_size(db, run, rendered)
                 await db.commit()
 
             if had_text:
@@ -535,14 +546,35 @@ class AgentRun:
         self.tools_off = is_chat
         return is_chat
 
-    def _builder(self, rendered: dict[bool, list[Message]]) -> RequestBuilder:
+    def _specs(self) -> list[ToolSpec]:
+        """The tool specs every request of the run sends."""
         # Sorted by name, so the tool list (the start of every prompt) is the same
         # bytes on every request of a run and across runs: a prompt-cache prefix.
         # Hidden tools: old names that are still executed, but never offered.
         offered = sorted((t for t in self.tools.values() if not t.hidden), key=lambda t: t.name)
         names = frozenset(t.name for t in offered)
         # A long field description several tools share is said once (tools/say_once.py).
-        specs = [] if self.tools_off else say_once([t.spec(names) for t in offered])
+        return [] if self.tools_off else say_once([t.spec(names) for t in offered])
+
+    async def _note_request_size(
+        self, db: AsyncSession, run: Run, rendered: dict[bool, list[Message]]
+    ) -> None:
+        """The first request's size, estimated, on the run (its details show it); a
+        `request.large` event when it is over LARGE_REQUEST_TOKENS, so the timeline says
+        what made it big. Part of the step's transaction: doesn't commit."""
+        messages = rendered[bool(self.candidates[0].capabilities.get("vision"))]
+        parts = {
+            "system": len(self.system) // CHARS_PER_TOKEN,
+            "tools": sum(len(json.dumps(s.model_dump())) for s in self._specs()) // CHARS_PER_TOKEN,
+            "messages": estimate_tokens(messages),
+        }
+        tokens = sum(parts.values())
+        run.totals = {**run.totals, "first_request_tokens": tokens}
+        if tokens >= LARGE_REQUEST_TOKENS:
+            await runs.emit(db, run, "request.large", {"tokens": tokens, **parts})
+
+    def _builder(self, rendered: dict[bool, list[Message]]) -> RequestBuilder:
+        specs = self._specs()
 
         def build(model: ResolvedModel) -> ChatRequest:
             history = rendered[bool(model.capabilities.get("vision"))]
@@ -654,6 +686,8 @@ class AgentRun:
             return transcript  # nothing to summarize: trimming in the request builder applies
         run.transcript = [m.model_dump() for m in result.transcript]
         run.totals = {**run.totals, "compactions": run.totals.get("compactions", 0) + 1}
+        # Tool results from before now are summarized away (code_status reads this).
+        run.options = {**run.options, COMPACTED_AT: datetime.now(UTC).isoformat()}
         self._add_usage(db, run, result.model, result.usage, "summarize")
         await runs.emit(
             db,
@@ -678,8 +712,9 @@ class AgentRun:
             reason = limit_message(limit, self.policy.limits)
             notice = TextBlock(text=LIMIT_NOTICE.format(reason=reason))
             transcript[-1] = Message(role="user", content=[*transcript[-1].content, notice])
+            sent = without_old_screenshots(transcript)
             rendered = {
-                vision: await resolve_attachments(db, transcript, self._render_caps(vision))
+                vision: await resolve_attachments(db, sent, self._render_caps(vision))
                 for vision in {bool(m.capabilities.get("vision")) for m in self.candidates}
             }
             had_text = bool(run.totals.get("text"))
