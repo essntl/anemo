@@ -76,7 +76,8 @@ test('the app in Ukrainian and Russian', async ({ page }) => {
     await page.goto('/settings/general')
     await page.getByRole('combobox', { name: 'Language' }).click()
     await page.getByRole('option', { name: 'Українська' }).click()
-    await page.getByRole('button', { name: 'Save' }).click()
+    // The General card's Save (Long chats below has its own).
+    await page.getByRole('button', { name: 'Save' }).first().click()
     // The whole app is drawn again in the new language, without a reload.
     await expect(page.getByRole('button', { name: 'Новий чат' })).toBeVisible()
     await expect(page.getByRole('navigation', { name: 'Сторінки' }).getByRole('link', { name: 'Завдання' })).toBeVisible()
@@ -98,7 +99,7 @@ test('the app in Ukrainian and Russian', async ({ page }) => {
 
     await page.getByRole('combobox', { name: 'Мова' }).click()
     await page.getByRole('option', { name: 'Русский' }).click()
-    await page.getByRole('button', { name: 'Зберегти' }).click()
+    await page.getByRole('button', { name: 'Зберегти' }).first().click()
     await expect(page.getByRole('button', { name: 'Новый чат' })).toBeVisible()
     await expect(page.getByRole('navigation', { name: 'Страницы' }).getByRole('link', { name: 'Задачи' })).toBeVisible()
   } finally {
