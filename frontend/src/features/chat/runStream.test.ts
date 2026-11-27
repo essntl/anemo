@@ -70,6 +70,12 @@ describe('runReducer', () => {
     expect(apply([{ type: 'context.compacted', data: {} }]).notice).toMatch(/summarized/)
   })
 
+  it('says when the first request was large, and what made it so', () => {
+    const notice = apply([{ type: 'request.large', data: { tokens: 61_000, system: 1_000, tools: 30_000, messages: 30_000 } }]).notice
+    expect(notice).toMatch(/large request/)
+    expect(notice).toMatch(/tools 30/)
+  })
+
   it('ignores unknown events', () => {
     expect(apply([{ type: 'something.new', data: {} }])).toEqual(initialRunView)
   })
