@@ -118,7 +118,7 @@ def upgrade() -> None:
     # Nothing loosens: watched (and phones) -> Watched, trusted -> Trusted (legacy).
     conn.execute(
         sa.text(
-            "UPDATE devices SET profile_id = CASE WHEN trust = 'trusted' THEN :legacy ELSE :watched END"
+            "UPDATE devices SET profile_id = CASE WHEN trust = 'trusted' THEN CAST(:legacy AS uuid) ELSE CAST(:watched AS uuid) END"
         ),
         {"legacy": ids["legacy"], "watched": ids["watched"]},
     )
