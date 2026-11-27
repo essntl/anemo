@@ -81,11 +81,16 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     volumes:
       - pgdata:/var/lib/postgresql/data
+    # Every second while starting (start_interval, Docker Engine 25+), so the app and the
+    # worker start as soon as it is up; then every 30 s. Each check is a `docker exec`
+    # (~60 ms of CPU): at 5 s they were nearly all of an idle Postgres' CPU.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U aiw -d aiw -h 127.0.0.1"]
-      interval: 5s
+      interval: 30s
+      start_period: 120s
+      start_interval: 1s
       timeout: 5s
-      retries: 20
+      retries: 3
     networks: [core]
 
   valkey:
@@ -93,11 +98,13 @@ services:
     restart: unless-stopped
     # Redis only holds ephemeral streams/signals; no persistence needed.
     command: ["valkey-server", "--save", "", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "volatile-lru"]
-    healthcheck:
+    healthcheck:  # as for postgres
       test: ["CMD", "valkey-cli", "ping"]
-      interval: 5s
+      interval: 30s
+      start_period: 120s
+      start_interval: 1s
       timeout: 3s
-      retries: 20
+      retries: 3
     networks: [core]
 
   migrate:

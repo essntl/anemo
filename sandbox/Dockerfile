@@ -7,8 +7,16 @@ FROM python:3.13-slim
 # or `npm install` into the workspace/home when the network sandbox is allowed.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         bash ca-certificates coreutils curl file findutils git jq less make \
-        nodejs npm openssh-client procps ripgrep rsync sqlite3 tree unzip wget xz-utils zip tini \
+        openssh-client procps ripgrep rsync sqlite3 tree unzip wget xz-utils zip tini \
     && rm -rf /var/lib/apt/lists/*
+
+# Node.js and npm from the official image, not Debian's packages: those brought 340
+# node-* packages, webpack, libssl-dev and a second Python for node-gyp.
+COPY --from=node:22-bookworm-slim /usr/local/bin/node /usr/local/bin/node
+COPY --from=node:22-bookworm-slim /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
+    && node --version && npm --version
 
 # Libraries for reading and making files people ask for: spreadsheets, Word and
 # PowerPoint files, PDFs and charts. Installed system-wide (not in the execd venv), so

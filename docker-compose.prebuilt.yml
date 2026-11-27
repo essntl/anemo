@@ -96,11 +96,15 @@ services:
       POSTGRES_USER: aiw
     volumes:
       - ./postgres:/var/lib/postgresql/data
+    # Every second while starting (start_interval, Docker Engine 25+), then every 30 s:
+    # each check is a `docker exec`, and at 5 s they were most of an idle Postgres' CPU.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U aiw -d aiw -h 127.0.0.1"]
-      interval: 5s
+      interval: 30s
+      start_period: 120s
+      start_interval: 1s
       timeout: 5s
-      retries: 20
+      retries: 3
     networks: [core]
 
   valkey:
@@ -109,11 +113,13 @@ services:
     restart: unless-stopped
     labels: *icon
     command: ["valkey-server", "--save", "", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "volatile-lru"]
-    healthcheck:
+    healthcheck:  # as for postgres
       test: ["CMD", "valkey-cli", "ping"]
-      interval: 5s
+      interval: 30s
+      start_period: 120s
+      start_interval: 1s
       timeout: 3s
-      retries: 20
+      retries: 3
     networks: [core]
 
   migrate:
