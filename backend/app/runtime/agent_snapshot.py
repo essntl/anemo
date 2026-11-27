@@ -80,6 +80,8 @@ async def snapshot_run(db: AsyncSession, run: Run, transcript: list[Message]) ->
     """Freeze what the run may do and know (permissions, folder access, profile, skills,
     memories, prompt): changing settings later does not affect a run that has started."""
     chat = run.kind == "chat"
+    # It reads a dozen settings sections: one query for all of them.
+    await settings_service.load_all(db)
     profile = await db.get(AgentProfile, run.profile_id) if run.profile_id else None
     automation = await db.get(Automation, run.automation_id) if run.automation_id else None
     settings = await profiles.effective_settings(db, profile)

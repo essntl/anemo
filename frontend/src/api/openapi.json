@@ -39652,6 +39652,17 @@
             "type": "integer",
             "title": "Compactions",
             "default": 0
+          },
+          "first_request_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Request Tokens"
           }
         },
         "type": "object",

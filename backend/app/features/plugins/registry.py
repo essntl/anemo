@@ -336,7 +336,7 @@ async def _script(
         )
         # Switched with the plugin (a manual one only runs when it is started anyway).
         automation.enabled = plugin.enabled
-        automations.reschedule(automation)
+        await automations.reschedule(db, automation)
     await track("scripts", item.id, automation.id)
 
 
@@ -441,7 +441,7 @@ async def switch(db: AsyncSession, plugin: Plugin, enabled: bool) -> None:
         if isinstance(target, Automation):
             if target.enabled and target.kind == "script" and target.script_hash is None:
                 target.enabled = False
-            automations.reschedule(target)
+            await automations.reschedule(db, target)
     await db.flush()
 
 
@@ -453,7 +453,7 @@ async def release(db: AsyncSession, plugin: Plugin) -> None:
             automation = await db.get(Automation, row.object_id)
             if automation is not None and automation.kind == "script":
                 automation.enabled = False
-                automations.reschedule(automation)
+                await automations.reschedule(db, automation)
         if row.object_type == "mcp_server":
             server = await db.get(McpServer, row.object_id)
             if server is not None:

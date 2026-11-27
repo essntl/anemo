@@ -6,12 +6,13 @@ export-openapi    print the OpenAPI schema (used to generate frontend API types)
 claude-code-check run a short agent conversation on the Claude subscription provider
                   and print the prompt-cache use of every model request (uses some
                   subscription quota; `claude-code-check --help` for options)
-tool-spec-sizes   print the size of every built-in tool spec as the model receives it
 usage-report      tokens per kind of work and per model (uncached, cached, written,
                   output) and the biggest requests (`usage-report --help` for options)
 request-size [RUN_ID]  the size of a run's first model request: system prompt, tool
                   specs (the biggest listed), earlier messages, the new message and its
                   turn context (default: the newest chat or agent run)
+request-size --tools   the size of every built-in tool spec as the model receives it
+                  (no database needed; was `tool-spec-sizes`)
 """
 
 import asyncio
@@ -79,15 +80,15 @@ def main(argv: list[str]) -> int:
         from app.claude_code_check import main as check
 
         return check(argv[2:])
-    if cmd == "tool-spec-sizes":
-        from app.tools.spec_size import report
-
-        print(report())
-        return 0
     if cmd == "usage-report":
         from app.features.usage.report import main as usage_report
 
         return usage_report(argv[2:])
+    if cmd == "request-size" and argv[2:] == ["--tools"]:
+        from app.tools.spec_size import report
+
+        print(report())
+        return 0
     if cmd == "request-size":
         return asyncio.run(_request_size(argv[2:]))
     if cmd == "export-openapi":

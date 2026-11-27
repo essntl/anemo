@@ -131,6 +131,9 @@ export function RunDetailPage() {
             {t('{input} in · {output} out', { input: formatCount(data.totals.input_tokens), output: formatCount(data.totals.output_tokens) })}
           </Stat>
           <Stat label={t('Cost')}>{formatCost(data.totals.cost_usd)}</Stat>
+          {data.totals.first_request_tokens != null && (
+            <Stat label={t('First request')}>{t('about {n} tokens', { n: formatCount(data.totals.first_request_tokens) })}</Stat>
+          )}
           <Stat label={t('Context')}>
             {data.totals.compactions ? t('Summarized {n}×', { n: data.totals.compactions }) : t('Full history')}
           </Stat>

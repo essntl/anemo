@@ -9,6 +9,7 @@ import logging
 import os
 import signal
 import socket
+from pathlib import Path
 
 from app import claude_runner_client
 from app.core.config import get_settings
@@ -26,6 +27,10 @@ log = logging.getLogger("worker")
 HEARTBEAT_KEY = "worker:heartbeat:{worker_id}"
 HEARTBEAT_INTERVAL_S = 10
 HEARTBEAT_TTL_S = 45
+# Touched with each heartbeat: the Docker healthcheck looks at its age in shell. Starting
+# Python for it (`app.cli worker-health`) cost 0.44 s of CPU every 30 s, most of what an
+# idle worker container used.
+ALIVE_FILE = Path("/tmp/anemo-worker-alive")  # noqa: S108 - inside the container only
 
 
 def worker_id() -> str:
@@ -37,6 +42,7 @@ async def heartbeat_loop(wid: str, stop: asyncio.Event) -> None:
     while not stop.is_set():
         try:
             await redis.set(HEARTBEAT_KEY.format(worker_id=wid), "1", ex=HEARTBEAT_TTL_S)
+            await asyncio.to_thread(ALIVE_FILE.touch)
         except Exception:  # noqa: BLE001 - keep beating once Redis is back
             log.warning("heartbeat failed", exc_info=True)
         try:
@@ -80,11 +86,13 @@ async def main() -> None:
     log.info("worker starting", extra={"ctx": {"worker_id": wid}})
     beat = asyncio.create_task(heartbeat_loop(wid, stop))
     runner_status = asyncio.create_task(runner_status_loop(stop))
-    periodic = asyncio.create_task(scheduler.run(stop))  # reminders, automations
+    # The job runner's LISTEN connection sets it when an automation's run time changes.
+    scheduler_wake = asyncio.Event()
+    periodic = asyncio.create_task(scheduler.run(stop, scheduler_wake))  # reminders, automations
     # Sessions with the MCP servers that triggers wait on (mcp.notification events).
     mcp_listening = asyncio.create_task(mcp_listener.McpListener(wid).run(stop))
     # Returns after `stop` is set and in-flight jobs have finished or been handed back.
-    await JobRunner(wid, settings.worker_concurrency).run(stop)
+    await JobRunner(wid, settings.worker_concurrency, scheduler_wake=scheduler_wake).run(stop)
     log.info("worker stopped")
     beat.cancel()
     periodic.cancel()

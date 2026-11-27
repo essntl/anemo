@@ -122,7 +122,11 @@ async def _given_before(
         # Turns from before messages kept this: what their runs recorded as given.
         options: dict[str, Any] | None
         for options in await db.scalars(
-            select(Run.options).where(Run.user_message_id.in_(unknown))
+            # The conversation narrows it to an index (ix_runs_conversation); there is
+            # none on user_message_id, and without it every turn read all runs.
+            select(Run.options).where(
+                Run.conversation_id == conversation.id, Run.user_message_id.in_(unknown)
+            )
         ):
             given |= memory.keys((options or {}).get("memory_context") or [])
     return given
