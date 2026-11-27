@@ -46,7 +46,7 @@ from app.core.errors import Unauthorized
 from app.events import bus
 from app.features.auth import tokens
 from app.features.code_sessions import ingest as code_ingest
-from app.features.devices import relay, service
+from app.features.devices import profile_sync, relay, service
 from app.features.devices.models import Device
 from app.features.devices.phone_events import PhoneFilter
 from app.features.triggers import events as trigger_events
@@ -162,9 +162,11 @@ class Connection:
         raw: str,
         ip: str | None,
         platform: relay.Platform = relay.DEFAULT_PLATFORM,
+        capabilities: tuple[str, ...] = (),
     ) -> None:
         self.ws = ws
         self.platform = platform  # from hello; written with every offer
+        self.capabilities = capabilities  # from hello (Anemo Desktop 1.10.0: profiles)
         self.device_id = device.id
         self.kind = device.kind
         self.trust = device.trust
@@ -269,6 +271,16 @@ class Connection:
             )
             if not await relay.renew(self.device_id, self.conn, offer):
                 raise _Closed(CLOSE_REPLACED, "replaced by a newer connection")
+            version = message.get("profile_version")
+            if isinstance(version, int) and not isinstance(version, bool):
+                # The profile the device enforces (spec 25 §10): the settings page shows
+                # "waiting for confirmation" while it is older than the server's.
+                await relay.annotate(
+                    self.device_id,
+                    self.conn,
+                    profile_version=str(version),
+                    profile_pending="1" if message.get("profile_pending") is True else "0",
+                )
         elif kind in ("code.job", "code.events"):
             if not self.takes_code:
                 return  # a phone, or a computer that isn't trusted: nothing stored, no ack
@@ -393,6 +405,25 @@ async def _hello(ws: WebSocket) -> dict[str, Any] | None:
     return hello
 
 
+KNOWN_CAPABILITIES = ("profiles", "shell.analyze")
+
+
+def _capabilities(hello: dict[str, Any]) -> tuple[str, ...]:
+    """What `hello.capabilities` names that this server knows (Anemo Desktop 1.10.0)."""
+    raw = hello.get("capabilities")
+    if not isinstance(raw, list):
+        return ()
+    return tuple(c for c in KNOWN_CAPABILITIES if c in raw)
+
+
+async def _sync_profile_soon(device_id: uuid.UUID) -> None:
+    """Send the device its profile once the connection's command task is up. Never ends
+    the connection: it waits forever after (asyncio.wait watches for the first to finish)."""
+    await asyncio.sleep(0.2)
+    await profile_sync.push(device_id)
+    await asyncio.Event().wait()
+
+
 @router.websocket("/ws")
 async def device_socket(ws: WebSocket) -> None:
     await ws.accept()
@@ -416,7 +447,9 @@ async def device_socket(ws: WebSocket) -> None:
     async with get_sessionmaker()() as db:
         await service.seen(db, device.id, str(version) if version is not None else "")
 
-    connection = Connection(ws, device, raw, ip, relay.platform_of(hello.get("platform")))
+    connection = Connection(
+        ws, device, raw, ip, relay.platform_of(hello.get("platform")), _capabilities(hello)
+    )
     last_id = hello.get("last_id")
     if not isinstance(last_id, str) or not _STREAM_ID.match(last_id):
         last_id = None  # a malformed cursor counts as none
@@ -462,6 +495,11 @@ async def device_socket(ws: WebSocket) -> None:
         pubsub = None  # the task owns it now
         tasks.append(asyncio.create_task(connection.listen()))
         tasks.append(asyncio.create_task(connection.recheck()))
+        if connection.capabilities:
+            await relay.annotate(device.id, connection.conn, caps=",".join(connection.capabilities))
+        if "profiles" in connection.capabilities:
+            # Its copy of the profile, as soon as its commands are listened to (§9).
+            tasks.append(asyncio.create_task(_sync_profile_soon(device.id)))
         if device.kind == "phone":
             tasks.append(asyncio.create_task(connection.relay_events(cursor)))
         done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)

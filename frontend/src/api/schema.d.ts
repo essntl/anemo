@@ -8013,6 +8013,18 @@ export interface components {
             version: number;
             /** Grants */
             grants?: components["schemas"]["DeviceGrantOut"][];
+            /** Device Version */
+            device_version?: number | null;
+            /**
+             * Waiting For Confirmation
+             * @default false
+             */
+            waiting_for_confirmation: boolean;
+            /**
+             * Analyser
+             * @default false
+             */
+            analyser: boolean;
         };
         /** DeviceProfileCopyIn */
         DeviceProfileCopyIn: {

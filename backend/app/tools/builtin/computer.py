@@ -33,19 +33,23 @@ screenshot of each step is kept for the run's timeline, as the browser tools do.
 import asyncio
 import base64
 import binascii
+import hashlib
 import re
+import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+from sqlalchemy import select
 
 from app.core.db import get_sessionmaker
 from app.features.attachments import images
 from app.features.devices import permissions as perms
-from app.features.devices import relay, shared_screen
+from app.features.devices import profile_sync, relay, shared_screen
 from app.features.devices import service as devices
+from app.features.runs.models import Approval
 from app.policy.models import Action, Decision, Risk
 from app.policy.shell_risk import classify, max_risk
 from app.tools import clixml
@@ -78,6 +82,10 @@ _DEVICES = "computers"  # ctx.state: {casefolded name: device info}, refreshed e
 _CONTROLS = "computer_controls"  # ctx.state: {casefolded name: {ref: description}}
 _PASSWORDS = "computer_passwords"  # ctx.state: {casefolded name: refs of password fields}
 _WINDOWS = "computer_windows"  # ctx.state: {casefolded name: {window ref: title}}
+_ANALYSES = "computer_shell_analyses"  # ctx.state: {device id + command hash: shell.analyze answer}
+# How long the server waits for the device's analysis before falling back (spec 25 §6.1).
+ANALYZE_TIMEOUT_S = 3.0
+NOT_CHECKED = " (Anemo Desktop couldn't check this command, so the old rules decided)"
 
 
 def _key(name: str) -> str:
@@ -98,6 +106,8 @@ def _info(device: relay.DeviceInfo) -> dict[str, Any]:
         "profile_name": device.profile_name,
         "preset": device.preset,
         "categories": perms.categories_for(device.categories, device.trust),
+        "capabilities": list(device.capabilities),
+        "permissions_version": device.permissions_version,
     }
 
 
@@ -230,6 +240,59 @@ def _resource(ctx: ToolContext, name: str) -> str:
     may contain "/", which would widen the approval to other devices)."""
     device = _known(ctx, name)
     return f"device:{device['id']}" if device else "device:unknown"
+
+
+def analysis_key(device_id: str, command: str) -> str:
+    return f"{device_id}:{hashlib.sha256(command.encode()).hexdigest()}"
+
+
+def analysis_for(ctx: ToolContext, device: dict[str, Any], command: str) -> dict[str, Any] | None:
+    """The device's `shell.analyze` answer for this command, when there is a usable one."""
+    found = (ctx.state.get(_ANALYSES) or {}).get(analysis_key(device["id"], command))
+    if isinstance(found, dict) and found.get("verdict") in ("allow", "ask", "deny"):
+        return found
+    return None
+
+
+def _risk_of(analysis: dict[str, Any]) -> Risk:
+    """The analysis as the Agent Permissions' risk: no change is safe, an allowed change
+    moderate, and anything the device asks about or refuses dangerous."""
+    if analysis.get("verdict") != "allow":
+        return "dangerous"
+    effects = analysis.get("effects") or []
+    changes = any(isinstance(e, dict) and e.get("kind") != "read" for e in effects)
+    return "moderate" if changes or analysis.get("unknown") else "safe"
+
+
+async def _decision_fields(ctx: ToolContext, device: Any, command: str) -> dict[str, Any]:
+    """What `shell` carries about the decision (spec 25 §6.1 step 5): the approval the user
+    gave, or the rule that allowed it, and the profile version it was decided with."""
+    fields: dict[str, Any] = {"profile_version": getattr(device, "permissions_version", 0)}
+    approval = await _approval_of(ctx)
+    if approval is not None:
+        fields["approval"] = approval
+    else:
+        known = _known(ctx, device.name)
+        analysis = analysis_for(ctx, known, command) if known is not None else None
+        rule = str((analysis or {}).get("rule") or "as the Agent Permissions say")
+        fields["auto"] = {"rule": rule[:300]}
+    return fields
+
+
+async def _approval_of(ctx: ToolContext) -> dict[str, Any] | None:
+    """The user's approval of this call, if it needed one."""
+    if ctx.call_id is None:
+        return None
+    async with get_sessionmaker()() as db:
+        approval = await db.scalar(
+            select(Approval)
+            .where(Approval.tool_call_id == ctx.call_id, Approval.status == "approved")
+            .order_by(Approval.decided_at.desc())
+            .limit(1)
+        )
+    if approval is None:
+        return None
+    return {"id": str(approval.id), "scope": "once"}
 
 
 def _blocked_for_acting(ctx: ToolContext, name: str) -> str | None:
@@ -538,12 +601,22 @@ def _stricter_now(name: str, *, watched: bool = False) -> ToolResult:
     )
 
 
+@dataclass
+class _Stale:
+    """The device refused a shell as decided with a newer profile than its copy."""
+
+    message: str
+
+
 async def _send(
     ctx: ToolContext, device: Any, action: str, fields: dict[str, Any], timeout_s: float
-) -> dict[str, Any] | ToolResult:
-    """One command; a relay error becomes the error the model sees."""
+) -> Any:
+    """One command; a relay error becomes the error the model sees (a `_Stale` for a
+    shell decided with a newer profile than the device's copy)."""
     try:
         return await relay.send(device.id, action, fields, timeout_s=timeout_s)
+    except relay.ProfileStale as exc:
+        return _Stale(str(exc))
     except relay.Stopped:
         known = _known(ctx, device.name)
         if known is not None:
@@ -1086,6 +1159,31 @@ class ComputerShell(Tool):
     idempotent = False  # never re-run automatically after a crash
     timeout_s = float(SHELL_MAX_TIMEOUT_S + SHELL_GRACE_S + 10)
 
+    async def prepare(self, args: ShellInput, ctx: ToolContext) -> None:
+        """Ask the device what the command does (`shell.analyze`, spec 25 §6.1), for a
+        PowerShell whose profile decides by work folders or is Unrestricted. 3 s at most; an
+        older Anemo Desktop, or none in time, leaves it to the old rules."""
+        device = _known(ctx, args.device)
+        if device is None or not is_powershell(device.get("shell_kind")):
+            return
+        if levels(device)["shell"] not in ("folders", "allow", "ask"):
+            return
+        if "shell.analyze" not in (device.get("capabilities") or []):
+            return
+        analyses: dict[str, Any] = ctx.state.setdefault(_ANALYSES, {})
+        key = analysis_key(device["id"], args.command)
+        if key in analyses:
+            return
+        try:
+            analyses[key] = await relay.send(
+                uuid.UUID(device["id"]),
+                "shell.analyze",
+                {"command": args.command},
+                timeout_s=ANALYZE_TIMEOUT_S,
+            )
+        except (relay.Unavailable, relay.Refused, relay.ActionFailed, relay.Stopped, ValueError):
+            analyses[key] = {"verdict": "unavailable"}
+
     def actions(self, args: ShellInput, ctx: ToolContext) -> list[Action]:
         device = _known(ctx, args.device)
         # A device this step's list doesn't know is rated as PowerShell, as before; run()
@@ -1093,23 +1191,44 @@ class ComputerShell(Tool):
         kind = device.get("shell_kind") if device is not None else None
         shell = shell_name(kind)
         rating = rate_command(args.command, kind)
+        risk: Risk = rating.risk
         why = f" ({'; '.join(rating.reasons)})" if rating.reasons else ""
         blocked = _blocked_for_acting(ctx, args.device)
         decision, reason = None, None
+        network = rating.network
         if blocked is None and device is not None:
             decision, reason, denied = device_layer(device, "shell", shell)
             if denied:
                 blocked = denied
             elif not device["shell"]:
                 blocked = f"{shell} is switched off in Anemo Desktop on “{device['name']}”"
+            analysis = analysis_for(ctx, device, args.command)
+            level = levels(device)["shell"]
+            if blocked is None and analysis is not None:
+                # The device's analysis decides for the device layer (§6.1 step 3); the
+                # risk the Agent Permissions see comes from it too, not from the regexes.
+                decision = analysis["verdict"]
+                rule = str(analysis.get("rule") or "")[:300]
+                reason = f"Anemo Desktop on “{device['name']}”: {rule}"
+                why = f" ({rule})" if rule else ""
+                risk = _risk_of(analysis)
+                network = network or bool(analysis.get("network"))
+            elif blocked is None and level == "folders" and not is_powershell(kind):
+                # macOS has no analyser yet (spec 25 §10): on Scoped every zsh/bash command
+                # the rating doesn't call safe asks; read-only ones go through.
+                decision = "ask" if rating.risk != "safe" else None
+                reason = f"profile {device.get('profile_name')}: no analyser for {shell} yet"
+            elif blocked is None and level == "folders":
+                decision, reason = None, None  # the old rules decide, as Trusted (legacy)
+                why += NOT_CHECKED
         return [
             Action(
                 capability=SHELL,
                 resource=_resource(ctx, args.device),
-                risk=rating.risk,
+                risk=risk,
                 summary=f"Run {shell} `{_short(args.command, 80)}` on {args.device}{why}",
                 blocked=blocked,
-                contacts_people=rating.network,
+                contacts_people=network,
                 device_decision=decision,
                 device_reason=reason,
             )
@@ -1130,8 +1249,18 @@ class ComputerShell(Tool):
                 is_error=True,
             )
         timeout = min(args.timeout_s, ctx.limits.max_shell_timeout_s)
-        fields = {"command": args.command, "timeout_s": timeout}
+        fields: dict[str, Any] = {"command": args.command, "timeout_s": timeout}
+        known = _known(ctx, args.device)
+        if known is not None and "profiles" in (known.get("capabilities") or []):
+            fields.update(await _decision_fields(ctx, device, args.command))
         result = await _send(ctx, device, "shell", fields, timeout + SHELL_GRACE_S)
+        if isinstance(result, _Stale):
+            # The device's copy of its profile is older than what this was decided with:
+            # send it again and try once more (spec 25 §6.1 step 6).
+            await profile_sync.push(device.id)
+            result = await _send(ctx, device, "shell", fields, timeout + SHELL_GRACE_S)
+            if isinstance(result, _Stale):
+                return ToolResult(content=result.message, is_error=True)
         if isinstance(result, ToolResult):
             return result
         exit_code = result.get("exit_code")

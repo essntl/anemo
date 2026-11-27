@@ -62,6 +62,14 @@ function PermissionsForm({ deviceId, deviceName, current, profiles }: {
           options={profiles.map((p) => ({ value: p.id, label: profileName(p) }))} />
       </div>
       {profile.preset && PRESETS[profile.preset] && <p className="-mt-2 text-[12px] text-muted">{t(PRESETS[profile.preset].description)}</p>}
+      {current.waiting_for_confirmation && (
+        <p role="status" className="rounded-control bg-warning/10 px-2 py-1.5 text-[12.5px] text-warning">
+          {t('Waiting for confirmation on {name}: it keeps the old permissions until someone allows the change there.', { name: deviceName })}
+        </p>
+      )}
+      {current.device_version != null && !current.analyser && usesFolders && (
+        <p className="text-[12px] text-muted">{t('This computer’s Anemo Desktop doesn’t check commands itself yet; update it for work folders to apply to the shell.')}</p>
+      )}
 
       <div className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-5" aria-label={t('What the profile allows')}>
         {CATEGORIES.map((c) => (

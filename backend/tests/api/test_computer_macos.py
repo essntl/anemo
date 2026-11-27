@@ -199,3 +199,18 @@ def test_mac_application_names_can_be_opened():
         assert computer.ActInput(device="Mac", action="open", target=name).target == name
     with pytest.raises(ValueError):
         computer.ActInput(device="Mac", action="open", target="/Applications/Calculator.app")
+
+
+async def test_on_a_scoped_mac_only_read_only_commands_go_through(fake):
+    """No analyser for zsh yet (spec 25 §10): what the rating doesn't call safe asks."""
+    from app.features.devices import permissions as perms
+
+    fake.add("Mac", "trusted", shell=True, platform="macos", shell_kind="zsh")
+    ctx = await _ctx(fake)
+    info = ctx.state["computers"]["mac"]
+    info.update(
+        preset="scoped", profile_name="Scoped", categories=dict(perms.PRESETS["scoped"].categories)
+    )
+    auto = {"computer.shell": "autonomous"}
+    assert _decide(SHELL, computer.ShellInput(device="Mac", command="ls -la"), ctx, auto) == "allow"
+    assert _decide(SHELL, computer.ShellInput(device="Mac", command="touch x"), ctx, auto) == "ask"

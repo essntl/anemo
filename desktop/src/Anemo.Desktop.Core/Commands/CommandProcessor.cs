@@ -53,6 +53,7 @@ public sealed partial class CommandProcessor : ICommandExecutor
     private readonly CommandOptions _options;
     private readonly CodeJobs.CodeJobControl? _codeJobs;
     private readonly Files.DeviceFiles? _files;
+    private readonly Core.Permissions.PermissionGuard? _permissions;
     private readonly ControlRefs _refs = new();
     private readonly WindowRefs _windows = new();
     private ScreenCapture? _lastCapture;
@@ -65,7 +66,8 @@ public sealed partial class CommandProcessor : ICommandExecutor
         CommandLog? log = null,
         CommandOptions? options = null,
         CodeJobs.CodeJobControl? codeJobs = null,
-        Files.DeviceFiles? files = null)
+        Files.DeviceFiles? files = null,
+        Core.Permissions.PermissionGuard? permissions = null)
     {
         _platform = platform;
         _control = control;
@@ -74,7 +76,11 @@ public sealed partial class CommandProcessor : ICommandExecutor
         _options = options ?? new CommandOptions();
         _codeJobs = codeJobs;
         _files = files;
+        _permissions = permissions;
     }
+
+    /// <summary>The device's permission profile and its checks (spec 25), when this client has them.</summary>
+    public Core.Permissions.PermissionGuard? Permissions => _permissions;
 
     private IDesktop Desktop => _platform.Desktop;
 
@@ -127,6 +133,18 @@ public sealed partial class CommandProcessor : ICommandExecutor
         {
             RequireShellAllowed(device);
             return await ShellAsync(args, ct);
+        }
+
+        if (action == "profile.sync" && _permissions is not null)
+        {
+            return _permissions.Sync(args.Node("profile"));
+        }
+
+        if (action == "shell.analyze" && _permissions is not null)
+        {
+            var command = args.String("command", 8000);
+            var analysis = await _permissions.AnalyzeAsync(command, ShellFolder(), ct);
+            return Core.Permissions.PermissionGuard.Describe(analysis, _permissions);
         }
 
         if (CodeJobs.CodeJobControl.Handles(action))

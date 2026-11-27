@@ -930,6 +930,7 @@ class AgentRun:
         args: Any,
         grants: list[Grant],
     ) -> str | None:
+        await tool.prepare(args, self.ctx)
         verdict = tool_calls.decide(
             tool,
             args,

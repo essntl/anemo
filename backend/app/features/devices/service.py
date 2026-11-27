@@ -6,6 +6,7 @@ docs/specs/CONTRACTS-devices.md §2: other features read only `id`, `name`, `kin
 `trust` of what they return.
 """
 
+import asyncio
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -20,7 +21,7 @@ from app.features.audit import service as audit
 from app.features.auth import tokens
 from app.features.auth.models import ApiToken
 from app.features.devices import permissions as perms
-from app.features.devices import profiles, relay
+from app.features.devices import profile_sync, profiles, relay
 from app.features.devices.models import Device, DeviceProfile, Kind, Trust
 
 # The name the stub gave the lookups' result type; the ORM model has the same fields.
@@ -195,11 +196,16 @@ async def set_permissions(
         await permissions_changed(device)
 
 
+_syncing: set[asyncio.Task[object]] = set()
+
+
 async def permissions_changed(device: Device) -> None:
-    """The device's permissions changed without its trust level changing. Anemo Desktop
-    gets its new profile copy through `profile.sync` (from PR group B on); until then
-    nothing needs to reach it: the server decides alone."""
-    return None
+    """The device's permissions changed without its trust level changing: Anemo Desktop
+    gets its new copy (`profile.sync`) in the background, so the request doesn't wait on
+    the device. A device that misses it gets it when it reconnects."""
+    task: asyncio.Task[object] = asyncio.create_task(profile_sync.push(device.id))
+    _syncing.add(task)
+    task.add_done_callback(_syncing.discard)
 
 
 async def delete(db: AsyncSession, device_id: uuid.UUID, *, ip: str | None) -> None:

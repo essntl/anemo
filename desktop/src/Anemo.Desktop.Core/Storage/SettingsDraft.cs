@@ -56,6 +56,9 @@ public sealed record SettingsDraft
 
     public bool ShareFiles { get; init; }
 
+    /// <summary>"Confirm loosened permissions on this computer" (spec 25 §10).</summary>
+    public bool ConfirmLoosenedPermissions { get; init; }
+
     /// <summary>The allowed folders, separated by <c>;</c> (or one per line); empty: the home folder.</summary>
     public string FileFolders { get; init; } = "";
 
@@ -75,6 +78,7 @@ public sealed record SettingsDraft
         CodeProjectsFolder = settings.CodeProjectsFolder ?? "",
         GitHubOwner = settings.GitHubOwner ?? "",
         ShareFiles = settings.ShareFiles,
+        ConfirmLoosenedPermissions = settings.ConfirmLoosenedPermissions,
         FileFolders = string.Join("; ", settings.FileFolders ?? []),
         AutoUpdate = settings.AutoUpdate,
     };
@@ -137,6 +141,7 @@ public sealed record SettingsDraft
             CodeProjectsFolder = OrNull(CodeProjectsFolder),
             GitHubOwner = owner.Length == 0 ? null : owner,
             ShareFiles = ShareFiles,
+            ConfirmLoosenedPermissions = ConfirmLoosenedPermissions,
             FileFolders = folders.Length == 0 ? null : folders,
             AutoUpdate = AutoUpdate,
         };

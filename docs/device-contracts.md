@@ -263,7 +263,9 @@ result code. 1.6.0 adds remote repositories and fetching to the git actions (§7
 `code_git_remote` offer field, `code_git_cache_clear`, the `unauthenticated` result code).
 1.7.0 adds files between the computer and the workspace (§8, the `files` offer field, the
 `exists` result code). 1.9.0 adds messages for a running job (§7.4: `code_start` `input`,
-`code_input`, `code_input_withdraw`, the `code_input` offer field, `code.job` `input`).
+`code_input`, `code_input_withdraw`, the `code_input` offer field, `code.job` `input`). 1.10.0 adds permission profiles (§9: `hello.capabilities`, the offer's
+`profile_version` and `profile_pending`, `profile.sync`, `shell.analyze`, the `shell`
+fields `profile_version`, `auto` and `approval`, and the `profile_stale` result code).
 The server still supports 1.0.0: an older client simply sends no `code.*`. The server sends
 `{"type": "notice", "text": "…"}` once per connection when a client is older than the
 oldest version it supports; it keeps working where it can. A client that gets an action it
@@ -578,3 +580,96 @@ and again until nothing changes), it is
 
 Anything else is `refused` with a sentence saying why. The server doesn't know the rule;
 it is the client's to keep, as the trust checks are.
+
+
+## 9. Permission profiles (Anemo Desktop 1.10.0)
+
+The design is in `docs/specs/25-device-permission-profiles.md`. A computer's permissions are a
+**profile**: one level per category (`see`, `act`, `shell`, `files`, `code`), each one of
+`allow`, `ask`, `deny`, `folders` (the work folders decide) or `policy` (no device layer; the
+Agent Permissions alone, which is what Trusted (legacy) does). The device also has its own
+**work folders**, **protected-folder levels** and the "Unrestricted for automations" switch.
+Everything is managed in Anemo. The device keeps a copy and checks every `shell` against it.
+
+**Hello and offer.**
+
+```
+client → {"type": "hello", …, "capabilities": ["profiles", "shell.analyze"]}
+client → {"type": "device.offer", …, "profile_version": 7, "profile_pending": false}
+```
+
+- `profiles`: the client takes `profile.sync`.
+- `shell.analyze`: the client analyses PowerShell commands (the Windows client; macOS has no analyser yet).
+- `profile_version`: the version of the profile the client **enforces**.
+- `profile_pending`: a loosening waits for the user's click on the computer (below).
+
+The server keeps both in the online hash (`relay.Offer.capabilities`, `profile_version`,
+`profile_pending`). A client without `capabilities` is an older one: the server sends it no
+`profile.sync` and no `shell.analyze`, and decides as before (Trusted (legacy) rules).
+
+**`profile.sync`** is a `device.command`. The server sends it right after `welcome` to a
+client with `profiles`, and again whenever the device's permissions change.
+
+```
+server → {"type": "device.command", "id", "action": "profile.sync",
+          "profile": {"version": 7,
+                      "profile": {"id", "name": "Scoped", "preset": "scoped" | null},
+                      "categories": {"see": "allow", "act": "ask", "shell": "folders",
+                                     "files": "folders", "code": "ask"},
+                      "work_folders": [{"path": "C:\\dev", "recycle": false,
+                                        "added_from": "settings"}],
+                      "protected": {"anemo": "hard", "keys": "deny", "system": "ask", …},
+                      "relevance_check": true, "automations_unrestricted": false}}
+client → {"type": "device.result", "id", "ok": true,
+          "state": {"applied": true, "version": 7, "pending": false}}
+```
+
+- The client stores the copy in its data folder (`permissions.json`, on the hard floor).
+- It never replaces a newer copy with an older one.
+- Work-folder paths may hold `%USERPROFILE%`, `%TEMP%`, `%TMP%`, `%LOCALAPPDATA%`, `%APPDATA%` and `%PROGRAMDATA%`.
+
+**"Confirm loosened permissions on this computer"** is a switch in Anemo Desktop's settings window. It is off by default and is never set by the server. With it on, a sync that loosens anything is held: the client answers `applied: false, pending: true`, shows a notification, and keeps enforcing the old copy until the user allows the change there. These count as loosening:
+- a looser category;
+- a new work folder;
+- a protected folder from deny to ask;
+- the relevance check off;
+- "Unrestricted for automations" on.
+
+Tightening applies at once.
+
+**`shell.analyze`** asks the device what a command would do, before the server decides. The server waits 3 s at most; without an answer it decides by the old rules, and the approval says so.
+
+```
+server → {"type": "device.command", "id", "action": "shell.analyze", "command": "…"}
+client → {"type": "device.result", "id", "ok": true,
+          "state": {"verdict": "allow" | "ask" | "deny",
+                    "effects": [{"kind": "read" | "write" | "delete" | "run",
+                                 "path": "C:\\dev\\anemo\\logs", "recursive": true,
+                                 "work_folder": "C:\\dev", "recycle": false}],
+                    "unknown": ["variable $p used as a path (remove-item)"],
+                    "rule": "delete inside work folder C:\\dev",
+                    "network": false, "profile_version": 7, "pending": false}}
+```
+
+`verdict` is `"unavailable"` when the client can't parse PowerShell. Analysing never runs anything: the client parses the command with PowerShell's own parser in a helper process that only parses (`powershell.exe -NoProfile`).
+
+**`shell` gains three fields** (sent only to a client with `profiles`):
+
+```
+server → {…, "action": "shell", "command", "timeout_s", "profile_version": 7,
+          "auto": {"rule": "delete inside work folder C:\\dev"}}
+       or {…, "approval": {"id": "<approval id>", "scope": "once" | "folder" | "hour"}}
+```
+
+The client analyses the command again (cached by its hash) and refuses:
+- `refused` when its own copy says deny;
+- `refused` when it says ask and no `approval` came;
+- `profile_stale` when `profile_version` is newer than its copy (including while a loosening waits for confirmation).
+
+On `profile_stale` the server sends `profile.sync` again and tries once more. An older server takes `profile_stale` as failed.
+
+**The hard floor** is fixed in the client's code, on every profile, Unrestricted included: Anemo Desktop's own data folder and its install folder are never written, deleted, read or run by a command.
+
+**What this protects against:**
+- It stops server bugs and a stale server-side profile.
+- It does not stop a compromised server or Anemo account. Whoever controls Anemo controls the profile; Anemo's login is the boundary (spec 25 §6.1).

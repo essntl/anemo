@@ -489,6 +489,21 @@
                                 </ContentControl>
                                 <ContentControl Style="{StaticResource CardBox}">
                                     <StackPanel>
+                                        <TextBlock Style="{StaticResource CardTitle}" Text="Permissions" />
+                                        <DockPanel>
+                                            <Border Style="{StaticResource IconTile}" DockPanel.Dock="Left">
+                                                <ui:LineIcon Kind="shield" Size="18" Stroke="{DynamicResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <CheckBox x:Name="ConfirmLooseningSwitch" Style="{StaticResource Switch}" DockPanel.Dock="Right" AutomationProperties.Name="Confirm loosened permissions on this computer" />
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource RowTitle}" Text="Confirm loosened permissions on this computer" />
+                                                <TextBlock Style="{StaticResource Help}" Text="What agents may do here is set in Anemo (Settings › Devices). With this on, a change there that allows more waits for your click in a notification on this computer; until then the old permissions stay." />
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </StackPanel>
+                                </ContentControl>
+                                <ContentControl Style="{StaticResource CardBox}">
+                                    <StackPanel>
                                         <TextBlock Style="{StaticResource CardTitle}" Text="Files" />
                                         <DockPanel>
                                             <Border Style="{StaticResource IconTile}" DockPanel.Dock="Left">

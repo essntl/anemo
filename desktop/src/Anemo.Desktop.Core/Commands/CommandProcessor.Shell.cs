@@ -33,13 +33,27 @@ public sealed partial class CommandProcessor
         _ => ShellStartFor(shell.Path, command, workFolder),
     };
 
+    /// <summary>The folder the shell starts in: Settings', else <c>%USERPROFILE%\AnemoWork</c>.</summary>
+    private string ShellFolder() =>
+        string.IsNullOrWhiteSpace(_settings().WorkFolder) ? _options.DefaultWorkFolder : _settings().WorkFolder!;
+
     private async Task<JsonNode> ShellAsync(Args args, CancellationToken ct)
     {
         var command = args.String("command", 8000);
         var timeout = args.Int("timeout_s", 1, 600, fallback: 60);
         var program = _platform.Shell.FindShell()
             ?? throw CommandException.Unavailable(_options.Platform.NoShellMessage);
-        var folder = string.IsNullOrWhiteSpace(_settings().WorkFolder) ? _options.DefaultWorkFolder : _settings().WorkFolder!;
+        var folder = ShellFolder();
+        // The device's own check (spec 25 §6.1): whatever the server decided, the profile here holds.
+        if (_permissions is not null && ShellKinds.IsPowerShell(program.Kind))
+        {
+            await _permissions.CheckShellAsync(args, command, folder, ct);
+        }
+        else if (_permissions is not null && _permissions.Profile.Level("shell") == "deny")
+        {
+            throw CommandException.Refused("The shell isn't allowed on this computer (its permission profile in Anemo).");
+        }
+
         _platform.Shell.EnsureFolder(folder);
 
         var stdout = new OutputCapture();

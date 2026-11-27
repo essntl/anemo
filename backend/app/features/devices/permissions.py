@@ -139,7 +139,7 @@ PROTECTED: list[ProtectedFolder] = [
     ProtectedFolder(
         key="anemo",
         label="Anemo Desktop's own data and install folders",
-        paths=["%LOCALAPPDATA%\\AnemoDesktop", "%LOCALAPPDATA%\\Programs\\AnemoDesktop"],
+        paths=["%APPDATA%\\Anemo Desktop", "the folder Anemo Desktop runs from"],
         level="hard",
         adjustable=False,
     ),
