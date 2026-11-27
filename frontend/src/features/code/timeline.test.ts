@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   type CodeEvent, type TimelineItem, type ToolCall, buildTimeline, contiguousSeq, diffOf, mergeEvents, readRange, resultOf, shellOutput,
-  subjectOf, todoProgress, toTodos,
+  injectedText, subjectOf, todoProgress, toTodos,
 } from './timeline'
 
 let at = 0
@@ -279,3 +279,44 @@ describe('messages sent while the job ran (§15)', () => {
   })
 })
 
+
+describe('what Claude Code itself puts in as a user turn', () => {
+  const NOTE = [
+    '<task-notification>',
+    '<task-id>b1x2</task-id>',
+    '<tool-use-id>toolu_9</tool-use-id>',
+    '<output-file>/tmp/claude/tasks/b1x2.output</output-file>',
+    '<status>completed</status>',
+    '<summary>Background command "Run CI for item 1" completed (exit code 0)</summary>',
+    '</task-notification>',
+  ].join('\n')
+
+  it('a finished background command is a quiet line from its summary, never a delivered message', () => {
+    at = 0
+    const replay = (text: string, uuid: string) => ev({ type: 'user', message: { role: 'user', content: text }, isReplay: true, uuid })
+    const items = buildTimeline([
+      replay('Fix the login bug', 'p'),
+      replay(NOTE, 'n1'),
+      ev({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: NOTE }] } }),
+      ev({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: '<system-reminder>\nTodo list changed\n</system-reminder>' }] } }),
+      ev({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: '<command-name>/cost</command-name>\n<local-command-stdout>Total cost: $0.10</local-command-stdout>' }] } }),
+    ])
+    expect(items.map((i) => i.kind)).toEqual(['notice', 'notice', 'notice'])
+    expect(items.map((i) => (i.kind === 'notice' ? i.text : ''))).toEqual([
+      'Background command "Run CI for item 1" completed (exit code 0)',
+      'Background command "Run CI for item 1" completed (exit code 0)',
+      '/cost: Total cost: $0.10',
+    ])
+  })
+
+  it('reads the parts it knows and leaves the user’s own text alone', () => {
+    expect(injectedText('<task-notification><status>failed</status><summary>Background command "x" failed with exit code 1</summary></task-notification>'))
+      .toEqual({ notice: 'Background command "x" failed with exit code 1' })
+    expect(injectedText('<task-notification><status>killed</status><summary>Task "y" stopped</summary></task-notification>'))
+      .toEqual({ notice: 'Task "y" stopped (killed)' })
+    expect(injectedText('<task-notification><status>completed</status></task-notification>'))
+      .toEqual({ notice: 'A background task ended: completed' })
+    expect(injectedText('Please look at <system-reminder> tags in the code')).toBeNull()
+    expect(injectedText('Fix the bug')).toBeNull()
+  })
+})
