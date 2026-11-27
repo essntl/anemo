@@ -174,7 +174,7 @@ function Thread({ conversationId, onRestart, onGone, prepare = same, display = s
   }, [activeRunId, conversationId, qc])
 
   const list = messages.data ?? []
-  const scroll = useStickToBottom([list.length, live.text, live.reasoning])
+  const { ref: scroll } = useStickToBottom([list.length, live.text, live.reasoning])
 
   const onSend = async (text: string, attachmentIds: string[] = [], referenceIds: string[] = [], skillId: string | null = null) => {
     setError(null)
