@@ -56,7 +56,13 @@ cleanup() {
 trap cleanup EXIT
 
 echo "Starting a throwaway stack on $BASE"
-$COMPOSE up -d --build --wait
+if ! $COMPOSE up -d --build --wait; then
+  # Compose only says which service failed ("migrate didn't complete successfully"):
+  # print what the first services wrote, so a failure in CI can be read from its log.
+  echo "The stack did not start. The last lines of its first services:" >&2
+  $COMPOSE logs --no-color --timestamps --tail 60 postgres valkey migrate >&2 || true
+  exit 1
+fi
 
 # First-time setup, as a user would do it: the fake provider and a default model.
 E2E_BASE_URL="$BASE" E2E_PASSWORD="$PASSWORD" node e2e/scripts/seed-fake.mjs
