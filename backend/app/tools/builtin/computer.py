@@ -46,8 +46,9 @@ from sqlalchemy import select
 
 from app.core.db import get_sessionmaker
 from app.features.attachments import images
+from app.features.devices import activity_log as device_log
 from app.features.devices import permissions as perms
-from app.features.devices import profile_sync, relay, shared_screen
+from app.features.devices import profile_sync, relay, relevance, shared_screen
 from app.features.devices import profiles as device_profiles
 from app.features.devices import service as devices
 from app.features.runs.models import Approval
@@ -85,6 +86,7 @@ _PASSWORDS = "computer_passwords"  # ctx.state: {casefolded name: refs of passwo
 _WINDOWS = "computer_windows"  # ctx.state: {casefolded name: {window ref: title}}
 _ANALYSES = "computer_shell_analyses"  # ctx.state: {device id + command hash: shell.analyze answer}
 _GRANTS = "computer_device_grants"  # ctx.state: {device id: [active "next hour" grants]}
+_TOUCHED = "computer_touched_folders"  # ctx.state: folders this run changed on computers
 _USED_GRANT = (
     "computer_used_grant"  # ctx.state: {device id + command hash: the grant that allowed it}
 )
@@ -113,6 +115,8 @@ def _info(device: relay.DeviceInfo) -> dict[str, Any]:
         "categories": perms.categories_for(device.categories, device.trust),
         "capabilities": list(device.capabilities),
         "permissions_version": device.permissions_version,
+        "relevance_check": device.relevance_check,
+        "automations_unrestricted": device.automations_unrestricted,
     }
 
 
@@ -162,7 +166,21 @@ async def refresh(ctx: ToolContext) -> None:
     """Remember which devices are online now, with their trust and the client's switches,
     for the next `actions()`. Called by the agent loop before every step when the computer
     tools are offered."""
-    ctx.state[_DEVICES] = {_key(d.name): _info(d) for d in await online_devices()}
+    found = {_key(d.name): _info(d) for d in await online_devices()}
+    if ctx.automation_id is not None:
+        for info in found.values():
+            as_automation(info)
+    ctx.state[_DEVICES] = found
+
+
+def as_automation(info: dict[str, Any]) -> None:
+    """An automation on an Unrestricted computer works as Scoped with the same work folders,
+    unless its "Unrestricted for automations" switch is on (spec 25 §9)."""
+    if info.get("preset") == "unrestricted" and not info.get("automations_unrestricted"):
+        info["categories"] = {**perms.PRESETS["scoped"].categories, "see": "allow"}
+        info["profile_name"] = (
+            f"{info.get('profile_name') or 'Unrestricted'} (as Scoped for automations)"
+        )
 
 
 _OS_NAMES = {"windows": "Windows", "macos": "macOS"}
@@ -1048,6 +1066,13 @@ class ComputerAct(Tool):
             if args.action == "type" and "password" in state.content.lower():
                 state.content += " " + NO_TYPING_SECRETS
             return state
+        await device_log.record(
+            device_id=device.id,
+            device_name=name,
+            action="device.act",
+            summary=f"On {name}: {_act_summary(args, ctx)}"[:300],
+            details={"action": args.action, "target": args.target, "ref": args.ref},
+        )
         if args.action == "clipboard_set":
             return ToolResult(
                 content=f"The text is on the clipboard of {name}.",
@@ -1271,11 +1296,32 @@ class ComputerShell(Tool):
             analyses[key] = await relay.send(
                 uuid.UUID(device["id"]),
                 "shell.analyze",
-                {"command": args.command},
+                {"command": args.command, **({"automation": True} if ctx.automation_id else {})},
                 timeout_s=ANALYZE_TIMEOUT_S,
             )
         except (relay.Unavailable, relay.Refused, relay.ActionFailed, relay.Stopped, ValueError):
             analyses[key] = {"verdict": "unavailable"}
+            return
+        analysis = analyses[key]
+        # The relevance check (spec 25 §7) may only turn an allow into an ask.
+        touched: set[str] = ctx.state.setdefault(_TOUCHED, set())
+        if (
+            analysis.get("verdict") == "allow"
+            and device.get("relevance_check")
+            and relevance.needs_check(analysis, touched)
+        ):
+            verdict = await relevance.check(
+                device_name=device["name"],
+                command=args.command,
+                analysis=analysis,
+                conversation_id=ctx.conversation_id,
+                automation_id=ctx.automation_id,
+            )
+            analysis["relevance"] = {
+                "ok": verdict.ok,
+                "why": verdict.why,
+                "unavailable": verdict.unavailable,
+            }
 
     def actions(self, args: ShellInput, ctx: ToolContext) -> list[Action]:
         device = _known(ctx, args.device)
@@ -1321,6 +1367,17 @@ class ComputerShell(Tool):
                     ] = grant
                 elif decision == "ask":
                     device_info = _approval_options(device, args.command, analysis, level)
+                checked = analysis.get("relevance") or {}
+                if decision == "allow" and checked.get("ok") is False:
+                    # Allowed by the rules, but not what the user asked for: ask (§7).
+                    decision = "ask"
+                    reason = f"the relevance check: {checked.get('why')}"
+                    why = f" ({checked.get('why')})"
+                    device_info = {
+                        **_approval_options(device, args.command, analysis, level),
+                        "scopes": ["once"],
+                        "relevance": checked.get("why"),
+                    }
             elif blocked is None and level == "folders" and not is_powershell(kind):
                 # macOS has no analyser yet (spec 25 §10): on Scoped every zsh/bash command
                 # the rating doesn't call safe asks; read-only ones go through.
@@ -1362,6 +1419,8 @@ class ComputerShell(Tool):
         known = _known(ctx, args.device)
         if known is not None and "profiles" in (known.get("capabilities") or []):
             fields.update(await _decision_fields(ctx, device, args.command))
+            if ctx.automation_id is not None:
+                fields["automation"] = True
         result = await _send(ctx, device, "shell", fields, timeout + SHELL_GRACE_S)
         if isinstance(result, _Stale):
             # The device's copy of its profile is older than what this was decided with:
@@ -1373,6 +1432,17 @@ class ComputerShell(Tool):
         if isinstance(result, ToolResult):
             return result
         exit_code = result.get("exit_code")
+        analysis = analysis_for(ctx, known, args.command) if known is not None else None
+        if analysis is not None:
+            ctx.state.setdefault(_TOUCHED, set()).update(relevance.touched_folders(analysis))
+        await device_log.shell(
+            device_id=device.id,
+            device_name=name,
+            command=args.command,
+            fields=fields,
+            analysis=analysis,
+            result=result,
+        )
         # PowerShell writes its error stream as CLIXML when it goes to a pipe: plain text again.
         stdout = head_tail(clixml.decode(str(result.get("stdout") or "")))
         stderr = head_tail(clixml.decode(str(result.get("stderr") or "")))

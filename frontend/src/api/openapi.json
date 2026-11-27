@@ -2087,6 +2087,65 @@
         }
       }
     },
+    "/api/settings/devices": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Put Devices Settings",
+        "operationId": "put_devices_settings_api_settings_devices_put",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceSettings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/audit": {
       "get": {
         "tags": [
@@ -2215,7 +2274,8 @@
                     "event",
                     "document",
                     "file",
-                    "project"
+                    "project",
+                    "device"
                   ],
                   "type": "string"
                 },
@@ -24285,6 +24345,9 @@
           },
           "plugins": {
             "$ref": "#/components/schemas/PluginSettings"
+          },
+          "devices": {
+            "$ref": "#/components/schemas/DeviceSettings"
           }
         },
         "type": "object",
@@ -24311,7 +24374,8 @@
           "voice",
           "code",
           "images",
-          "plugins"
+          "plugins",
+          "devices"
         ],
         "title": "AllSettings"
       },
@@ -30382,6 +30446,25 @@
           "name"
         ],
         "title": "DeviceRenameIn"
+      },
+      "DeviceSettings": {
+        "properties": {
+          "relevance_model_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relevance Model Id"
+          }
+        },
+        "type": "object",
+        "title": "DeviceSettings",
+        "description": "Settings \u203a Devices (docs/specs/25-device-permission-profiles.md \u00a77)."
       },
       "DeviceTrustIn": {
         "properties": {

@@ -143,7 +143,7 @@ public sealed partial class CommandProcessor : ICommandExecutor
         if (action == "shell.analyze" && _permissions is not null)
         {
             var command = args.String("command", 8000);
-            var analysis = await _permissions.AnalyzeAsync(command, ShellFolder(), ct);
+            var analysis = await _permissions.AnalyzeAsync(command, ShellFolder(), ct, args.Bool("automation", false));
             return Core.Permissions.PermissionGuard.Describe(analysis, _permissions);
         }
 

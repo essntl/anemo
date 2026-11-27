@@ -10,6 +10,8 @@ export interface DeviceOptions {
   folder: string | null
   parent_folder: string | null
   scopes: ('once' | 'folder' | 'hour' | 'command')[]
+  /** Why the relevance check asks (spec 25 §7), when it does. */
+  relevance?: string | null
 }
 
 /** The device options of a call, when it is a command on a computer that can say what it does. */

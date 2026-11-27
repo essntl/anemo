@@ -120,15 +120,15 @@ public sealed class PermissionGuard
     }
 
     /// <summary><c>shell.analyze</c> (and the same check before <c>shell</c>): cached by the command's hash.</summary>
-    public async Task<ShellAnalysis?> AnalyzeAsync(string command, string workFolder, CancellationToken ct)
+    public async Task<ShellAnalysis?> AnalyzeAsync(string command, string workFolder, CancellationToken ct, bool automation = false)
     {
         if (_analyser is null)
         {
             return null;
         }
 
-        var profile = Profile;
-        var key = $"{profile.Version}|{workFolder}|{Hash(command)}";
+        var profile = ProfileFor(automation);
+        var key = $"{profile.Version}|{automation}|{workFolder}|{Hash(command)}";
         lock (_lock)
         {
             if (_cache.TryGetValue(key, out var hit))
@@ -175,7 +175,7 @@ public sealed class PermissionGuard
             throw CommandException.Stale(why);
         }
 
-        var analysis = await AnalyzeAsync(command, workFolder, ct);
+        var analysis = await AnalyzeAsync(command, workFolder, ct, args.Bool("automation", false));
         if (analysis is null)
         {
             return null; // no analyser here (macOS): the categories above are all the device checks
@@ -192,6 +192,23 @@ public sealed class PermissionGuard
         }
 
         return analysis;
+    }
+
+    /// <summary>
+    /// The profile a command is checked with (spec 25 §9): an automation on an Unrestricted
+    /// computer works as Scoped with the same work folders, unless "Unrestricted for
+    /// automations" is on.
+    /// </summary>
+    public PermissionProfile ProfileFor(bool automation)
+    {
+        var profile = Profile;
+        if (!automation || profile.Level("shell") != "allow" || profile.AutomationsUnrestricted)
+        {
+            return profile;
+        }
+
+        var scoped = new Dictionary<string, string>(profile.Categories) { ["shell"] = "folders", ["files"] = "folders", ["act"] = "ask", ["code"] = "ask" };
+        return profile with { Categories = scoped };
     }
 
     public static string Hash(string command) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(command))).ToLowerInvariant();
