@@ -666,7 +666,11 @@ The client analyses the command again (cached by its hash) and refuses:
 - `refused` when it says ask and no `approval` came;
 - `profile_stale` when `profile_version` is newer than its copy (including while a loosening waits for confirmation).
 
-On `profile_stale` the server sends `profile.sync` again and tries once more. An older server takes `profile_stale` as failed.
+On `profile_stale` the server sends `profile.sync` again and tries once more.
+
+**Automations.** `shell.analyze` and `shell` carry `"automation": true` in an automation run. An Unrestricted profile then analyses as Scoped with the same work folders, unless `automations_unrestricted` is on.
+
+**Recycle Bin.** When every delete of a command is in work folders with `recycle: true`, the client starts PowerShell with a `Remove-Item` function that moves items to the Recycle Bin. An item over 5% of its drive is refused, never deleted for good. The result of `shell` gains `"recycled": bool` and `"work_folder": "<the folder it ran in>"`. An older server takes `profile_stale` as failed.
 
 **The hard floor** is fixed in the client's code, on every profile, Unrestricted included: Anemo Desktop's own data folder and its install folder are never written, deleted, read or run by a command.
 
