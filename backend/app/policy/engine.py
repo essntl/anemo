@@ -6,10 +6,12 @@ Evaluation order:
   1. Hard floor (code, not configuration): some things are never allowed.
   2. Each policy layer (the selected policy, the global ceiling, and for a
      sub-agent the policy of every agent above it) is evaluated with its most
-     specific matching rule.
+     specific matching rule. A device action brings its device profile's decision as
+     one more layer (`Action.device_decision`, spec 25 §3).
   3. Layers combine as "most restrictive wins": deny > ask > allow.
   4. An `ask` may become `allow` through a run grant, but only if the ceiling
-     itself allows the action. Grants never override deny.
+     itself allows the action and the device profile doesn't ask. Grants never
+     override deny.
   5. An action marked `always_ask` is asked about even when allowed, every time (no run
      grant skips it). So is one that reaches other people (`contacts_people`) when the
      caller says so (`ask_contacts`: an automation run that does not allow the tool).
@@ -114,6 +116,14 @@ def evaluate(
         results.append(ceiling_eval)
     if parent:
         results.append(evaluate_policy(parent, action))
+    if action.device_decision is not None:
+        results.append(
+            Evaluation(
+                decision=action.device_decision,
+                reason=action.device_reason or "the device's permission profile",
+                rule="device-profile",
+            )
+        )
     # A sub-agent may do nothing that an agent above it may not.
     results.extend(evaluate_policy(layer, action) for layer in ancestors)
     worst = max(results, key=lambda e: _RANK[e.decision])
@@ -129,7 +139,12 @@ def evaluate(
         return Evaluation(decision="ask", reason=action.always_ask, rule="always-ask")
 
     # 4. Run grants may lift an `ask`, never a deny, and only below the ceiling.
-    if worst.decision == "ask" and (ceiling_eval is None or ceiling_eval.decision == "allow"):
+    device_asks = action.device_decision == "ask"
+    if (
+        worst.decision == "ask"
+        and not device_asks
+        and (ceiling_eval is None or ceiling_eval.decision == "allow")
+    ):
         if any(grant_matches(g, action) for g in grants):
             return Evaluation(
                 decision="allow", reason="Approved earlier in this run", rule="run-grant"

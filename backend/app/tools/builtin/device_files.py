@@ -37,13 +37,14 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.core.db import get_sessionmaker
 from app.core.errors import AppError, Conflict
+from app.features.devices import permissions as perms
 from app.features.devices import relay
 from app.features.devices import service as devices
 from app.features.settings import service as settings_service
 from app.features.settings.sections import FilesSettings
 from app.policy.models import Action
 from app.tools.base import Tool, ToolContext, ToolResult
-from app.tools.builtin.computer import known_device
+from app.tools.builtin.computer import device_layer, known_device, levels
 from app.tools.builtin.workspace import backup_file, path_action, path_exists
 from app.workspace import files, fs_guard
 
@@ -101,8 +102,8 @@ def _blocked(ctx: ToolContext, name: str) -> str | None:
         return None
     if device["kind"] != "computer":
         return f"“{device['name']}” is a phone, not a computer"
-    if device["trust"] != "trusted":
-        return f"“{device['name']}” is a watched computer: files are copied only with trusted ones"
+    if levels(device)["files"] == "deny":
+        return f"Files are not copied with “{device['name']}” (its permission profile)"
     if not device.get("files"):
         return (
             f"“{device['name']}” doesn't offer files (Let Anemo read and write files in Anemo "
@@ -112,12 +113,18 @@ def _blocked(ctx: ToolContext, name: str) -> str | None:
 
 
 def _device_action(ctx: ToolContext, device: str, summary: str, *, dangerous: bool) -> Action:
+    known = known_device(ctx, device)
+    decision, reason, _denied = (
+        device_layer(known, "files", "Copying files") if known else (None, None, None)
+    )
     return Action(
         capability=FILES,
         resource=_resource(ctx, device),
         risk="dangerous" if dangerous else "moderate",
         summary=summary,
         blocked=_blocked(ctx, device),
+        device_decision=decision,
+        device_reason=reason,
     )
 
 
@@ -137,12 +144,13 @@ async def _computer(ctx: ToolContext, name: str) -> Any:
     for the model."""
     async with get_sessionmaker()() as db:
         device = await devices.by_name(db, name)
-    if device is None or device.kind != "computer":
+        live = await devices.levels_of(db, device) if device is not None else None
+    if device is None or device.kind != "computer" or live is None:
         return _error(f"There is no computer named “{name}”.")
-    if device.trust != "trusted":
+    if live["files"] == "deny":
         return _error(
-            f"“{device.name}” is a watched computer: files are only copied to and from trusted "
-            "computers. Ask the user."
+            f"Files are not copied to and from “{device.name}”: its permission profile doesn't "
+            "allow it. Ask the user."
         )
     offer = await relay.online(device.id)
     if offer is None:
@@ -156,6 +164,11 @@ async def _computer(ctx: ToolContext, name: str) -> Any:
             "write files” in Anemo Desktop (1.7.0 or later) there."
         )
     before = known_device(ctx, name)
+    decided = levels(before)["files"] if before is not None else "policy"
+    if perms.stricter(live["files"], decided):
+        return _error(
+            f"The permission profile of “{device.name}” is stricter now. Call the tool again."
+        )
     if before is not None and before.get("id") != str(device.id):
         # Decided for another device of that name (deleted and added again): ask again.
         return _error(

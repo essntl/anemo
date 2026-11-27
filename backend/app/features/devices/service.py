@@ -8,6 +8,7 @@ docs/specs/CONTRACTS-devices.md §2: other features read only `id`, `name`, `kin
 
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -18,8 +19,9 @@ from app.core.ids import uuid7
 from app.features.audit import service as audit
 from app.features.auth import tokens
 from app.features.auth.models import ApiToken
-from app.features.devices import relay
-from app.features.devices.models import Device, Kind, Trust
+from app.features.devices import permissions as perms
+from app.features.devices import profiles, relay
+from app.features.devices.models import Device, DeviceProfile, Kind, Trust
 
 # The name the stub gave the lookups' result type; the ORM model has the same fields.
 DeviceRef = Device
@@ -44,6 +46,13 @@ async def by_name(db: AsyncSession, name: str) -> Device | None:
         .order_by(Device.created_at, Device.id)
         .limit(1)
     )
+
+
+async def levels_of(db: AsyncSession, device: Device) -> dict[str, perms.Level]:
+    """The category levels of the device's permission profile now (spec 25 §3)."""
+    profile_id = getattr(device, "profile_id", None)
+    profile = await db.get(DeviceProfile, profile_id) if profile_id else None
+    return perms.categories_for(profile.categories if profile else None, device.trust)
 
 
 async def by_token_id(db: AsyncSession, token_id: uuid.UUID) -> Device | None:
@@ -83,14 +92,34 @@ async def _commit_named(db: AsyncSession) -> None:
 
 
 async def create(
-    db: AsyncSession, *, name: str, kind: Kind, trust: Trust, ip: str | None
+    db: AsyncSession,
+    *,
+    name: str,
+    kind: Kind,
+    trust: Trust,
+    ip: str | None,
+    profile_id: uuid.UUID | None = None,
 ) -> tuple[Device, str]:
     """A new device with its own token; returns the device and the token itself (shown
-    once; only its hash is kept)."""
+    once; only its hash is kept). Its profile is `profile_id`, or the one the old trust
+    level means (watched -> Watched, trusted -> Trusted (legacy)); a phone is Watched."""
     name = name.strip()
     await _check_name_free(db, name)
+    if kind == "phone" or profile_id is None:
+        profile = await profiles.profile_for_trust(db, "watched" if kind == "phone" else trust)
+    else:
+        profile = await profiles.get_profile(db, profile_id)
     token, raw = await tokens.create(db, _token_name(name))
-    device = Device(id=uuid7(), name=name, kind=kind, trust=trust, token_id=token.id)
+    device = Device(
+        id=uuid7(),
+        name=name,
+        kind=kind,
+        trust=profiles.trust_of(profile),
+        token_id=token.id,
+        profile_id=profile.id,
+    )
+    if any(v == "folders" for v in profile.categories.values()):
+        device.work_folders = profiles.default_work_folders()
     db.add(device)
     audit.record(
         db,
@@ -98,7 +127,7 @@ async def create(
         ip=ip,
         target_type="device",
         target_id=device.id,
-        details={"name": name, "kind": kind, "trust": trust},
+        details={"name": name, "kind": kind, "trust": device.trust, "profile": profile.name},
     )
     await _commit_named(db)
     await db.refresh(device)
@@ -131,24 +160,37 @@ async def rename(db: AsyncSession, device_id: uuid.UUID, name: str, *, ip: str |
 async def set_trust(
     db: AsyncSession, device_id: uuid.UUID, trust: Trust, *, ip: str | None
 ) -> Device:
-    """Change the trust level. The router asks for the password first (re-auth)."""
+    """The old way to change a device's permissions, kept for one release: watched gives
+    it the Watched profile, trusted the Trusted (legacy) one. The router asks for the
+    password first (re-auth)."""
     device = await get(db, device_id)
-    old = device.trust
-    device.trust = trust
-    audit.record(
-        db,
-        "device.trust_changed",
-        ip=ip,
-        target_type="device",
-        target_id=device.id,
-        details={"name": device.name, "from": old, "to": trust},
-    )
-    await db.commit()
-    await db.refresh(device)
-    if old != trust:
-        # Its connection closes (1012); the client reconnects and gets the new level.
-        await relay.tell(device.id, "trust_changed")
+    profile = await profiles.profile_for_trust(db, trust)
+    await set_permissions(db, device, profile_id=profile.id, ip=ip)
     return device
+
+
+async def set_permissions(
+    db: AsyncSession,
+    device: Device,
+    *,
+    ip: str | None,
+    **changes: Any,
+) -> None:
+    """Change a device's profile or its own part (profiles.set_permissions) and tell the
+    device: a changed trust level closes its connection (1012, it reconnects and reads it
+    from `welcome`)."""
+    changed, trust_changed = await profiles.set_permissions(db, device, ip=ip, **changes)
+    if trust_changed:
+        await relay.tell(device.id, "trust_changed")
+    elif changed:
+        await permissions_changed(device)
+
+
+async def permissions_changed(device: Device) -> None:
+    """The device's permissions changed without its trust level changing. Anemo Desktop
+    gets its new profile copy through `profile.sync` (from PR group B on); until then
+    nothing needs to reach it: the server decides alone."""
+    return None
 
 
 async def delete(db: AsyncSession, device_id: uuid.UUID, *, ip: str | None) -> None:

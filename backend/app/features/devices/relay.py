@@ -42,7 +42,7 @@ from sqlalchemy import select
 
 from app.core.db import get_sessionmaker
 from app.core.redis import get_redis
-from app.features.devices.models import Device
+from app.features.devices.models import Device, DeviceProfile
 
 log = logging.getLogger(__name__)
 
@@ -115,6 +115,11 @@ class DeviceInfo:
     platform: Platform = DEFAULT_PLATFORM
     shell_kind: ShellKind = DEFAULT_SHELL_KIND
     files: bool = False  # the offer's `files` (§8)
+    # The device's permission profile (spec 25): its name, preset and category levels.
+    # None when unknown: then the old trust level decides (permissions.categories_for).
+    profile_name: str | None = None
+    preset: str | None = None
+    categories: dict[str, str] | None = None
 
 
 class Unavailable(Exception):
@@ -439,6 +444,7 @@ async def list_online() -> list[DeviceInfo]:
     """Every device that is connected now (phones included), sorted by name."""
     async with get_sessionmaker()() as db:
         devices = list(await db.scalars(select(Device).order_by(Device.name)))
+        profiles = {p.id: p for p in await db.scalars(select(DeviceProfile))}
     if not devices:
         return []
     try:
@@ -464,6 +470,17 @@ async def list_online() -> list[DeviceInfo]:
                 platform=offer.platform if offer else DEFAULT_PLATFORM,
                 shell_kind=offer.shell_kind if offer else DEFAULT_SHELL_KIND,
                 files=offer.files if offer else False,
+                profile_name=profiles[device.profile_id].name
+                if device.profile_id in profiles
+                else None,
+                preset=profiles[device.profile_id].preset
+                if device.profile_id in profiles
+                else None,
+                categories=(
+                    dict(profiles[device.profile_id].categories)
+                    if device.profile_id in profiles
+                    else None
+                ),
             )
         )
     return found

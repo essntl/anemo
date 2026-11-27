@@ -41,7 +41,7 @@ from app.features.devices.models import Device
 from app.features.runs.models import Run, ToolCall
 from app.policy.models import Action
 from app.tools.base import COMPACTED_AT, Tool, ToolContext, ToolResult
-from app.tools.builtin.computer import known_device
+from app.tools.builtin.computer import device_layer, known_device, levels
 from app.tools.untrusted import untrusted, untrusted_note
 
 SEE = "code.see"
@@ -78,11 +78,21 @@ def _resource(ctx: ToolContext, name: str) -> str:
 
 
 def _watched_note(ctx: ToolContext, name: str) -> str:
-    """What actions() can say about a watched computer (run() refuses it)."""
+    """What actions() can say about a computer whose profile doesn't allow Claude Code
+    (run() refuses it)."""
     device = known_device(ctx, name)
-    if device is not None and device.get("trust") != "trusted":
-        return " (refused: a watched computer)"
+    if device is not None and levels(device)["code"] == "deny":
+        return " (refused: its permission profile doesn't allow Claude Code)"
     return ""
+
+
+def _layer(ctx: ToolContext, name: str) -> tuple[Any, str | None]:
+    """The device profile's layer for starting a job (spec 25 §3, category `code`)."""
+    device = known_device(ctx, name)
+    if device is None:
+        return None, None
+    decision, reason, _denied = device_layer(device, "code", "Claude Code")
+    return decision, reason
 
 
 async def _computer(name: str) -> Device | ToolResult:
@@ -99,12 +109,16 @@ async def _computer(name: str) -> Device | ToolResult:
     )
 
 
-def _refuse_watched(device: Device) -> ToolResult | None:
-    if device.trust == "trusted":
+async def _refuse_watched(device: Device) -> ToolResult | None:
+    """Refuses a computer whose permission profile denies Claude Code (Watched)."""
+    async with get_sessionmaker()() as db:
+        live = await devices.levels_of(db, device)
+    if live["code"] != "deny":
         return None
     return ToolResult(
-        content=f"“{device.name}” is a watched computer: Claude Code jobs are only started "
-        "and cancelled on trusted computers (they run with bypassPermissions). Ask the user.",
+        content=f"“{device.name}” doesn't allow Claude Code jobs (its permission profile, e.g. "
+        "Watched): they are only started and cancelled on computers whose profile allows them "
+        "(they run with bypassPermissions). Ask the user.",
         is_error=True,
     )
 
@@ -150,7 +164,7 @@ class CodeProjects(Tool):
         device = await _computer(args.device)
         if isinstance(device, ToolResult):
             return device
-        if (refused := _refuse_watched(device)) is not None:
+        if (refused := await _refuse_watched(device)) is not None:
             return refused
         try:
             async with get_sessionmaker()() as db:
@@ -216,6 +230,8 @@ class CodeStart(Tool):
                 risk="moderate",
                 summary=f"Start a Claude Code job on {args.device} in {args.project}: "
                 f"“{_one_line(args.prompt, 120)}”" + _watched_note(ctx, args.device),
+                device_decision=_layer(ctx, args.device)[0],
+                device_reason=_layer(ctx, args.device)[1],
             )
         ]
 
@@ -223,7 +239,7 @@ class CodeStart(Tool):
         device = await _computer(args.device)
         if isinstance(device, ToolResult):
             return device
-        if (refused := _refuse_watched(device)) is not None:
+        if (refused := await _refuse_watched(device)) is not None:
             return refused
         try:
             async with get_sessionmaker()() as db:
@@ -567,7 +583,7 @@ class CodeCancel(Tool):
             device = await db.get(Device, found.device_id)
         if device is None:
             return ToolResult(content="That job's computer is gone.", is_error=True)
-        if (refused := _refuse_watched(device)) is not None:
+        if (refused := await _refuse_watched(device)) is not None:
             return refused
         try:
             async with get_sessionmaker()() as db:
@@ -703,7 +719,7 @@ class CodeGitGraph(Tool):
         device = await _computer(args.device)
         if isinstance(device, ToolResult):
             return device
-        if (refused := _refuse_watched(device)) is not None:
+        if (refused := await _refuse_watched(device)) is not None:
             return refused
         try:
             async with get_sessionmaker()() as db:
