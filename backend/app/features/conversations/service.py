@@ -15,11 +15,13 @@ from app.core.errors import AppError, Conflict, NotFound
 from app.events import bus
 from app.features.attachments import service as attachments
 from app.features.attachments.models import Attachment
-from app.features.conversations import recall
+from app.features.conversations import compaction, recall
 from app.features.conversations import search as chat_search
 from app.features.conversations.models import ChatMessage, Conversation
 from app.features.conversations.schemas import (
     AttachmentSummary,
+    CompactionSummary,
+    ContextOut,
     ConversationOut,
     EventSummary,
     MessageOut,
@@ -165,6 +167,9 @@ def message_out(
         versions=versions,
         version=min(m.version, len(m.versions or [])) if m.versions else 0,
         timing=timings.get(m.run_id) if m.run_id else None,
+        compaction=CompactionSummary.model_validate(m.compaction)
+        if m.role == compaction.ROLE and m.compaction
+        else None,
     )
 
 
@@ -590,6 +595,11 @@ async def send_turn(
             raise NotFound("Agent profile not found")
         conv.profile_id = profile_id
     seq = await _next_seq(db, conv.id)
+    auto = await _auto_compaction(db, conv, seq, mode)
+    if auto is not None:
+        # The turn's run summarizes the chat first, then answers from the summary.
+        options = {**(options or {}), "compact_first": str(auto.id)}
+        seq += 1
     user = ChatMessage(
         conversation_id=conv.id,
         seq=seq,
@@ -636,6 +646,63 @@ async def send_turn(
     await db.refresh(user)
     await db.refresh(assistant)
     return run, user, assistant, files
+
+
+async def _auto_compaction(
+    db: AsyncSession, conv: Conversation, seq: int, mode: str
+) -> ChatMessage | None:
+    """A compaction row at `seq` when the chat has reached the auto-compact threshold
+    (docs/specs/24-chat-compaction.md §3), else None. Part of send_turn (no commit)."""
+    chat_settings = await compaction.settings(db)
+    if not chat_settings.auto_compact:
+        return None
+    if await compaction.context_tokens(db, conv.id) < chat_settings.compact_at_tokens:
+        return None
+    if await compaction.compacts_itself(db, conv, mode):
+        return None
+    row = compaction.new_row(conv.id, seq, None, auto=True)
+    db.add(row)
+    await db.flush()
+    return row
+
+
+async def compact(
+    db: AsyncSession, conversation_id: uuid.UUID, focus: str | None
+) -> tuple[Run, ChatMessage]:
+    """`/compact`: queue a run that summarizes the chat so far into a compaction row."""
+    conv = await _lock_idle_conversation(db, conversation_id)
+    mode = conv.default_mode or "chat"
+    if await compaction.compacts_itself(db, conv, mode):
+        raise Conflict("Claude Code compacts this chat by itself.", code="compacts_itself")
+    has_messages = await db.scalar(
+        select(ChatMessage.id)
+        .where(ChatMessage.conversation_id == conv.id, ChatMessage.role != compaction.ROLE)
+        .limit(1)
+    )
+    if has_messages is None:
+        raise Conflict("There is nothing to compact yet.", code="nothing_to_compact")
+    row = compaction.new_row(
+        conv.id, await _next_seq(db, conv.id), (focus or "").strip() or None, auto=False
+    )
+    db.add(row)
+    await db.flush()
+    run = await _start_run(
+        db, conv, row, "(compact)", conv.model_id, None, mode, options={"compact": True}
+    )
+    await db.commit()
+    await db.refresh(row)
+    return run, row
+
+
+async def context(db: AsyncSession, conversation_id: uuid.UUID) -> ContextOut:
+    conv = await get_conversation(db, conversation_id)
+    chat_settings = await compaction.settings(db)
+    return ContextOut(
+        tokens=await compaction.context_tokens(db, conv.id),
+        compact_at=chat_settings.compact_at_tokens,
+        auto_compact=chat_settings.auto_compact,
+        compacts_itself=await compaction.compacts_itself(db, conv, conv.default_mode or "chat"),
+    )
 
 
 async def regenerate(

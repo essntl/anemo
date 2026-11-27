@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.events import bus
 from app.features.automations import service as automations
+from app.features.conversations import compaction
 from app.features.conversations.models import ChatMessage, Conversation
 from app.features.notifications import service as notifications
 from app.features.runs import service as runs
@@ -168,6 +169,6 @@ async def after_answer(db: AsyncSession, run: Run) -> None:
     if run.automation_id is not None:
         return  # scheduled runs are not conversations with the user
     message = await db.get(ChatMessage, run.assistant_message_id)
-    if message is None:
-        return
+    if message is None or message.role == compaction.ROLE:
+        return  # a /compact run's summary is no answer
     await follow_up_answer(db, run.conversation_id, message.seq)

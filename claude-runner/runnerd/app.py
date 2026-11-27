@@ -131,6 +131,8 @@ class TurnIn(BaseModel):
     claude_session_id: str | None = Field(None, pattern=r"^[0-9a-fA-F-]{36}$")
     fork: ForkIn | None = None
     input: MessageInput | ResultsInput = Field(discriminator="type")
+    # Claude Code compacts the conversation near this many tokens (autoCompactWindow).
+    compact_window: int | None = Field(None, ge=20_000, le=2_000_000)
 
 
 class OneShotIn(BaseModel):
@@ -170,7 +172,13 @@ async def _make_room() -> None:
 
 async def _turn_events(session: Session, body: TurnIn) -> AsyncIterator[bytes]:
     tools = [t.model_dump() for t in sorted(body.tools, key=lambda t: t.name)]
-    config = ProcessConfig(model=body.model, effort=body.effort, tools_hash=digest(tools), persist=True)
+    config = ProcessConfig(
+        model=body.model,
+        effort=body.effort,
+        tools_hash=digest(tools),
+        persist=True,
+        compact_window=body.compact_window,
+    )
     try:
         await asyncio.wait_for(session.lock.acquire(), LOCK_WAIT_S)
     except TimeoutError:

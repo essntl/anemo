@@ -11,6 +11,9 @@ from app.features.conversations.schemas import (
     BranchIn,
     ChatBulkIn,
     ChatBulkOut,
+    CompactIn,
+    CompactOut,
+    ContextOut,
     ConversationIn,
     ConversationOut,
     ConversationPatch,
@@ -159,6 +162,19 @@ async def send_turn(conversation_id: uuid.UUID, body: TurnIn, db: Db) -> TurnOut
             assistant, mode=run.kind, timings=await service.message_timings(db, [assistant])
         ),
     )
+
+
+@router.post("/{conversation_id}/compact", response_model=CompactOut, status_code=202)
+async def compact(conversation_id: uuid.UUID, body: CompactIn, db: Db) -> CompactOut:
+    """`/compact`: summarize the chat so far; the model reads on from the summary."""
+    run, row = await service.compact(db, conversation_id, body.focus)
+    return CompactOut(run_id=run.id, message=service.message_out(row))
+
+
+@router.get("/{conversation_id}/context", response_model=ContextOut)
+async def context(conversation_id: uuid.UUID, db: Db) -> ContextOut:
+    """How big the chat's history is for the model, and when it is compacted."""
+    return await service.context(db, conversation_id)
 
 
 @router.get("/{conversation_id}/messages/{message_id}/page", response_model=PageContentOut)

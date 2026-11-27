@@ -290,6 +290,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Chat Settings */
+        put: operations["put_chat_settings_api_settings_chat_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings/appearance": {
         parameters: {
             query?: never;
@@ -1029,6 +1046,46 @@ export interface paths {
          * @description Queues the answer; follow it live at GET /api/runs/{run_id}/events.
          */
         post: operations["send_turn_api_conversations__conversation_id__turns_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/conversations/{conversation_id}/compact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Compact
+         * @description `/compact`: summarize the chat so far; the model reads on from the summary.
+         */
+        post: operations["compact_api_conversations__conversation_id__compact_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/conversations/{conversation_id}/context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Context
+         * @description How big the chat's history is for the model, and when it is compacted.
+         */
+        get: operations["context_api_conversations__conversation_id__context_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -5737,6 +5794,7 @@ export interface components {
         /** AllSettings */
         AllSettings: {
             general: components["schemas"]["GeneralSettings"];
+            chat: components["schemas"]["ChatSettings"];
             appearance: components["schemas"]["AppearanceSettings"];
             profile: components["schemas"]["ProfileSettings"];
             models: components["schemas"]["ModelDefaults"];
@@ -6706,6 +6764,24 @@ export interface components {
             /** Changed */
             changed: number;
         };
+        /**
+         * ChatSettings
+         * @description Long chats (docs/specs/24-chat-compaction.md): at the start of a turn, a chat whose
+         *     context reaches `compact_at_tokens` is summarized first (API providers; the Claude
+         *     subscription gets the number as Claude Code's own auto-compact window).
+         */
+        ChatSettings: {
+            /**
+             * Auto Compact
+             * @default true
+             */
+            auto_compact: boolean;
+            /**
+             * Compact At Tokens
+             * @default 250000
+             */
+            compact_at_tokens: number;
+        };
         /** Check */
         Check: {
             /** Name */
@@ -7249,6 +7325,43 @@ export interface components {
             /** Status */
             status: string | null;
         };
+        /** CompactIn */
+        CompactIn: {
+            /**
+             * Focus
+             * @description What to keep in detail
+             */
+            focus?: string | null;
+        };
+        /** CompactOut */
+        CompactOut: {
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            message: components["schemas"]["MessageOut"];
+        };
+        /**
+         * CompactionSummary
+         * @description A compaction row (role "compaction"): where the model reads on, and how big the
+         *     context was before and after (estimates). Numbers are None while it is written.
+         */
+        CompactionSummary: {
+            /** Kept From Seq */
+            kept_from_seq?: number | null;
+            /** Tokens Before */
+            tokens_before?: number | null;
+            /** Tokens After */
+            tokens_after?: number | null;
+            /** Focus */
+            focus?: string | null;
+            /**
+             * Auto
+             * @default false
+             */
+            auto: boolean;
+        };
         /** ContentOut */
         ContentOut: {
             /** Path */
@@ -7259,6 +7372,20 @@ export interface components {
             hash: string;
             /** Size */
             size: number;
+        };
+        /**
+         * ContextOut
+         * @description How big the chat's history is for the model, and when it is compacted.
+         */
+        ContextOut: {
+            /** Tokens */
+            tokens: number;
+            /** Compact At */
+            compact_at: number;
+            /** Auto Compact */
+            auto_compact: boolean;
+            /** Compacts Itself */
+            compacts_itself: boolean;
         };
         /** ContributedCommandOut */
         ContributedCommandOut: {
@@ -9404,6 +9531,7 @@ export interface components {
              */
             version: number;
             timing?: components["schemas"]["RunTiming"] | null;
+            compaction?: components["schemas"]["CompactionSummary"] | null;
         };
         /**
          * MessageVersion
@@ -14531,6 +14659,41 @@ export interface operations {
             };
         };
     };
+    put_chat_settings_api_settings_chat_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     put_appearance_settings_api_settings_appearance_put: {
         parameters: {
             query?: never;
@@ -16213,6 +16376,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TurnOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    compact_api_conversations__conversation_id__compact_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompactIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompactOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    context_api_conversations__conversation_id__context_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContextOut"];
                 };
             };
             /** @description Validation Error */
