@@ -433,9 +433,12 @@ async def _compact_first(
 
 TITLE_PROMPT = (
     "Write a short, specific title (at most 6 words) for a conversation that starts "
-    "with the exchange below. Reply with the title only, no quotes or punctuation at the end.\n\n"
-    "User: {user}\n\nAssistant: {assistant}"
+    "with the message below. Reply with the title only, no quotes or punctuation at the end."
+    "\n\n{user}"
 )
+# Of the first message. The answer isn't sent: the question names the topic, and the
+# answer was up to as long again (~375 tokens more per chat).
+TITLE_SOURCE_CHARS = 1000
 
 
 async def generate_title(conversation_id: uuid.UUID) -> None:
@@ -443,19 +446,15 @@ async def generate_title(conversation_id: uuid.UUID) -> None:
         conv = await db.get(Conversation, conversation_id)
         if conv is None or not conv.title_is_auto:
             return
-        first = list(
-            await db.scalars(
-                select(ChatMessage)
-                .where(ChatMessage.conversation_id == conversation_id)
-                .order_by(ChatMessage.seq)
-                .limit(2)
-            )
+        first = await db.scalar(
+            select(ChatMessage)
+            .where(ChatMessage.conversation_id == conversation_id, ChatMessage.role == "user")
+            .order_by(ChatMessage.seq)
+            .limit(1)
         )
-        if len(first) < 2:
+        if first is None or not first.text_plain.strip():
             return
-        prompt = TITLE_PROMPT.format(
-            user=first[0].text_plain[:1500], assistant=first[1].text_plain[:1500]
-        )
+        prompt = TITLE_PROMPT.format(user=first.text_plain[:TITLE_SOURCE_CHARS])
         candidates = await resolve(db, RouteRequest(task="title"))
         model = candidates[0]
         req = ChatRequest(

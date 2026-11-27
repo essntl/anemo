@@ -309,9 +309,14 @@ async def test_title_is_generated_after_first_exchange(authed):
     await execute_chat_run(uuid.UUID(turn["run_id"]))
     async with get_sessionmaker()() as db:
         assert await db.scalar(select(Job).where(Job.type == "conversation.title"))
+    FakeAdapter.requests.clear()
     await generate_title(uuid.UUID(cid))
     conv = (await authed.get(f"/api/conversations/{cid}")).json()
     assert conv["title"] != "New chat" and len(conv["title"]) <= 80
+    # From the first message only: the answer is not sent along.
+    (sent,) = FakeAdapter.requests
+    prompt = sent.messages[0].content[0].text  # type: ignore[union-attr]
+    assert prompt.endswith("\n\nhi") and "Assistant:" not in prompt
 
 
 async def test_a_title_typed_while_one_is_being_generated_is_kept(authed, monkeypatch):
