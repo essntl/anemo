@@ -53,6 +53,8 @@ export const DEFAULT_APPEARANCE: Appearance = {
   background: DEFAULT_BACKGROUND,
   glass: false,
   glass_strength: 50,
+  full_width: false,
+  full_width_pages: {},
 }
 
 /** As the server sends it (or an older cache has it): fields with a default may be missing. */
@@ -67,7 +69,7 @@ export function withDefaults(value: StoredAppearance | null | undefined): Appear
     asset_id: v.background?.asset_id ?? null,
     custom_gradient: { ...DEFAULT_CUSTOM_GRADIENT, ...v.background?.custom_gradient },
   }
-  return { ...DEFAULT_APPEARANCE, ...v, tint: v.tint ?? null, background }
+  return { ...DEFAULT_APPEARANCE, ...v, tint: v.tint ?? null, background, full_width_pages: { ...v.full_width_pages } }
 }
 
 type Surface = 'bg' | 'surface' | 'surface-2' | 'surface-hover' | 'card'

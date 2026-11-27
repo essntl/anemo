@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { usePluginCodeTabs } from '@/features/plugins/slotData'
 import { cn } from '@/lib/cn'
+import { FullWidthToggle } from '@/features/appearance/fullWidth'
 import { t } from '@/lib/i18n'
 import { withoutAgent } from './agents'
 import { CodeJobList } from './CodeJobList'
@@ -45,7 +46,7 @@ export function CodePage() {
   return (
     // From `md` up the page is one panel on the ground, like the documents.
     <div className="flex h-full md:mx-3 md:mb-3 md:h-[calc(100%-0.75rem)] md:overflow-hidden md:rounded-panel md:border md:border-border md:bg-surface md:shadow-soft">
-      <PageHeader title={t('Code')} />
+      <PageHeader title={t('Code')}><FullWidthToggle page="code" /></PageHeader>
       <aside aria-label={t('Jobs')} className={cn('h-full w-full min-w-0 shrink-0 lg:w-80 lg:border-r lg:border-border', right && 'max-lg:hidden')}>
         <CodeJobList jobId={jobId} />
       </aside>

@@ -6,6 +6,7 @@
 import { isHex } from '@/lib/color'
 import { type Appearance, type Background, type CustomGradient, DEFAULT_APPEARANCE, DEFAULT_BACKGROUND, DEFAULT_CUSTOM_GRADIENT } from './apply'
 import { CODE_FONTS, customFontId, UI_FONTS } from './fonts'
+import { WIDTH_PAGES } from './fullWidthPages'
 import { GRADIENTS } from './gradients'
 
 const FORMAT = 'anemo.appearance'
@@ -23,6 +24,14 @@ function oneOf<T>(value: unknown, allowed: readonly T[], fallback: T): T {
 
 function between(value: unknown, min: number, max: number, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? Math.round(Math.min(max, Math.max(min, value))) : fallback
+}
+
+/** The pages' own full-width choices: only known pages, only true or false. */
+function widthPages(value: unknown): Record<string, boolean> {
+  const out: Record<string, boolean> = {}
+  if (!value || typeof value !== 'object') return out
+  for (const [k, v] of Object.entries(value)) if ((WIDTH_PAGES as readonly string[]).includes(k) && typeof v === 'boolean') out[k] = v
+  return out
 }
 
 function customGradient(value: unknown): CustomGradient {
@@ -87,5 +96,7 @@ export function parseImport(text: string, uploadIds: readonly string[]): Appeara
     },
     glass: v.glass === true,
     glass_strength: between(v.glass_strength, 0, 100, d.glass_strength),
+    full_width: v.full_width === true,
+    full_width_pages: widthPages(v.full_width_pages),
   }
 }

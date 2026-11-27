@@ -1,6 +1,6 @@
 /**
  * Theme state: everything in Settings > Appearance (mode, accent, tint, fonts,
- * background, glass, density).
+ * background, glass, density, full width).
  *
  * The values are cached in localStorage so the first paint is correct (see the
  * inline script in index.html and features/appearance/apply.ts). Once logged in, the
@@ -81,8 +81,8 @@ export function applyAppearance(a: Appearance): void {
 
 /** The appearance fields of the store, without its methods. */
 export function currentAppearance(): Appearance {
-  const { mode, accent, density, tint, tint_strength, ui_font, code_font, background, glass, glass_strength } = useThemeStore.getState()
-  return { mode, accent, density, tint, tint_strength, ui_font, code_font, background, glass, glass_strength }
+  const { mode, accent, density, tint, tint_strength, ui_font, code_font, background, glass, glass_strength, full_width, full_width_pages } = useThemeStore.getState()
+  return { mode, accent, density, tint, tint_strength, ui_font, code_font, background, glass, glass_strength, full_width, full_width_pages }
 }
 
 interface ThemeStore extends Appearance {

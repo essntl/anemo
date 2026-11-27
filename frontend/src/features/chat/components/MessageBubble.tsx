@@ -82,7 +82,7 @@ export function UserBubble({ text, attachments = [], references = [], skill, pag
       {/* A message can be just files (or a page): then no empty bubble under them. */}
       {/* No avatar beside your own messages: the bubble on the right already says who wrote it. */}
       {(text || skill) && (
-        <div className="max-w-[80%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-accent-soft px-4 py-2.5 text-[14.5px]">
+        <div className="max-w-[80%] whitespace-pre-wrap break-words rounded-2xl [.full-width_&]:max-w-[min(80%,75ch)] rounded-br-md bg-accent-soft px-4 py-2.5 text-[14.5px]">
           {skill && (
             <span className="mr-2 inline-flex items-center gap-1 align-[-2px] font-medium text-accent" title={t('Answered with the /{slug} skill', { slug: skill.slug })}>
               <SkillIcon name={skill.icon} className="h-[15px] w-[15px]" />

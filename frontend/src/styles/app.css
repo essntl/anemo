@@ -203,6 +203,11 @@
   .markdown li.task-list-item { @apply -ml-5 list-none; }
   .markdown img { @apply my-3 max-w-full rounded-lg; }
 
+  /* Full width (features/appearance/fullWidth.tsx): text keeps a readable line length,
+     while tables, code blocks and diagrams use the room. */
+  .full-width .markdown > :where(p, ul, ol, blockquote, h1, h2, h3, h4, h5, h6, dl) { max-width: 75ch; }
+  .full-width .markdown table { max-width: none; }
+
   /* The rich document editor (TipTap) uses .markdown too; these are its extras. */
   /* A heading jumped to from the outline keeps a little air above it. */
   .tiptap :is(h1, h2, h3) { scroll-margin-top: 0.75rem; }

@@ -17,6 +17,8 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Select } from '@/components/ui/Select'
 import { DESKTOP, useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
+import { FullWidthToggle } from '@/features/appearance/fullWidth'
+import { useFullWidth } from '@/features/appearance/useFullWidth'
 import { plural, t } from '@/lib/i18n'
 import { PRIORITY_LABELS, type Project, type Task, type TaskStatus, useCreateTask, useProjects, useTasks } from './api'
 import { TaskBoard } from './components/TaskBoard'
@@ -141,11 +143,13 @@ export function TasksPage() {
   // Very wide screens: a task opens beside the list (not over it), so the list stays in reach.
   const beside = useMediaQuery(VERY_WIDE) && view === 'list'
   const desktop = useMediaQuery(DESKTOP)
+  const fullWidth = useFullWidth('tasks')
   return (
     <div className="flex h-full">
     <div className="min-w-0 flex-1 overflow-y-auto">
-    <div className={cn('mx-auto p-4 md:px-8 md:pb-8 md:pt-2', view === 'board' ? 'max-w-none' : 'max-w-3xl')}>
+    <div className={cn('mx-auto p-4 md:px-8 md:pb-8 md:pt-2', view === 'board' || fullWidth ? 'max-w-none' : 'max-w-3xl')}>
       <PageHeader title={t('Tasks')}>
+        {view !== 'board' && <FullWidthToggle page="tasks" />}
         {/* On a phone the Trash is beside the view switch below: up here it ran under the Dynamic Island. */}
         {desktop && <Button size="sm" variant="ghost" className="shrink-0" icon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => setTrashOpen(true)}>{t('Trash')}</Button>}
         <Button size="sm" variant="primary" className="shrink-0" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing({ task: null })}>

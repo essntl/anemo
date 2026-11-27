@@ -13,6 +13,7 @@ import { Lingering } from '@/components/ui/Lingering'
 import { SketchPickerDialog } from '@/features/sketch/SketchPickerDialog'
 import { isAppLink, sketchPreviewUrl } from '@/lib/appLinks'
 import { cn } from '@/lib/cn'
+import { useFullWidth } from '@/features/appearance/useFullWidth'
 import { t } from '@/lib/i18n'
 import { uploadAsset } from '../api'
 import { editorExtensions } from '../editorExtensions'
@@ -45,6 +46,8 @@ interface RichEditorProps {
 
 export function RichEditor({ initial, onChange, onError, variant = 'document', label = t('Document text'), onOpenAppLink, className }: RichEditorProps) {
   const notes = variant === 'notes'
+  // Settings > Appearance > Full width (documents only; the notes stay a column).
+  const fullWidth = useFullWidth('documents') && !notes
   const navigate = useNavigate()
   const fileInput = useRef<HTMLInputElement>(null)
   const editorRef = useRef<Editor | null>(null)
@@ -167,7 +170,8 @@ export function RichEditor({ initial, onChange, onError, variant = 'document', l
           e.target.value = ''
         }} />
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-3xl">
+        {/* Full width: tables and code use the room, the text keeps a readable line length (styles/app.css). */}
+        <div className={cn('mx-auto', fullWidth ? 'full-width max-w-none md:px-6' : 'max-w-3xl')}>
           <EditorContent editor={editor} />
         </div>
       </div>

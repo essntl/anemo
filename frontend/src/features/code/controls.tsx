@@ -17,6 +17,7 @@ import { useAutosize } from '@/hooks/useAutosize'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { chatLink } from '@/lib/appLinks'
 import { cn } from '@/lib/cn'
+import { useFullWidth } from '@/features/appearance/useFullWidth'
 import { t } from '@/lib/i18n'
 import {
   type CodeMessage, isWaiting, startErrorMessage, useCancelJob, useFollowUp, useRemoveMessage, useSendMessage, useSendMessageNow,
@@ -262,5 +263,6 @@ export function FollowUpBox({ job, onSent }: { job: CodeJob; title?: string | nu
 function Dock({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
   useToastLift(ref)
-  return <div ref={ref} className="mx-auto w-full max-w-3xl px-3 pb-2 pt-1 md:px-8 md:pb-3">{children}</div>
+  const fullWidth = useFullWidth('code')
+  return <div ref={ref} className={cn('mx-auto w-full px-3 pb-2 pt-1 md:px-8 md:pb-3', fullWidth ? 'max-w-none' : 'max-w-3xl')}>{children}</div>
 }

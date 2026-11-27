@@ -7,14 +7,15 @@ import { AccentCard, TintCard } from '@/features/appearance/ColorCards'
 import { FontCard } from '@/features/appearance/FontCard'
 import { DeviceCard, GlassCard, PreviewCard } from '@/features/appearance/MoreCards'
 import { type Density, type ThemeMode, useThemeStore } from '../theme'
-import { t } from '@/lib/i18n'
+import { plural, t } from '@/lib/i18n'
 
 /**
  * Settings > Appearance. Every change applies to the whole app at once (the app is the
  * preview) and is saved after a short pause; see features/appearance for how.
  */
 export function AppearancePage() {
-  const { mode, density, set } = useThemeStore()
+  const { mode, density, full_width: fullWidth, full_width_pages: widthPages, set } = useThemeStore()
+  const ownChoices = Object.keys(widthPages).length
 
   return (
     <div className="flex flex-col gap-(--card-gap)">
@@ -40,6 +41,21 @@ export function AppearancePage() {
                   { value: 'compact', label: t('Compact') },
                 ]} />
             } />
+          <SettingRow title={t('Full width')}
+            description={<>
+              {t('Content uses the whole window instead of a centred column: Home becomes a free grid, chats give tables, code and diagrams more room (text keeps a readable line length). Phones are not changed.')}
+              {ownChoices > 0 && (
+                <>
+                  {' '}
+                  {plural(ownChoices, '{n} page has its own choice, made with the button in its header.', '{n} pages have their own choice, made with the button in their header.')}
+                  {' '}
+                  <button type="button" className="font-medium text-accent hover:underline" onClick={() => set({ full_width_pages: {} })}>
+                    {t('Use this setting everywhere')}
+                  </button>
+                </>
+              )}
+            </>}
+            checked={fullWidth} onCheckedChange={(v) => set({ full_width: v })} />
         </SettingRows>
       </Card>
 
