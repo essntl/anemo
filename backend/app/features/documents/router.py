@@ -15,7 +15,7 @@ from sqlalchemy import select
 
 from app.api.deps import Db
 from app.core.errors import AppError, NotFound
-from app.features.documents import paths, pins, references, service, sketch, sketches
+from app.features.documents import paths, pins, references, service, sketch, sketches, tidy
 from app.features.documents import properties as doc_properties
 from app.features.documents.models import Document, DocumentRevision
 from app.features.documents.sketch_schemas import SketchOut, sketch_out
@@ -178,6 +178,94 @@ async def set_pin(document_id: uuid.UUID, body: PinIn, db: Db) -> PinsOut:
     return PinsOut(
         document_ids=await pins.set_pinned(db, document_id, body.project_id, body.pinned)
     )
+
+
+class TidyIn(BaseModel):
+    # The documents in view (the client leaves out archived ones, newest first).
+    document_ids: list[uuid.UUID] = Field(max_length=tidy.MAX_DOCUMENTS)
+    within: str | None = Field(None, max_length=500, description="A project's folder")
+
+
+class TidyChange(BaseModel):
+    kind: Literal["property", "archive", "title", "folder"]
+    key: str | None = Field(None, max_length=40)  # property: type, status or tags
+    value: Any = None  # property: a slug, or for tags the whole new list
+    title: str | None = Field(None, max_length=200)
+    folder: str | None = Field(None, max_length=500)
+
+
+class TidySuggestionOut(BaseModel):
+    document_id: uuid.UUID
+    title: str
+    path: str
+    folder: str
+    current: dict[str, Any]
+    changes: list[TidyChange]
+    why: str | None = None
+
+
+class TidyOut(BaseModel):
+    suggestions: list[TidySuggestionOut]
+    considered: int  # documents the model looked at
+    failed: int  # of them, in batches the model didn't answer
+    model: str | None = None
+
+
+class TidyApplyChange(TidyChange):
+    document_id: uuid.UUID
+
+
+class TidyApplyIn(BaseModel):
+    changes: list[TidyApplyChange] = Field(max_length=1000)
+    within: str | None = Field(None, max_length=500)
+
+
+class TidyAppliedOut(BaseModel):
+    applied: int
+    problems: list[str]
+
+
+def _change(c: TidyChange) -> tidy.Change:
+    return tidy.Change(kind=c.kind, key=c.key, value=c.value, title=c.title, folder=c.folder)
+
+
+@router.post("/tidy", response_model=TidyOut)
+async def tidy_suggest(body: TidyIn, db: Db) -> TidyOut:
+    """Tidy up: the background model's suggestions for these documents (properties,
+    archiving, clearer titles, moves into existing folders), checked. Changes nothing."""
+    result = await tidy.suggest(db, body.document_ids, body.within)
+    return TidyOut(
+        suggestions=[
+            TidySuggestionOut(
+                document_id=s.document.id,
+                title=s.document.title,
+                path=s.document.path,
+                folder=_out(s.document).folder,
+                current=s.document.properties or {},
+                changes=[
+                    TidyChange(
+                        kind=c.kind, key=c.key, value=c.value, title=c.title, folder=c.folder
+                    )
+                    for c in s.changes
+                ],
+                why=s.why,
+            )
+            for s in result.suggestions
+        ],
+        considered=result.considered,
+        failed=result.failed,
+        model=result.model,
+    )
+
+
+@router.post("/tidy/apply", response_model=TidyAppliedOut)
+async def tidy_apply(body: TidyApplyIn, db: Db) -> TidyAppliedOut:
+    """Make the chosen tidy-up changes through the normal document paths (a revision or
+    a move each, in the activity log)."""
+    applied, problems = await tidy.apply(
+        db, [(c.document_id, _change(c)) for c in body.changes], body.within
+    )
+    return TidyAppliedOut(applied=applied, problems=problems)
 
 
 class AssetOut(BaseModel):

@@ -23,6 +23,7 @@ memory-extraction prompt with FakeAdapter.extraction_reply.
 """
 
 import asyncio
+import json
 import math
 import re
 import zlib
@@ -90,6 +91,22 @@ def _fake_compaction(req: ChatRequest, prompt: str) -> str:
     return "\n".join(lines)
 
 
+def _fake_tidy(prompt: str) -> str:
+    """The tidy-up answer, made checkable: archive what is titled "Prompt: ...", type
+    `note` for documents without a type."""
+    out: list[dict[str, Any]] = []
+    for block in prompt.split("\n\n"):
+        head = re.match(r"\[(d\d+)\] title: (.*)", block)
+        if not head:
+            continue
+        key, title = head.groups()
+        if title.startswith("Prompt:"):
+            out.append({"id": key, "archive": True, "why": "a one-off prompt"})
+        elif '"type"' not in block:
+            out.append({"id": key, "type": "note", "why": "it reads like a note"})
+    return json.dumps({"documents": out})
+
+
 def _first_user_text(req: ChatRequest) -> str:
     for msg in req.messages:
         if msg.role == "user":
@@ -116,6 +133,8 @@ class FakeAdapter:
     requests: ClassVar[list[ChatRequest]] = []
     embedded: ClassVar[list[str]] = []  # texts sent to embed()
     extraction_reply: ClassVar[str] = "[]"  # what the memory extraction prompt gets back
+    # What the tidy-up prompt (features/documents/tidy.py) gets back; None: _fake_tidy's.
+    tidy_reply: ClassVar[str | None] = None
     # What transcribe() hears, and what it was last sent (tests set and read these).
     transcript: ClassVar[str] = "Um, so, uh, please add milk to my shopping list."
     transcribed: ClassVar[list[dict[str, Any]]] = []
@@ -149,6 +168,11 @@ class FakeAdapter:
         if _first_user_text(req).startswith("Extract durable memories"):
             yield TextDelta(FakeAdapter.extraction_reply)
             yield Usage(input_tokens=200, output_tokens=30)
+            yield Done("end")
+            return
+        if _first_user_text(req).startswith("Tidy these documents."):
+            yield TextDelta(FakeAdapter.tidy_reply or _fake_tidy(prompt))
+            yield Usage(input_tokens=len(prompt) // 4, output_tokens=50)
             yield Done("end")
             return
         if req.model == "scripted":

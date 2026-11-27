@@ -2549,6 +2549,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/documents/tidy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Tidy Suggest
+         * @description Tidy up: the background model's suggestions for these documents (properties,
+         *     archiving, clearer titles, moves into existing folders), checked. Changes nothing.
+         */
+        post: operations["tidy_suggest_api_documents_tidy_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/tidy/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Tidy Apply
+         * @description Make the chosen tidy-up changes through the normal document paths (a revision or
+         *     a move each, in the activity log).
+         */
+        post: operations["tidy_apply_api_documents_tidy_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/documents/assets": {
         parameters: {
             query?: never;
@@ -13482,6 +13524,100 @@ export interface components {
             /** Width */
             width?: number | null;
         };
+        /** TidyAppliedOut */
+        TidyAppliedOut: {
+            /** Applied */
+            applied: number;
+            /** Problems */
+            problems: string[];
+        };
+        /** TidyApplyChange */
+        TidyApplyChange: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "property" | "archive" | "title" | "folder";
+            /** Key */
+            key?: string | null;
+            /** Value */
+            value?: unknown;
+            /** Title */
+            title?: string | null;
+            /** Folder */
+            folder?: string | null;
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+        };
+        /** TidyApplyIn */
+        TidyApplyIn: {
+            /** Changes */
+            changes: components["schemas"]["TidyApplyChange"][];
+            /** Within */
+            within?: string | null;
+        };
+        /** TidyChange */
+        TidyChange: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "property" | "archive" | "title" | "folder";
+            /** Key */
+            key?: string | null;
+            /** Value */
+            value?: unknown;
+            /** Title */
+            title?: string | null;
+            /** Folder */
+            folder?: string | null;
+        };
+        /** TidyIn */
+        TidyIn: {
+            /** Document Ids */
+            document_ids: string[];
+            /**
+             * Within
+             * @description A project's folder
+             */
+            within?: string | null;
+        };
+        /** TidyOut */
+        TidyOut: {
+            /** Suggestions */
+            suggestions: components["schemas"]["TidySuggestionOut"][];
+            /** Considered */
+            considered: number;
+            /** Failed */
+            failed: number;
+            /** Model */
+            model?: string | null;
+        };
+        /** TidySuggestionOut */
+        TidySuggestionOut: {
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Title */
+            title: string;
+            /** Path */
+            path: string;
+            /** Folder */
+            folder: string;
+            /** Current */
+            current: {
+                [key: string]: unknown;
+            };
+            /** Changes */
+            changes: components["schemas"]["TidyChange"][];
+            /** Why */
+            why?: string | null;
+        };
         /** TimelineOut */
         TimelineOut: {
             /**
@@ -19981,6 +20117,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PinsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tidy_suggest_api_documents_tidy_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TidyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TidyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tidy_apply_api_documents_tidy_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TidyApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TidyAppliedOut"];
                 };
             };
             /** @description Validation Error */

@@ -2,7 +2,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { NavLink, useNavigate, useSearchParams } from 'react-router'
-import { Archive, ArchiveRestore, Bot, ChevronRight, FileText, Folder, PenLine, Pin, PinOff, Plus, Search } from 'lucide-react'
+import { Archive, ArchiveRestore, Bot, ChevronRight, FileText, Folder, PenLine, Pin, PinOff, Plus, Search, Sparkles } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { ActionMenu, type MenuAction } from '@/components/ui/ActionMenu'
 import { Button } from '@/components/ui/Button'
@@ -18,6 +18,7 @@ import { rich, t } from '@/lib/i18n'
 import { ARCHIVED, isFinished, type ListRow, listRows, PINNED, type Vocabulary } from '../listRows'
 import { type GroupBy, OUTSIDE, type SortBy, useDocListStore, useListView } from '../docListStore'
 import { useDocumentPins } from '../usePins'
+import { TidyDialog } from './TidyDialog'
 import { type DocumentSummary, type SketchLayout, useArchiveDocument, useCreateDocument, useDocuments, usePrefetchDocument } from '../api'
 
 const vocabulary = (d: PropertyDefinition | undefined): Vocabulary => (d?.options ?? []).map((o) => ({ slug: o.slug, label: o.label }))
@@ -47,6 +48,7 @@ export function DocumentList({ currentFolder, projectFolder, projectName, outsid
   const fold = useDocListStore((s) => s.fold)
   const [query, setQuery] = useState('')
   const [menuFor, setMenuFor] = useState<string | null>(null)
+  const [tidying, setTidying] = useState(false)
 
   const everything = documents.data?.documents
   const q = query.trim().toLowerCase()
@@ -128,6 +130,12 @@ export function DocumentList({ currentFolder, projectFolder, projectName, outsid
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [asked])
 
+  // Tidy up looks at what is in view and not finished yet, the most recently changed first.
+  const tidyIds = useMemo(
+    () => all.filter((d) => !isFinished(d)).sort((a, b) => b.updated_at.localeCompare(a.updated_at)).map((d) => d.id),
+    [all],
+  )
+
   const actionsFor = (doc: DocumentSummary): MenuAction[] => {
     const finished = isFinished(doc)
     const pinned = pins.isPinned(doc.id)
@@ -146,6 +154,10 @@ export function DocumentList({ currentFolder, projectFolder, projectName, outsid
   return (
     <div className="flex h-full flex-col">
       <PageHeader title={t('Documents')} detail={projectName ?? (outside ? t('Uncategorized') : undefined)}>
+      <Button size="icon" variant="ghost" aria-label={t('Tidy up')} title={t('Tidy up: suggestions to organise these documents')}
+        disabled={tidyIds.length === 0} onClick={() => setTidying(true)}>
+        <Sparkles className="h-4 w-4" />
+      </Button>
       <Button size="icon" variant="ghost" aria-label={t('New sketch')} title={t('New sketch')} onClick={() => setNewSketch(true)}>
         <PenLine className="h-4 w-4" />
       </Button>
@@ -153,6 +165,7 @@ export function DocumentList({ currentFolder, projectFolder, projectName, outsid
         {t('New')}
       </Button>
       </PageHeader>
+      {tidying && <TidyDialog ids={tidyIds} within={projectFolder ?? null} onClose={() => setTidying(false)} />}
       <Lingering value={newSketch}>
         {() => <NewSketchDialog busy={create.isPending} onCreate={createSketch} onClose={() => setNewSketch(false)} />}
       </Lingering>

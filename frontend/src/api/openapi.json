@@ -10136,6 +10136,126 @@
         }
       }
     },
+    "/api/documents/tidy": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Tidy Suggest",
+        "description": "Tidy up: the background model's suggestions for these documents (properties,\narchiving, clearer titles, moves into existing folders), checked. Changes nothing.",
+        "operationId": "tidy_suggest_api_documents_tidy_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TidyIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TidyOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/tidy/apply": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Tidy Apply",
+        "description": "Make the chosen tidy-up changes through the normal document paths (a revision or\na move each, in the activity log).",
+        "operationId": "tidy_apply_api_documents_tidy_apply_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TidyApplyIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TidyAppliedOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/documents/assets": {
       "post": {
         "tags": [
@@ -44384,6 +44504,300 @@
         ],
         "title": "TextBox",
         "description": "Text at (x, y) (its top left), `size` the font size; `width` wraps it."
+      },
+      "TidyAppliedOut": {
+        "properties": {
+          "applied": {
+            "type": "integer",
+            "title": "Applied"
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Problems"
+          }
+        },
+        "type": "object",
+        "required": [
+          "applied",
+          "problems"
+        ],
+        "title": "TidyAppliedOut"
+      },
+      "TidyApplyChange": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "property",
+              "archive",
+              "title",
+              "folder"
+            ],
+            "title": "Kind"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          },
+          "value": {
+            "title": "Value"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "folder": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder"
+          },
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "document_id"
+        ],
+        "title": "TidyApplyChange"
+      },
+      "TidyApplyIn": {
+        "properties": {
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/TidyApplyChange"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Changes"
+          },
+          "within": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Within"
+          }
+        },
+        "type": "object",
+        "required": [
+          "changes"
+        ],
+        "title": "TidyApplyIn"
+      },
+      "TidyChange": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "property",
+              "archive",
+              "title",
+              "folder"
+            ],
+            "title": "Kind"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          },
+          "value": {
+            "title": "Value"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "folder": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "TidyChange"
+      },
+      "TidyIn": {
+        "properties": {
+          "document_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Document Ids"
+          },
+          "within": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Within",
+            "description": "A project's folder"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_ids"
+        ],
+        "title": "TidyIn"
+      },
+      "TidyOut": {
+        "properties": {
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/TidySuggestionOut"
+            },
+            "type": "array",
+            "title": "Suggestions"
+          },
+          "considered": {
+            "type": "integer",
+            "title": "Considered"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          }
+        },
+        "type": "object",
+        "required": [
+          "suggestions",
+          "considered",
+          "failed"
+        ],
+        "title": "TidyOut"
+      },
+      "TidySuggestionOut": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "folder": {
+            "type": "string",
+            "title": "Folder"
+          },
+          "current": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Current"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/TidyChange"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "why": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Why"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "title",
+          "path",
+          "folder",
+          "current",
+          "changes"
+        ],
+        "title": "TidySuggestionOut"
       },
       "TimelineOut": {
         "properties": {

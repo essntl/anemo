@@ -174,3 +174,18 @@ From the brief, in the first PR (features 1–4):
   "Drawing sheet" kept for screen readers.
 - **Archive and Unarchive** are only in the row menu, as asked. The document's own menu
   has Pin but not Archive, because its properties bar already sets the status.
+
+In the second PR (feature 5, Tidy up):
+
+- **Accept all and Reject all tick or clear every checkbox.** They don't apply or close
+  anything; only Apply selected changes documents.
+- **Every suggested change starts ticked**, as in the existing property suggestions
+  review.
+- **Tags are only added.** The model can't remove a tag, and a suggestion with tags the
+  document already has is dropped.
+- **A suggested status of `archived` or `done` is dropped.** Archiving is its own
+  change, with its own checkbox, so the two can't both be offered.
+- **Moves keep the file name.** A name already taken in the target folder fails like a
+  move in the editor does (the problem is listed in the toast).
+- **A suggestion's "why"** (a few words from the model) is shown with each document.
+
