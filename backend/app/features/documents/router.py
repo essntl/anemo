@@ -15,7 +15,7 @@ from sqlalchemy import select
 
 from app.api.deps import Db
 from app.core.errors import AppError, NotFound
-from app.features.documents import paths, references, service, sketch, sketches
+from app.features.documents import paths, pins, references, service, sketch, sketches
 from app.features.documents import properties as doc_properties
 from app.features.documents.models import Document, DocumentRevision
 from app.features.documents.sketch_schemas import SketchOut, sketch_out
@@ -155,6 +155,29 @@ async def list_documents(db: Db) -> DocumentList:
     docs = list(await db.scalars(select(Document).order_by(Document.path)))
     actors = await _actors(db, docs)
     return DocumentList(documents=[_out(d, actors) for d in docs], folders=folders)
+
+
+class PinsOut(BaseModel):
+    document_ids: list[uuid.UUID]  # the most recently pinned first
+
+
+class PinIn(BaseModel):
+    project_id: uuid.UUID | None = Field(None, description="The project; None outside projects")
+    pinned: bool
+
+
+@router.get("/pins", response_model=PinsOut)
+async def list_pins(db: Db, project_id: uuid.UUID | None = None) -> PinsOut:
+    """The documents pinned to the top of the list: in a project, or outside projects."""
+    return PinsOut(document_ids=await pins.pinned(db, project_id))
+
+
+@router.put("/{document_id}/pin", response_model=PinsOut)
+async def set_pin(document_id: uuid.UUID, body: PinIn, db: Db) -> PinsOut:
+    """Pin or unpin a document in a project (or outside projects). Returns that place's pins."""
+    return PinsOut(
+        document_ids=await pins.set_pinned(db, document_id, body.project_id, body.pinned)
+    )
 
 
 class AssetOut(BaseModel):
