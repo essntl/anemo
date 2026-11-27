@@ -2,13 +2,16 @@
 
 One claim loop per lane, each with its own concurrency limit, so background work
 (automations, indexing) can never block interactive chat/agent turns. Workers
-wake instantly on Postgres NOTIFY and also poll every few seconds as a fallback.
+wake instantly on Postgres NOTIFY; an idle lane otherwise sleeps until its next
+delayed job or retry is due, and looks again at least every POLL_INTERVAL_S in case a
+notification was missed.
 """
 
 import asyncio
 import logging
 import uuid
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 from typing import Any
 
 import asyncpg
@@ -24,7 +27,11 @@ Handler = Callable[[dict[str, Any]], Awaitable[None]]
 # Called once a job has failed for good (no retry left), to clean up after it.
 GiveUp = Callable[[dict[str, Any]], Awaitable[None]]
 
-POLL_INTERVAL_S = 5.0
+# The longest an idle lane sleeps without a notification (was 5 s, when lanes polled:
+# 24 claim transactions a minute on an idle worker).
+POLL_INTERVAL_S = 60.0
+# Not sooner than this after a miss, so a job due "now" by another clock can't spin.
+MIN_WAIT_S = 0.05
 HEARTBEAT_S = 10.0
 REAP_INTERVAL_S = 30.0
 
@@ -160,6 +167,13 @@ def default_give_ups() -> dict[str, GiveUp]:
     return {"run.execute": run_execute, "chats.index": chats_index}
 
 
+def _until(due: datetime | None) -> float:
+    """Seconds to sleep until `due` (a job's run_at), at most POLL_INTERVAL_S."""
+    if due is None:
+        return POLL_INTERVAL_S
+    return min(POLL_INTERVAL_S, max(MIN_WAIT_S, (due - datetime.now(UTC)).total_seconds()))
+
+
 class JobRunner:
     def __init__(
         self,
@@ -167,6 +181,7 @@ class JobRunner:
         concurrency: int,
         handlers: dict[str, Handler] | None = None,
         give_ups: dict[str, GiveUp] | None = None,
+        scheduler_wake: asyncio.Event | None = None,
     ) -> None:
         self.worker_id = worker_id
         self.handlers = handlers or default_handlers()
@@ -174,6 +189,8 @@ class JobRunner:
         self.limits = {"interactive": max(1, concurrency), "background": max(1, concurrency // 2)}
         self.wakeups = {lane: asyncio.Event() for lane in self.limits}
         self.running: set[asyncio.Task[None]] = set()
+        # Set when an automation's run time changed (the scheduler waits on it).
+        self.scheduler_wake = scheduler_wake
 
     async def run(self, stop: asyncio.Event) -> None:
         loops = [asyncio.create_task(self._lane_loop(lane, stop)) for lane in self.limits]
@@ -191,26 +208,34 @@ class JobRunner:
         slots = asyncio.Semaphore(self.limits[lane])
         while not stop.is_set():
             await slots.acquire()
+            wait = POLL_INTERVAL_S
+            # Cleared before claiming: a job added meanwhile wakes the wait below.
+            self.wakeups[lane].clear()
             try:
                 async with get_sessionmaker()() as db:
                     job = await queue.claim(db, self.worker_id, [lane])
+                    if job is None:
+                        wait = _until(await queue.next_due(db, [lane]))
             except Exception:  # noqa: BLE001 - DB hiccup: back off and keep going
                 log.warning("claim failed", exc_info=True)
-                job = None
+                job, wait = None, POLL_INTERVAL_S
             if job is None:
                 slots.release()
-                self.wakeups[lane].clear()
                 try:
-                    await asyncio.wait_for(self.wakeups[lane].wait(), timeout=POLL_INTERVAL_S)
+                    await asyncio.wait_for(self.wakeups[lane].wait(), timeout=wait)
                 except TimeoutError:
                     pass
                 continue
             task = asyncio.create_task(self._execute(job))
             self.running.add(task)
 
-            def on_done(t: asyncio.Task[None], slots: asyncio.Semaphore = slots) -> None:
+            def on_done(
+                t: asyncio.Task[None], slots: asyncio.Semaphore = slots, lane: str = lane
+            ) -> None:
                 self.running.discard(t)
                 slots.release()
+                # A failed job may be due again soon (its retry): look again.
+                self.wakeups[lane].set()
 
             task.add_done_callback(on_done)
 
@@ -224,11 +249,19 @@ class JobRunner:
                 if not lane or lane == name:
                     event.set()
 
+        def on_schedule(*args: Any) -> None:
+            if self.scheduler_wake is not None:
+                self.scheduler_wake.set()
+
         while not stop.is_set():
             conn: asyncpg.Connection | None = None
             try:
                 conn = await asyncpg.connect(dsn)
                 await conn.add_listener(queue.NOTIFY_CHANNEL, on_notify)
+                await conn.add_listener(queue.SCHEDULER_CHANNEL, on_schedule)
+                # What was notified while not listening is not heard: look now.
+                on_notify()
+                on_schedule()
                 await stop.wait()
             except asyncio.CancelledError:
                 raise

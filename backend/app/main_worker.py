@@ -80,11 +80,13 @@ async def main() -> None:
     log.info("worker starting", extra={"ctx": {"worker_id": wid}})
     beat = asyncio.create_task(heartbeat_loop(wid, stop))
     runner_status = asyncio.create_task(runner_status_loop(stop))
-    periodic = asyncio.create_task(scheduler.run(stop))  # reminders, automations
+    # The job runner's LISTEN connection sets it when an automation's run time changes.
+    scheduler_wake = asyncio.Event()
+    periodic = asyncio.create_task(scheduler.run(stop, scheduler_wake))  # reminders, automations
     # Sessions with the MCP servers that triggers wait on (mcp.notification events).
     mcp_listening = asyncio.create_task(mcp_listener.McpListener(wid).run(stop))
     # Returns after `stop` is set and in-flight jobs have finished or been handed back.
-    await JobRunner(wid, settings.worker_concurrency).run(stop)
+    await JobRunner(wid, settings.worker_concurrency, scheduler_wake=scheduler_wake).run(stop)
     log.info("worker stopped")
     beat.cancel()
     periodic.cancel()
