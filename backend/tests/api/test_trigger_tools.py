@@ -126,7 +126,9 @@ async def test_a_code_job_ending_wakes_the_chat_that_asked_once(authed):
     assert any("This message is not from the user" in t for t in sent)
     assert any('<untrusted_data source="event code_job.ended">' in t for t in sent)
     offered = {t.name for t in request.tools}
-    assert not offered & {"create_trigger", "update_trigger", "create_schedule"}
+    # It may wait for the next event, but makes no schedules (test_trigger_rewake.py).
+    assert offered >= trigger_tools.TRIGGER_WRITE_TOOLS
+    assert "create_schedule" not in offered
     assert (await messages(authed, cid))[-1]["text"] == "The job is done: all tests pass."
 
     # Once: it is off now, and nothing wakes the chat again.

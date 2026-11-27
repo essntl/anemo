@@ -93,10 +93,11 @@ from app.runtime.streaming import (
     stream_with_fallback,
 )
 from app.tools import mcp_tool, registry
-from app.tools.base import COMPACTED_AT, Tool, ToolContext, ToolResult
+from app.tools.base import COMPACTED_AT, Tool, ToolContext, ToolResult, TriggerAccess
 from app.tools.builtin import computer
 from app.tools.builtin.ask import AskUserInput, clean_options
 from app.tools.builtin.plan import PlanInput
+from app.tools.builtin.triggers import trigger_access
 from app.tools.say_once import say_once
 from app.web.settings import WebSettings
 from app.workspace.access import WorkspaceSettings
@@ -177,6 +178,7 @@ class AgentRun:
         answer: tuple[uuid.UUID, uuid.UUID] | None = None,
         actor: Actor = USER,
         automation: dict[str, Any] | None = None,
+        access: TriggerAccess = "any",
     ) -> None:
         # The automation this run (or the run it is a sub-agent of) belongs to, as in its
         # policy snapshot: which tools reach other people without asking, whether a limit
@@ -230,6 +232,7 @@ class AgentRun:
             message_id=answer[0] if answer else None,
             answer_run_id=answer[1] if answer else None,
             actor=actor,
+            trigger_access=access,
         )
         self.current_call: uuid.UUID | None = None
         # Active time is counted per worker segment and added up in run.totals, so
@@ -1378,6 +1381,17 @@ async def pick_up(db: AsyncSession, run: Run) -> bool:
     return True
 
 
+async def _event_started(db: AsyncSession, run: Run) -> bool:
+    """An event trigger started it (or the run it works for, for a sub-agent)."""
+    top = await db.get(Run, run.root_run_id) if run.root_run_id else run
+    return bool((top or run).options.get("event"))
+
+
+def _unattended(run: Run) -> bool:
+    """Nobody watches it: an automation's run, or a sub-agent of one."""
+    return run.automation_id is not None or bool((run.policy or {}).get("automation"))
+
+
 async def run_tools(
     db: AsyncSession,
     run: Run,
@@ -1394,9 +1408,7 @@ async def run_tools(
     chosen tools. Also used by `python -m app.cli request-size`, to show the request a run
     sent."""
     assert run.policy is not None  # the snapshot is taken before the run is driven
-    # An event trigger started it (or the run it works for, for a sub-agent).
-    top = await db.get(Run, run.root_run_id) if run.root_run_id else run
-    event_started = bool((top or run).options.get("event"))
+    event_started = await _event_started(db, run)
     tools = registry.toolset_for(
         run.kind,
         policy,
@@ -1405,7 +1417,7 @@ async def run_tools(
         has_search=bool(web.search_url()),
         has_memory=bool(run.policy.get("memory")),
         is_automation=run.automation_id is not None,
-        unattended=run.automation_id is not None or bool(run.policy.get("automation")),
+        unattended=_unattended(run),
         has_browser=bool(run.policy.get("browser")),
         has_computer=bool(run.policy.get("computer")),
         can_spawn=run.kind == "agent"
@@ -1416,6 +1428,7 @@ async def run_tools(
         and run.options.get("source") == "voice"
         and bool(run.options.get("device_id")),
         event_started=event_started,
+        is_subagent=run.parent_run_id is not None,
         ancestors=ancestors,
         off=run.policy.get("off") or (),
     )
@@ -1503,6 +1516,11 @@ async def _prepare(run_id: uuid.UUID) -> AgentRun | None:
         automation_id = run.automation_id
         on_ask = (run.policy.get("automation") or {}).get("on_ask", "pause")
         effort = await effort_for(db, run)
+        access = trigger_access(
+            unattended=_unattended(run),
+            event_started=await _event_started(db, run),
+            chat_turn=answer_message is not None and run.parent_run_id is None,
+        )
         await runs.set_status(db, run, "running")  # commits
 
     return AgentRun(
@@ -1532,6 +1550,7 @@ async def _prepare(run_id: uuid.UUID) -> AgentRun | None:
         answer=answer_message,
         actor=runs.actor_for(run),
         automation=unattended_by,
+        access=access,
     )
 
 

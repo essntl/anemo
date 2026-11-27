@@ -5,6 +5,10 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from app.features.triggers import catalogue, events, matching, render, webhooks
+from app.policy.presets import PermissionSettings, compile_policy
+from app.tools import registry
+from app.tools.builtin.schedules import SCHEDULE_WRITE_TOOLS
+from app.tools.builtin.triggers import TRIGGER_WRITE_TOOLS
 
 
 def test_every_type_in_the_contract_is_in_the_catalogue() -> None:
@@ -57,6 +61,27 @@ def test_loop_protection() -> None:
     assert matching.loop_reason("user", 0, automation_id=a) is None
     assert matching.loop_reason("user", 2, automation_id=a) is None
     assert "too deep" in (matching.loop_reason("user", 3, automation_id=a) or "")
+    # A chat's wake-me has no depth cap (the dispatcher's budget ends its chains), but
+    # its own runs still don't wake it.
+    assert matching.loop_reason("user", 30, conversation_id=c) is None
+    assert (
+        matching.loop_reason(f"chat:{c}", 30, conversation_id=c) == "caused by this chat's own run"
+    )
+
+
+def test_which_runs_get_the_writing_trigger_tools() -> None:
+    policy = compile_policy(PermissionSettings())
+
+    def writes(**run: bool) -> set[str]:
+        tools = registry.toolset_for("agent", policy, None, **{"has_chat": True, **run})
+        return {t.name for t in tools} & (TRIGGER_WRITE_TOOLS | SCHEDULE_WRITE_TOOLS)
+
+    assert writes() == TRIGGER_WRITE_TOOLS | SCHEDULE_WRITE_TOOLS
+    assert writes(event_started=True) == TRIGGER_WRITE_TOOLS  # the woken chat's own turn
+    assert writes(event_started=True, is_subagent=True) == set()
+    assert writes(event_started=True, has_chat=False) == set()
+    assert writes(unattended=True) == set()
+    assert writes(unattended=True, event_started=True, is_automation=True) == set()
 
 
 def test_the_rate_limit_counts_the_last_hour() -> None:

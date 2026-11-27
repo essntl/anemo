@@ -12,7 +12,7 @@ import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Collection
 from dataclasses import dataclass, field
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Literal
 
 from pydantic import BaseModel
 
@@ -55,6 +55,11 @@ async def _no_images(filename: str, image: PreparedImage) -> str:
     raise RuntimeError("images are not available in this context")
 
 
+# Which event triggers a run may set, change or delete (tools/builtin/triggers.py,
+# trigger_access): any; only its own chat's wake-me ones; none.
+TriggerAccess = Literal["any", "own_wake", "none"]
+
+
 @dataclass
 class ToolContext:
     run_id: uuid.UUID
@@ -88,6 +93,8 @@ class ToolContext:
     # Who the run acts for (provenance). Set by the runtime, never from model input;
     # it is also the current actor while run() executes (app/core/actor.py).
     actor: Actor = USER
+    # Set by the runtime: an event-started run, and one nobody watches, may do less.
+    trigger_access: TriggerAccess = "any"
 
 
 class ToolResult(BaseModel):
