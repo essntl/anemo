@@ -21,6 +21,13 @@ interface SelectProps {
   /** `field` looks like an input (forms); `ghost` is a compact text button (toolbars);
    *  `pill` is a small rounded filter that is only as wide as its text. */
   variant?: keyof typeof VARIANTS
+  /** Shown before the value in the trigger (a toolbar menu's icon). */
+  icon?: ReactNode
+  /** Shown in the trigger instead of the chosen option's label (a short form of it);
+   *  the list still shows the full labels. */
+  display?: ReactNode
+  /** A tooltip for the trigger. */
+  title?: string
 }
 
 const VARIANTS = {
@@ -50,6 +57,9 @@ export function Select({
   id,
   className,
   variant = 'field',
+  icon,
+  display,
+  title,
   'aria-label': ariaLabel,
 }: SelectProps) {
   return (
@@ -57,6 +67,7 @@ export function Select({
       <RadixSelect.Trigger
         id={id}
         aria-label={ariaLabel}
+        title={title}
         className={cn(
           'group inline-flex min-w-0 items-center justify-between gap-2 text-left focus:outline-none disabled:opacity-60',
           'data-[placeholder]:text-subtle',
@@ -67,8 +78,9 @@ export function Select({
         {/* A field takes the width it is given and shortens its text to fit: its text
             never makes it (or a grid column it sits in) wider, e.g. a long model name
             on a phone. Other variants are as wide as their text. */}
+        {icon}
         <span className={cn('text-trim min-w-0 truncate py-[0.3em]', variant === 'field' && 'w-0 flex-1')}>
-          <RadixSelect.Value placeholder={placeholder} />
+          <RadixSelect.Value placeholder={placeholder}>{display}</RadixSelect.Value>
         </span>
         <RadixSelect.Icon>
           <ChevronDown className="h-4 w-4 shrink-0 opacity-60 transition-transform group-data-[state=open]:rotate-180" />

@@ -8,6 +8,7 @@ import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Checkbox } from '@/components/ui/Checkbox'
 import { Dialog } from '@/components/ui/Dialog'
+import { NoticeButton } from '@/components/ui/NoticeButton'
 import { toast } from '@/components/ui/toast'
 import { plural, t } from '@/lib/i18n'
 import { type PropertyDefinition, useApplySuggestions, useDismissSuggestions, useProperties, useSuggestions, valueLabel } from './api'
@@ -49,11 +50,9 @@ export function SuggestionsReview() {
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)}
-        className="mx-3 mt-2 flex w-[calc(100%-1.5rem)] items-center gap-2 rounded-control bg-accent-soft px-3 py-2 text-left text-[12.5px] font-medium text-accent hover:opacity-90">
-        <Sparkles className="h-4 w-4 shrink-0" />
+      <NoticeButton icon={<Sparkles />} onClick={() => setOpen(true)}>
         {plural(list.length, '{n} suggested property change to review', '{n} suggested property changes to review')}
-      </button>
+      </NoticeButton>
       <Dialog open={open} onOpenChange={(next) => !next && close()} className="md:w-[min(94vw,760px)]"
         title={t('Suggested properties')}
         description={t('The assistant suggested these for existing documents. Applying one writes it into the document, with a revision.')}

@@ -172,6 +172,45 @@ describe('groups', () => {
   })
 })
 
+describe('the toolbar and the meta line', () => {
+  it('has Group by, Sort, the archive switch and Tidy up on one toolbar, with short labels', async () => {
+    documents.push(doc('z', 'Old prompt', '', 'markdown', { status: 'archived' }) as never)
+    try {
+      show({})
+      const toolbar = screen.getByRole('group', { name: 'List view' })
+      const group = within(toolbar).getByRole('combobox', { name: 'Group by' })
+      expect(group).toHaveTextContent('Folder')
+      expect(group).toHaveAttribute('title', 'Group by folder')
+      expect(within(toolbar).getByRole('combobox', { name: 'Sort' })).toHaveTextContent('Title')
+      expect(within(toolbar).getByRole('button', { name: 'Hide archived documents' })).toBeInTheDocument()
+      expect(within(toolbar).getByRole('button', { name: 'Tidy up' })).toBeEnabled()
+      useDocListStore.getState().change('outside', { groupBy: 'changed', sortBy: 'changed' })
+      expect(await within(toolbar).findByText('Last change')).toBeInTheDocument()
+      expect(within(toolbar).getByRole('combobox', { name: 'Sort' })).toHaveTextContent('Recent')
+    } finally {
+      documents.pop()
+    }
+  })
+
+  it('puts chips, the agent mark and the age on one line in that order, also without chips', () => {
+    documents.push(
+      { ...doc('e', 'Launch plan', '', 'markdown', { type: 'plan', status: 'active' }), last_editor: 'agent' } as never,
+      { ...doc('f', 'Queue', '', 'markdown'), last_editor: 'agent' } as never,
+    )
+    try {
+      show({})
+      for (const [title, expected] of [['Launch plan', ['Active', 'Plan', 'agent', 'age']], ['Queue', ['agent', 'age']]] as const) {
+        const time = screen.getByRole('link', { name: new RegExp(title) }).querySelector('time')!
+        const line = [...time.parentElement!.children].flatMap((el) =>
+          el.tagName === 'TIME' ? ['age'] : el.getAttribute('aria-label') === 'Last changed by an agent' ? ['agent'] : [...el.children].map((c) => c.textContent))
+        expect(line).toEqual(expected)
+      }
+    } finally {
+      documents.splice(4)
+    }
+  })
+})
+
 describe('the row menu', () => {
   it('pins and archives', async () => {
     show({})

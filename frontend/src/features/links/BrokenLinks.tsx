@@ -8,6 +8,7 @@ import { Link } from 'react-router'
 import { Unlink, X } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { Dialog } from '@/components/ui/Dialog'
+import { NoticeButton } from '@/components/ui/NoticeButton'
 import { toast } from '@/components/ui/toast'
 import { plural, t } from '@/lib/i18n'
 import { type BrokenLink, useBrokenLinks, useRemoveLink } from './api'
@@ -44,11 +45,9 @@ export function BrokenLinks() {
   if (list.length === 0) return null
   return (
     <>
-      <button type="button" onClick={() => { setOpen(true); void broken.refetch() }}
-        className="mx-3 mt-2 flex w-[calc(100%-1.5rem)] items-center gap-2 rounded-control bg-surface-2 px-3 py-2 text-left text-[12.5px] font-medium text-muted hover:text-text">
-        <Unlink className="h-4 w-4 shrink-0" />
+      <NoticeButton icon={<Unlink />} tone="warning" onClick={() => { setOpen(true); void broken.refetch() }}>
         {plural(list.length, '{n} broken link', '{n} broken links')}
-      </button>
+      </NoticeButton>
       <Dialog open={open} onOpenChange={setOpen} className="md:w-[min(94vw,640px)]" title={t('Broken links')}
         description={t('These link to something that was deleted for good. Remove a link, or open the item and change its text.')}>
         <ul className="flex max-h-[60vh] flex-col overflow-auto">
