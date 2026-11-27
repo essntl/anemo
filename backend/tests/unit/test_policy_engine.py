@@ -209,3 +209,49 @@ def test_actions_that_reach_people_ask_when_the_caller_says_so():
     assert evaluate(act, deny, ask_contacts=True).decision == "deny"
     plain = Action(capability="http.request")
     assert evaluate(plain, allow_all, ask_contacts=True).decision == "allow"
+
+
+# --- the device profile as one more layer (spec 25 §3) --------------------------------
+
+
+def _device(decision, cap="computer.shell", risk="moderate"):  # type: ignore[no-untyped-def]
+    return Action(capability=cap, resource="device:1", risk=risk, device_decision=decision)
+
+
+def test_a_device_profile_never_loosens_the_policy():
+    ask = P(Rule(cap="computer.shell", decision="ask"))
+    assert evaluate(_device("allow"), ask).decision == "ask"
+    deny = P(Rule(cap="computer.shell", decision="deny"))
+    assert evaluate(_device("allow"), deny).decision == "deny"
+
+
+def test_a_device_profile_makes_things_stricter():
+    allow = P(Rule(cap="computer.shell", decision="allow"))
+    assert evaluate(_device(None), allow).decision == "allow"
+    asked = evaluate(_device("ask"), allow)
+    assert asked.decision == "ask" and asked.rule == "device-profile"
+    assert evaluate(_device("deny"), allow).decision == "deny"
+
+
+def test_a_run_grant_never_skips_a_device_profiles_question():
+    ask = P(Rule(cap="computer.shell", decision="ask"))
+    grant = Grant(capability="computer.shell", resource_prefix="device:1")
+    # The policy's own ask is lifted by "allow for this run"...
+    assert evaluate(_device(None), ask, grants=[grant]).decision == "allow"
+    # ...the device profile's ask is not.
+    assert evaluate(_device("ask"), ask, grants=[grant]).decision == "ask"
+    allow = P(Rule(cap="computer.shell", decision="allow"))
+    assert evaluate(_device("ask"), allow, grants=[grant]).decision == "ask"
+
+
+@given(
+    policy_decision=st.sampled_from(["allow", "ask", "deny"]),
+    device=st.sampled_from([None, "allow", "ask", "deny"]),
+)
+def test_the_device_layer_is_most_restrictive_wins(policy_decision, device):
+    policy = P(Rule(cap="computer.shell", decision=policy_decision))
+    without = evaluate(_device(None), policy).decision
+    got = evaluate(_device(device), policy).decision
+    assert RANK[got] >= RANK[without]
+    if device is not None:
+        assert RANK[got] >= RANK[device]

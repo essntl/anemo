@@ -962,3 +962,62 @@ async def test_sub_agents_get_the_computer_tools_too(authed, fake):
     assert computer.COMPUTER_TOOL_NAMES <= {t.name for t in FakeAdapter.requests[-1].tools}
     assert "- VM: computer, trusted" in turn_context_sent()
     assert [s[1] for s in fake.sent] == ["look"]
+
+
+# -- permission profiles (spec 25) ----------------------------------------------------------
+
+
+def _profile(ctx: ToolContext, name: str, preset: str | None, **categories: str) -> None:
+    """Give a device of this step's list a profile (what relay.list_online reports)."""
+    from app.features.devices import permissions as perms
+
+    info = ctx.state["computers"][name.casefold()]
+    base = dict(perms.PRESETS[preset].categories) if preset else dict(info["categories"])  # type: ignore[index]
+    info.update(preset=preset, profile_name=preset or "Custom", categories=base | categories)
+
+
+async def test_the_device_profile_is_one_more_layer(fake):
+    fake.add("VM", "trusted", shell=True)
+    fake.add("Custom", "trusted", shell=True)
+    ctx = await _ctx(fake)
+    auto = {"computer.shell": "autonomous", "computer.act": "autonomous"}
+    shell = computer.ShellInput(device="VM", command="Get-Date")
+    _profile(ctx, "VM", "unrestricted")
+    assert _decide(SHELL, shell, ctx, auto) == "allow"
+    # Unrestricted never loosens the Agent Permissions.
+    assert _decide(SHELL, shell, ctx, DEFAULTS) == "ask"
+    # A profile that asks before the shell asks, and "allow for this run" doesn't skip it.
+    _profile(ctx, "Custom", None, shell="ask", act="deny")
+    custom = computer.ShellInput(device="Custom", command="Get-Date")
+    device_id = ctx.state["computers"]["custom"]["id"]
+    grant = Grant(capability="computer.shell", resource_prefix=f"device:{device_id}")
+    assert _decide(SHELL, custom, ctx, auto, grants=[grant]) == "ask"
+    assert "profile Custom" in (SHELL.actions(custom, ctx)[0].device_reason or "")
+    # A profile that denies acting blocks it.
+    assert _decide(ACT, _act("Custom"), ctx, auto) == "deny"
+    _profile(ctx, "Custom", None, shell="deny")
+    assert _decide(SHELL, custom, ctx, auto) == "deny"
+
+
+def test_the_turn_context_line_names_a_new_profile() -> None:
+    device = relay.DeviceInfo(
+        id=uuid.uuid4(),
+        name="Main PC",
+        kind="computer",
+        trust="trusted",
+        control=True,
+        shell=True,
+        profile_name="Scoped",
+        preset="scoped",
+        categories={
+            "see": "allow",
+            "act": "ask",
+            "shell": "folders",
+            "files": "folders",
+            "code": "ask",
+        },
+    )
+    assert computer.line(device) == (
+        "- Main PC: computer, profile Scoped (writes only in work folders), control allowed, "
+        "every action is asked, PowerShell on"
+    )
