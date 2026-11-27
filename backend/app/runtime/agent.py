@@ -79,6 +79,7 @@ from app.runtime.history import (
     trim_to_budget,
 )
 from app.runtime.lifecycle import drive_until_stopped, effort_for
+from app.runtime.screenshots import without_old_screenshots
 from app.runtime.streaming import (
     RequestBuilder,
     StreamProgress,
@@ -362,8 +363,10 @@ class AgentRun:
                     return f"limit:{limit}"
                 transcript = await self._inject_notes(db, run, transcript)
                 transcript = await self._maybe_compact(db, run, transcript, KEEP_RECENT)
+                # Older screenshots are not sent again (runtime/screenshots.py).
+                sent = without_old_screenshots(transcript)
                 rendered = {
-                    vision: await resolve_attachments(db, transcript, self._render_caps(vision))
+                    vision: await resolve_attachments(db, sent, self._render_caps(vision))
                     for vision in {bool(m.capabilities.get("vision")) for m in self.candidates}
                 }
                 had_text = bool(run.totals.get("text"))
@@ -675,8 +678,9 @@ class AgentRun:
             reason = limit_message(limit, self.policy.limits)
             notice = TextBlock(text=LIMIT_NOTICE.format(reason=reason))
             transcript[-1] = Message(role="user", content=[*transcript[-1].content, notice])
+            sent = without_old_screenshots(transcript)
             rendered = {
-                vision: await resolve_attachments(db, transcript, self._render_caps(vision))
+                vision: await resolve_attachments(db, sent, self._render_caps(vision))
                 for vision in {bool(m.capabilities.get("vision")) for m in self.candidates}
             }
             had_text = bool(run.totals.get("text"))
