@@ -113,7 +113,7 @@ All the details, area by area: **[docs/features.md](docs/features.md)**.
 
 ## Install
 
-You need a Linux machine (or ZimaOS / CasaOS) with Docker and the Compose plugin, and
+You need a Linux machine (or ZimaOS / CasaOS) with Docker Engine 25+ and the Compose plugin, and
 about 2 GB of free memory.
 
 **From source**

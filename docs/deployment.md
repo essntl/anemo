@@ -5,7 +5,9 @@ Anemo runs as a small set of Docker containers. Only one port is published
 
 ## What you need
 
-- A Linux machine (or ZimaOS / CasaOS) with Docker and the Compose plugin.
+- A Linux machine (or ZimaOS / CasaOS) with Docker Engine 25 or newer and the Compose
+  plugin (`docker version` shows the engine's version). The health checks use
+  `start_interval`, which older engines don't have.
 - About 2 GB of free memory for the base stack. The optional browser adds up to 2 GB.
 - A folder for your files (the *workspace*). Agents work inside it and nowhere else.
 
