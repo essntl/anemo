@@ -24,6 +24,7 @@ from app.workspace import fs_guard
 MODEL_OUTPUT_CHARS = 12_000  # per stream, head + tail, sent to the model
 STORED_OUTPUT_CHARS = 64_000  # per stream, kept for the activity view
 PROGRESS_INTERVAL_S = 0.15
+ECHO_CHARS = 200  # of the command's first line, repeated at the top of its result
 
 
 class ShellInput(BaseModel):
@@ -42,6 +43,16 @@ class ShellInput(BaseModel):
 def _short(command: str, n: int = 80) -> str:
     one_line = " ".join(command.split())
     return one_line if len(one_line) <= n else one_line[: n - 1] + "…"
+
+
+def command_echo(command: str) -> str:
+    """The command as its result repeats it (run_shell, computer_shell): its first line
+    only. The model wrote the command, it is in the call already; a long script would be
+    paid for twice."""
+    lines = command.strip().splitlines() or [""]
+    first = lines[0] if len(lines[0]) <= ECHO_CHARS else lines[0][:ECHO_CHARS] + "…"
+    more = len(lines) - 1
+    return first + (f" … ({more} more line{'s' if more > 1 else ''})" if more else "")
 
 
 def _head_tail(text: str, limit: int) -> str:
@@ -152,7 +163,10 @@ class RunShell(Tool):
             status = f"stopped after {timeout}s (timeout), exit code {result.exit_code}"
         else:
             status = f"exit code {result.exit_code}"
-        parts = [f"$ {args.command}", f"[{status}, {result.duration_ms} ms, cwd {cwd}]"]
+        parts = [
+            f"$ {command_echo(args.command)}",
+            f"[{status}, {result.duration_ms} ms, cwd {cwd}]",
+        ]
         if result.stdout:
             parts.append("--- stdout ---\n" + _head_tail(result.stdout, MODEL_OUTPUT_CHARS))
         if result.stderr:

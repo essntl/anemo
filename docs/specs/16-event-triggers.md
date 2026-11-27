@@ -75,7 +75,9 @@ changes these fields that way.
 
 One list of `EventType(type, label, description, fields, max_data, addressed)`, read by
 the dispatcher (which fields may be filtered on), `GET /api/triggers/catalogue` (the
-Automations page's picker) and the tools' descriptions.
+Automations page's picker) and the tools' descriptions. A request lists the types once, in
+the first of create_trigger, create_schedule, update_schedule it offers; the others point
+to it (`say_event_types_once` in `tools/builtin/triggers.py`).
 
 | Type | `subject` | `data` |
 | --- | --- | --- |

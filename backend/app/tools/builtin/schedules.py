@@ -15,6 +15,7 @@ itself cannot create, change or delete schedules.
 
 import json
 import uuid
+from collections.abc import Collection
 from datetime import datetime
 from typing import Any, Literal
 from zoneinfo import ZoneInfo
@@ -51,8 +52,9 @@ from app.features.triggers import service as trigger_service
 from app.features.triggers.models import Trigger
 from app.jobs import queue
 from app.policy.models import Action
+from app.providers.base import ToolSpec
 from app.tools.base import Tool, ToolContext, ToolResult
-from app.tools.builtin.triggers import TriggerSpec, spec_words
+from app.tools.builtin.triggers import TriggerSpec, say_event_types_once, spec_words
 
 READ = "automation.read"
 MANAGE = "automation.manage"
@@ -89,10 +91,8 @@ CHECK = (
     "when the check runs"
 )
 TRIGGERS = (
-    "Events that start a run (besides or instead of the times): each {event, filter, "
-    "debounce_s, max_per_hour, once, expires_at, note}; see create_trigger for the event "
-    "types and their filter fields. With triggers alone (no rrule or at) it runs only on "
-    "its events. A run an event started gets the event as data"
+    "Events that start a run (besides or instead of the times). With triggers alone (no "
+    "rrule or at) it runs only on its events. A run an event started gets the event as data"
 )
 PROFILE = (
     "An agent profile (its name, as in Settings > Agent profiles) whose permissions its "
@@ -431,6 +431,9 @@ class CreateSchedule(Tool):
     Input = CreateScheduleInput
     idempotent = False
 
+    def spec(self, offered: Collection[str] = ()) -> ToolSpec:
+        return say_event_types_once(super().spec(offered), offered)
+
     def actions(self, args: CreateScheduleInput, ctx: ToolContext) -> list[Action]:
         if args.rrule:
             when = f"repeating ({args.rrule})"
@@ -511,6 +514,29 @@ class CreateSchedule(Tool):
         )
 
 
+# What update_schedule shares with create_schedule: in a request with both, it is
+# described once, in create_schedule.
+SHARED_FIELDS = frozenset({*SettingsIn.model_fields, "rrule", "at"})
+SHARED_DEFS = ("TriggerSpec", "CheckIn")
+
+
+def like_create_schedule(schema: dict[str, Any], null_clears: frozenset[str]) -> None:
+    """Shorten update_schedule's schema (in place) where it says what create_schedule
+    says: the shared fields and the trigger and check items keep their types and limits,
+    their descriptions point to create_schedule."""
+    for name, prop in schema["properties"].items():
+        if name in SHARED_FIELDS and "description" in prop:
+            clears = " Null: back to the default." if name in null_clears else ""
+            prop["description"] = "As in create_schedule." + clears
+    for name in SHARED_DEFS:
+        item = schema.get("$defs", {}).get(name)
+        if item is None:
+            continue
+        item["description"] = f"As in create_schedule ({name})."
+        for prop in item["properties"].values():
+            prop.pop("description", None)
+
+
 class UpdateScheduleInput(SettingsIn):
     id: str = Field(description="The schedule's id (from list_schedules)")
     name: str | None = Field(None, min_length=1, max_length=120)
@@ -547,6 +573,25 @@ class UpdateSchedule(Tool):
     capability = MANAGE
     Input = UpdateScheduleInput
     idempotent = False
+    # null: back to the default (all tools, the automations model, the agent's limits...).
+    null_clears = frozenset(
+        {
+            "tools",
+            "model",
+            "profile",
+            "max_tool_calls",
+            "max_minutes",
+            "retention_days",
+            "change_check",
+            "run_anyway_hours",
+        }
+    )
+
+    def spec(self, offered: Collection[str] = ()) -> ToolSpec:
+        spec = say_event_types_once(super().spec(offered), offered)
+        if "create_schedule" in offered:
+            like_create_schedule(spec.input_schema, self.null_clears)
+        return spec
 
     def actions(self, args: UpdateScheduleInput, ctx: ToolContext) -> list[Action]:
         changed = args.model_fields_set - {"id"}

@@ -10,7 +10,7 @@ To add a tool: subclass Tool, then register it in tools/registry.py.
 
 import uuid
 from abc import ABC, abstractmethod
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Collection
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
 
@@ -20,6 +20,7 @@ from app.core.actor import USER, Actor
 from app.features.attachments.images import PreparedImage
 from app.policy.models import Action, Limits
 from app.providers.base import ToolSpec
+from app.tools.schema import compact
 from app.web.settings import WebSettings
 from app.workspace.access import WorkspaceSettings
 
@@ -113,6 +114,9 @@ class Tool(ABC):
     # Executed when the model calls it, but never offered (left out of the tool list):
     # old names that existing prompts may still use.
     hidden: ClassVar[bool] = False
+    # Optional fields where an explicit null does something that leaving the field out
+    # doesn't (it clears a stored value): their schema keeps the null (tools/schema.py).
+    null_clears: ClassVar[frozenset[str]] = frozenset()
 
     def changes(self, args: Any) -> bool:
         """Whether this call changes something. Override when it depends on the call."""
@@ -127,7 +131,9 @@ class Tool(ABC):
     @abstractmethod
     async def run(self, args: Any, ctx: ToolContext) -> ToolResult: ...
 
-    def spec(self) -> ToolSpec:
-        schema = self.Input.model_json_schema()
-        schema.pop("title", None)
+    def spec(self, offered: Collection[str] = ()) -> ToolSpec:
+        """What the model is told about the tool. `offered`: the names of the tools in
+        the same request, so a tool can point to another's text instead of repeating it
+        (the event types: tools/builtin/triggers.py). Empty: the tool stands alone."""
+        schema = compact(self.Input.model_json_schema(), keep_null=self.null_clears)
         return ToolSpec(name=self.name, description=self.description, input_schema=schema)

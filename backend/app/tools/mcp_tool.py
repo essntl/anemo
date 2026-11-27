@@ -11,6 +11,7 @@ import hashlib
 import json
 import re
 import uuid
+from collections.abc import Collection
 from typing import Any
 
 from jsonschema import Draft202012Validator
@@ -91,7 +92,7 @@ class McpToolBase(Tool):
     from_plugin: bool = False
     timeout_s = CALL_TIMEOUT_S + client.CONNECT_TIMEOUT_S + 10
 
-    def spec(self) -> ToolSpec:
+    def spec(self, offered: Collection[str] = ()) -> ToolSpec:
         return ToolSpec(name=self.name, description=self.description, input_schema=self.schema)
 
     def changes(self, args: Any) -> bool:

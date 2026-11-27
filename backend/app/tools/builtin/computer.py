@@ -45,6 +45,7 @@ from app.policy.models import Action, Risk
 from app.policy.shell_risk import classify, max_risk
 from app.tools.base import Tool, ToolContext, ToolResult
 from app.tools.builtin.browser import KEY_MODIFIERS, clean_key
+from app.tools.builtin.shell import command_echo
 from app.tools.builtin.web import UNTRUSTED
 
 SEE = "computer.see"
@@ -1039,7 +1040,7 @@ class ComputerShell(Tool):
         stderr = head_tail(str(result.get("stderr") or ""))
         prompt = f"PS {name}>" if is_powershell(shell_kind) else f"{name}%"
         parts = [
-            f"{prompt} {args.command}",
+            f"{prompt} {command_echo(args.command)}",
             f"[exit code {exit_code}, {result.get('duration_ms', '?')} ms]",
         ]
         if stdout:

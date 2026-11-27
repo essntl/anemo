@@ -20,6 +20,7 @@ follows the level. Runs a trigger or a schedule started never get these tools
 """
 
 import uuid
+from collections.abc import Collection, Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
@@ -45,6 +46,7 @@ from app.features.triggers.schemas import (
     TriggerPatch,
 )
 from app.policy.models import Action, Risk
+from app.providers.base import ToolSpec
 from app.tools.base import Tool, ToolContext, ToolResult
 
 WAKE = "triggers.wake"
@@ -54,17 +56,58 @@ ASK = "an event trigger that starts work by itself"
 SAFE_WAKE = timedelta(hours=24)
 
 
+def _field_names(fields: Iterable[catalogue.EventField]) -> str:
+    return ", ".join(f.name + (" (required)" if f.required else "") for f in fields) or "none"
+
+
 def _event_list() -> str:
-    """The catalogue, for the tools' descriptions: each type and its filter fields."""
-    lines = []
+    """The catalogue, for the tools' descriptions: each type and its filter fields, one
+    line per group (task.*, document.*…) so the fields the group shares are said once."""
+    groups: dict[str, list[catalogue.EventType]] = {}
     for t in catalogue.EVENT_TYPES:
-        fields = ", ".join(f.name + (" (required)" if f.required else "") for f in t.fields)
-        fields = fields or "none"
-        lines.append(f"{t.type} ({t.description} Filter fields: {fields})")
-    return "; ".join(lines)
+        groups.setdefault(t.type.split(".")[0], []).append(t)
+    lines = []
+    for prefix, types in groups.items():
+        if len(types) == 1:
+            t = types[0]
+            lines.append(f"{t.type}: {t.description} Filter fields: {_field_names(t.fields)}")
+            continue
+        shared = [f for f in types[0].fields if all(f in t.fields for t in types)]
+        events = []
+        for t in types:
+            extra = [f for f in t.fields if f not in shared]
+            also = f" Also filter on: {_field_names(extra)}." if extra else ""
+            events.append(f"{t.type} ({t.description.rstrip('.')}.{also})")
+        lines.append(f"{prefix}.* (filter fields: {_field_names(shared)}): " + "; ".join(events))
+    return "\n".join(lines)
 
 
 EVENTS = _event_list()
+EVENT = "The event type, one of:\n" + EVENTS
+# The list is long, so a request says it once: in the first of these tools it offers;
+# the others point to it.
+EVENT_LIST_OWNERS = ("create_trigger", "create_schedule", "update_schedule")
+
+
+def event_list_owner(tool: str, offered: Collection[str]) -> str:
+    """The tool whose `event` lists the event types in a request with these tools."""
+    return next(name for name in EVENT_LIST_OWNERS if name == tool or name in offered)
+
+
+def say_event_types_once(spec: ToolSpec, offered: Collection[str]) -> ToolSpec:
+    """`spec` with its `event` pointing to the owner's list, unless it is the owner."""
+    owner = event_list_owner(spec.name, offered)
+    if owner == spec.name:
+        return spec
+    schema = spec.input_schema
+    target = schema if "event" in schema["properties"] else schema["$defs"]["TriggerSpec"]
+    where = "event" if owner == "create_trigger" else "triggers[].event"
+    target["properties"]["event"]["description"] = (
+        f"The event type: one of those listed in {owner}'s {where}"
+    )
+    return spec
+
+
 FILTER = (
     "Which events: {field: value} pairs that must all match (a list means any of them; "
     "text is compared without case; tags matches an item that has the tag), e.g. "
@@ -78,9 +121,10 @@ EXPIRES = (
 
 
 class TriggerSpec(BaseModel):
-    """One trigger: the event, which ones, and how often (shared with create_schedule)."""
+    """One trigger: the event, which ones, and how often."""
 
-    event: str = Field(min_length=1, max_length=60, description="The event type: " + EVENTS)
+    # Also create_schedule's and update_schedule's `triggers` (say_event_types_once).
+    event: str = Field(min_length=1, max_length=60, description=EVENT)
     filter: dict[str, Any] = Field(default_factory=dict, max_length=10, description=FILTER)
     debounce_s: int = Field(
         0,
@@ -230,6 +274,9 @@ class CreateTrigger(Tool):
     extra_capabilities = (MANAGE,)
     Input = CreateTriggerInput
     idempotent = False
+
+    def spec(self, offered: Collection[str] = ()) -> ToolSpec:
+        return say_event_types_once(super().spec(offered), offered)
 
     def actions(self, args: CreateTriggerInput, ctx: ToolContext) -> list[Action]:
         if args.target == "this_chat":
@@ -391,6 +438,7 @@ class UpdateTrigger(Tool):
     extra_capabilities = (MANAGE,)
     Input = UpdateTriggerInput
     idempotent = False
+    null_clears = frozenset({"expires_at"})  # null: it never expires
 
     def actions(self, args: UpdateTriggerInput, ctx: ToolContext) -> list[Action]:
         found = _lookup_trigger(args.id)
