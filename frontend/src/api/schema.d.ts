@@ -3789,6 +3789,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/devices/profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Profiles
+         * @description The built-in presets and the custom profiles, with how many devices use each.
+         */
+        get: operations["list_profiles_api_devices_profiles_get"];
+        put?: never;
+        /**
+         * Copy Profile
+         * @description A custom profile copied from another one. Needs the password confirmed recently.
+         */
+        post: operations["copy_profile_api_devices_profiles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/devices/profiles/{profile_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Profile
+         * @description Delete a custom profile that no device uses (409 profile_in_use otherwise).
+         */
+        delete: operations["delete_profile_api_devices_profiles__profile_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Change Profile
+         * @description Rename a custom profile or change its levels; applies at once to every device that
+         *     uses it. Built-in presets can't be changed (409 preset_locked).
+         */
+        patch: operations["change_profile_api_devices_profiles__profile_id__patch"];
+        trace?: never;
+    };
+    "/api/devices/{device_id}/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Permissions
+         * @description The device's profile, work folders, protected folders, grants and automation switch.
+         */
+        get: operations["get_permissions_api_devices__device_id__permissions_get"];
+        /**
+         * Set Permissions
+         * @description Change the device's profile, work folders, protected-folder levels or the automation
+         *     switch. Applies at once. Needs the password confirmed recently, so neither an agent
+         *     nor a device's own token can loosen it.
+         */
+        put: operations["set_permissions_api_devices__device_id__permissions_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/devices": {
         parameters: {
             query?: never;
@@ -7816,6 +7891,23 @@ export interface components {
             /** Kinds */
             kinds?: ("reminder" | "automation" | "approval" | "agent" | "focus")[] | null;
         };
+        /** DeviceGrantOut */
+        DeviceGrantOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Folder */
+            folder: string | null;
+            /** Command Hash */
+            command_hash: string | null;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+        };
         /** DeviceIn */
         DeviceIn: {
             /** Name */
@@ -7831,6 +7923,8 @@ export interface components {
              * @enum {string}
              */
             trust: "watched" | "trusted";
+            /** Profile Id */
+            profile_id?: string | null;
         };
         /** DeviceOut */
         DeviceOut: {
@@ -7851,6 +7945,18 @@ export interface components {
              * @enum {string}
              */
             trust: "watched" | "trusted";
+            /**
+             * Profile Id
+             * Format: uuid
+             */
+            profile_id: string;
+            /**
+             * Profile Name
+             * @default
+             */
+            profile_name: string;
+            /** Permissions Version */
+            permissions_version: number;
             /**
              * Created At
              * Format: date-time
@@ -7875,6 +7981,87 @@ export interface components {
              * @default false
              */
             shell: boolean;
+        };
+        /** DevicePermissionsIn */
+        DevicePermissionsIn: {
+            /** Profile Id */
+            profile_id?: string | null;
+            /** Work Folders */
+            work_folders?: components["schemas"]["WorkFolder"][] | null;
+            /** Protected Overrides */
+            protected_overrides?: {
+                [key: string]: "deny" | "ask";
+            } | null;
+            /** Automations Unrestricted */
+            automations_unrestricted?: boolean | null;
+        };
+        /** DevicePermissionsOut */
+        DevicePermissionsOut: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            profile: components["schemas"]["DeviceProfileOut"];
+            /** Work Folders */
+            work_folders: components["schemas"]["WorkFolder"][];
+            /** Protected */
+            protected: components["schemas"]["ProtectedFolderOut"][];
+            /** Automations Unrestricted */
+            automations_unrestricted: boolean;
+            /** Version */
+            version: number;
+            /** Grants */
+            grants?: components["schemas"]["DeviceGrantOut"][];
+        };
+        /** DeviceProfileCopyIn */
+        DeviceProfileCopyIn: {
+            /**
+             * Source Id
+             * Format: uuid
+             */
+            source_id: string;
+            /** Name */
+            name: string;
+        };
+        /** DeviceProfileOut */
+        DeviceProfileOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Preset */
+            preset: ("unrestricted" | "scoped" | "watched" | "legacy") | null;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Categories */
+            categories: {
+                [key: string]: "allow" | "ask" | "deny" | "folders" | "policy";
+            };
+            /** Relevance Check */
+            relevance_check: boolean;
+            /**
+             * Devices
+             * @default 0
+             */
+            devices: number;
+        };
+        /** DeviceProfilePatchIn */
+        DeviceProfilePatchIn: {
+            /** Name */
+            name?: string | null;
+            /** Categories */
+            categories?: {
+                [key: string]: "allow" | "ask" | "deny" | "folders" | "policy";
+            } | null;
+            /** Relevance Check */
+            relevance_check?: boolean | null;
         };
         /** DeviceRenameIn */
         DeviceRenameIn: {
@@ -9808,6 +9995,18 @@ export interface components {
              */
             trust: "watched" | "trusted";
             /**
+             * Profile Id
+             * Format: uuid
+             */
+            profile_id: string;
+            /**
+             * Profile Name
+             * @default
+             */
+            profile_name: string;
+            /** Permissions Version */
+            permissions_version: number;
+            /**
              * Created At
              * Format: date-time
              */
@@ -10963,6 +11162,21 @@ export interface components {
         PropertySettings: {
             /** Folder Defaults */
             folder_defaults?: components["schemas"]["FolderDefaults"][];
+        };
+        /** ProtectedFolderOut */
+        ProtectedFolderOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Paths */
+            paths: string[];
+            /** Default */
+            default: string;
+            /** Level */
+            level: string;
+            /** Adjustable */
+            adjustable: boolean;
         };
         /** ProviderIn */
         ProviderIn: {
@@ -14074,6 +14288,24 @@ export interface components {
                 [key: string]: string | null;
             };
             grid?: components["schemas"]["GridPlace"] | null;
+        };
+        /**
+         * WorkFolder
+         * @description A folder where an agent may do anything without asking (§4.1).
+         */
+        WorkFolder: {
+            /** Path */
+            path: string;
+            /**
+             * Recycle
+             * @default true
+             */
+            recycle: boolean;
+            /**
+             * Added From
+             * @default settings
+             */
+            added_from: string;
         };
         /**
          * WorkspaceSettings
@@ -22647,6 +22879,210 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_profiles_api_devices_profiles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceProfileOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    copy_profile_api_devices_profiles_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceProfileCopyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceProfileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_profile_api_devices_profiles__profile_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_profile_api_devices_profiles__profile_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceProfilePatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceProfileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_permissions_api_devices__device_id__permissions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DevicePermissionsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_permissions_api_devices__device_id__permissions_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DevicePermissionsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DevicePermissionsOut"];
+                };
             };
             /** @description Validation Error */
             422: {

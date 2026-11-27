@@ -15723,6 +15723,367 @@
         }
       }
     },
+    "/api/devices/profiles": {
+      "get": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "List Profiles",
+        "description": "The built-in presets and the custom profiles, with how many devices use each.",
+        "operationId": "list_profiles_api_devices_profiles_get",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceProfileOut"
+                  },
+                  "title": "Response List Profiles Api Devices Profiles Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "Copy Profile",
+        "description": "A custom profile copied from another one. Needs the password confirmed recently.",
+        "operationId": "copy_profile_api_devices_profiles_post",
+        "parameters": [
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceProfileCopyIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceProfileOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/devices/profiles/{profile_id}": {
+      "patch": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "Change Profile",
+        "description": "Rename a custom profile or change its levels; applies at once to every device that\nuses it. Built-in presets can't be changed (409 preset_locked).",
+        "operationId": "change_profile_api_devices_profiles__profile_id__patch",
+        "parameters": [
+          {
+            "name": "profile_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Profile Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceProfilePatchIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceProfileOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "Delete Profile",
+        "description": "Delete a custom profile that no device uses (409 profile_in_use otherwise).",
+        "operationId": "delete_profile_api_devices_profiles__profile_id__delete",
+        "parameters": [
+          {
+            "name": "profile_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Profile Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/devices/{device_id}/permissions": {
+      "get": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "Get Permissions",
+        "description": "The device's profile, work folders, protected folders, grants and automation switch.",
+        "operationId": "get_permissions_api_devices__device_id__permissions_get",
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Device Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DevicePermissionsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "Set Permissions",
+        "description": "Change the device's profile, work folders, protected-folder levels or the automation\nswitch. Applies at once. Needs the password confirmed recently, so neither an agent\nnor a device's own token can loosen it.",
+        "operationId": "set_permissions_api_devices__device_id__permissions_put",
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Device Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DevicePermissionsIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DevicePermissionsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/devices": {
       "get": {
         "tags": [
@@ -29471,6 +29832,50 @@
         "type": "object",
         "title": "DestinationPatch"
       },
+      "DeviceGrantOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "folder": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder"
+          },
+          "command_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Hash"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "folder",
+          "command_hash",
+          "expires_at"
+        ],
+        "title": "DeviceGrantOut"
+      },
       "DeviceIn": {
         "properties": {
           "name": {
@@ -29495,6 +29900,18 @@
             ],
             "title": "Trust",
             "default": "watched"
+          },
+          "profile_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Id"
           }
         },
         "type": "object",
@@ -29530,6 +29947,20 @@
               "trusted"
             ],
             "title": "Trust"
+          },
+          "profile_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Profile Id"
+          },
+          "profile_name": {
+            "type": "string",
+            "title": "Profile Name",
+            "default": ""
+          },
+          "permissions_version": {
+            "type": "integer",
+            "title": "Permissions Version"
           },
           "created_at": {
             "type": "string",
@@ -29581,11 +30012,283 @@
           "name",
           "kind",
           "trust",
+          "profile_id",
+          "permissions_version",
           "created_at",
           "last_seen_at",
           "client_version"
         ],
         "title": "DeviceOut"
+      },
+      "DevicePermissionsIn": {
+        "properties": {
+          "profile_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Id"
+          },
+          "work_folders": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/WorkFolder"
+                },
+                "type": "array",
+                "maxItems": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Folders"
+          },
+          "protected_overrides": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string",
+                  "enum": [
+                    "deny",
+                    "ask"
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protected Overrides"
+          },
+          "automations_unrestricted": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Automations Unrestricted"
+          }
+        },
+        "type": "object",
+        "title": "DevicePermissionsIn"
+      },
+      "DevicePermissionsOut": {
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Device Id"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/DeviceProfileOut"
+          },
+          "work_folders": {
+            "items": {
+              "$ref": "#/components/schemas/WorkFolder"
+            },
+            "type": "array",
+            "title": "Work Folders"
+          },
+          "protected": {
+            "items": {
+              "$ref": "#/components/schemas/ProtectedFolderOut"
+            },
+            "type": "array",
+            "title": "Protected"
+          },
+          "automations_unrestricted": {
+            "type": "boolean",
+            "title": "Automations Unrestricted"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/DeviceGrantOut"
+            },
+            "type": "array",
+            "title": "Grants"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device_id",
+          "profile",
+          "work_folders",
+          "protected",
+          "automations_unrestricted",
+          "version"
+        ],
+        "title": "DevicePermissionsOut"
+      },
+      "DeviceProfileCopyIn": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Source Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_id",
+          "name"
+        ],
+        "title": "DeviceProfileCopyIn"
+      },
+      "DeviceProfileOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "preset": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "unrestricted",
+                  "scoped",
+                  "watched",
+                  "legacy"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
+          "categories": {
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "allow",
+                "ask",
+                "deny",
+                "folders",
+                "policy"
+              ]
+            },
+            "propertyNames": {
+              "enum": [
+                "see",
+                "act",
+                "shell",
+                "files",
+                "code"
+              ]
+            },
+            "type": "object",
+            "title": "Categories"
+          },
+          "relevance_check": {
+            "type": "boolean",
+            "title": "Relevance Check"
+          },
+          "devices": {
+            "type": "integer",
+            "title": "Devices",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "preset",
+          "categories",
+          "relevance_check"
+        ],
+        "title": "DeviceProfileOut"
+      },
+      "DeviceProfilePatchIn": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "categories": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string",
+                  "enum": [
+                    "allow",
+                    "ask",
+                    "deny",
+                    "folders",
+                    "policy"
+                  ]
+                },
+                "propertyNames": {
+                  "enum": [
+                    "see",
+                    "act",
+                    "shell",
+                    "files",
+                    "code"
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categories"
+          },
+          "relevance_check": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relevance Check"
+          }
+        },
+        "type": "object",
+        "title": "DeviceProfilePatchIn"
       },
       "DeviceRenameIn": {
         "properties": {
@@ -34470,6 +35173,20 @@
             ],
             "title": "Trust"
           },
+          "profile_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Profile Id"
+          },
+          "profile_name": {
+            "type": "string",
+            "title": "Profile Name",
+            "default": ""
+          },
+          "permissions_version": {
+            "type": "integer",
+            "title": "Permissions Version"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -34524,6 +35241,8 @@
           "name",
           "kind",
           "trust",
+          "profile_id",
+          "permissions_version",
           "created_at",
           "last_seen_at",
           "client_version",
@@ -37394,6 +38113,47 @@
         "type": "object",
         "title": "PropertySettings",
         "description": "Document properties (Settings > Properties). The definitions themselves are rows\nof their own (features/properties); this holds the folder defaults."
+      },
+      "ProtectedFolderOut": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Paths"
+          },
+          "default": {
+            "type": "string",
+            "title": "Default"
+          },
+          "level": {
+            "type": "string",
+            "title": "Level"
+          },
+          "adjustable": {
+            "type": "boolean",
+            "title": "Adjustable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "paths",
+          "default",
+          "level",
+          "adjustable"
+        ],
+        "title": "ProtectedFolderOut"
       },
       "ProviderIn": {
         "properties": {
@@ -45741,6 +46501,33 @@
         ],
         "title": "WidgetLayout",
         "description": "One widget on the Home page. `w` columns and `h` rows (1-3 each) in the usual\nslots; `grid`: its place on the free grid, None until Home is first arranged there\n(the browser then works it out from the slots, so nothing moves)."
+      },
+      "WorkFolder": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "maxLength": 400,
+            "minLength": 2,
+            "title": "Path"
+          },
+          "recycle": {
+            "type": "boolean",
+            "title": "Recycle",
+            "default": true
+          },
+          "added_from": {
+            "type": "string",
+            "maxLength": 60,
+            "title": "Added From",
+            "default": "settings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "title": "WorkFolder",
+        "description": "A folder where an agent may do anything without asking (\u00a74.1)."
       },
       "WorkspaceSettings": {
         "properties": {

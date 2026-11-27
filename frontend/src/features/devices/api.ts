@@ -68,3 +68,79 @@ export function useDeleteDevice() {
     },
   })
 }
+
+// -- permission profiles (docs/specs/25-device-permission-profiles.md) ----------------------
+
+export type DeviceProfile = components['schemas']['DeviceProfileOut']
+export type DevicePermissions = components['schemas']['DevicePermissionsOut']
+export type WorkFolder = components['schemas']['WorkFolder']
+export type CategoryLevel = DeviceProfile['categories'][string]
+export type PermissionsChange = components['schemas']['DevicePermissionsIn']
+
+export const deviceProfilesKey = ['devices', 'profiles'] as const
+export const devicePermissionsKey = (id: string) => ['devices', id, 'permissions'] as const
+
+/** The built-in presets and the custom profiles, with how many devices use each. */
+export function useDeviceProfiles() {
+  return useQuery({
+    queryKey: deviceProfilesKey,
+    queryFn: async () => unwrap(await api.GET('/api/devices/profiles')),
+  })
+}
+
+/** One device's profile, work folders, protected folders, grants and automation switch. */
+export function useDevicePermissions(id: string, enabled = true) {
+  return useQuery({
+    queryKey: devicePermissionsKey(id),
+    queryFn: async () => unwrap(await api.GET('/api/devices/{device_id}/permissions', { params: { path: { device_id: id } } })),
+    enabled,
+  })
+}
+
+/** Changes what a device allows: security-sensitive, so the password is asked again. */
+export function useSetPermissions() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, change }: { id: string; change: PermissionsChange }) =>
+      withReauth(async () =>
+        unwrap(await api.PUT('/api/devices/{device_id}/permissions', { params: { path: { device_id: id } }, body: change })),
+      ),
+    onSuccess: (data, { id }) => {
+      qc.setQueryData(devicePermissionsKey(id), data)
+      void qc.invalidateQueries({ queryKey: devicesKey })
+      void qc.invalidateQueries({ queryKey: deviceProfilesKey })
+    },
+  })
+}
+
+export function useCopyProfile() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { source_id: string; name: string }) =>
+      withReauth(async () => unwrap(await api.POST('/api/devices/profiles', { body }))),
+    onSuccess: () => qc.invalidateQueries({ queryKey: deviceProfilesKey }),
+  })
+}
+
+export function useChangeProfile() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: string; name?: string; categories?: Record<string, CategoryLevel>; relevance_check?: boolean }) =>
+      withReauth(async () =>
+        unwrap(await api.PATCH('/api/devices/profiles/{profile_id}', { params: { path: { profile_id: id } }, body })),
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: deviceProfilesKey })
+      void qc.invalidateQueries({ queryKey: devicesKey })
+    },
+  })
+}
+
+export function useDeleteProfile() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) =>
+      withReauth(async () => unwrap(await api.DELETE('/api/devices/profiles/{profile_id}', { params: { path: { profile_id: id } } }))),
+    onSuccess: () => qc.invalidateQueries({ queryKey: deviceProfilesKey }),
+  })
+}

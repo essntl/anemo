@@ -11,7 +11,7 @@ from app.core.db import get_sessionmaker
 from app.features.audit.models import AuditLog
 from app.features.auth import tokens
 from app.features.auth.models import ApiToken, AuthSession
-from app.features.devices import service, shared_screen
+from app.features.devices import profiles, service, shared_screen
 from app.features.devices.models import Device
 from tests.conftest import requires_db
 
@@ -257,7 +257,8 @@ async def test_by_name_takes_the_older_of_two_case_variants(authed):
     first = await add(authed, "VM")
     async with get_sessionmaker()() as db:
         token, _ = await tokens.create(db, "Device: vm")
-        db.add(Device(name="vm", kind="computer", token_id=token.id))
+        watched = (await profiles.presets(db))["watched"]
+        db.add(Device(name="vm", kind="computer", token_id=token.id, profile_id=watched.id))
         await db.commit()
         found = await service.by_name(db, "Vm")
         assert found is not None and str(found.id) == first["id"]

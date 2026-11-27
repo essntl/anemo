@@ -79,6 +79,11 @@ class Action(BaseModel):
     # own actions have none, so the summary stays one line however many items there are.
     item: str | None = None
     ref: str | None = None
+    # The device's permission profile as one more layer (docs/specs/25-device-permission-
+    # profiles.md §3), set by the computer tools: None when the profile leaves it to the
+    # policy (Trusted (legacy)). An `ask` from it is never skipped by a run grant.
+    device_decision: Decision | None = None
+    device_reason: str | None = None
 
 
 class Grant(BaseModel):

@@ -10,8 +10,12 @@ opening programs, the clipboard: "moderate") and `computer.shell` (the device's 
 PowerShell, rated by policy/shell_risk.py plus the PowerShell rules below, or zsh/bash on a
 Mac, rated by policy/shell_risk.py plus the macOS rules below). Whatever the levels say:
 
-- on a **watched** device every `computer_act` asks, every time (`always_ask`);
-- `computer_shell` is blocked on a watched device and when the shell is off in the client;
+- the device's permission profile (features/devices/permissions.py, spec 25) is one more
+  layer: a category at "ask" asks every time (an "allow for this run" doesn't skip it),
+  "deny" blocks, "policy" (Trusted (legacy)) leaves it to the Agent Permissions;
+- `computer_act` on a device whose profile asks (Watched) asks every time (`always_ask`);
+- `computer_shell` is blocked when the profile denies it and when the shell is off in the
+  client;
 - acting and the shell are blocked while "Allow control" is off in the client.
 
 The tool descriptions are the same for every device (the tool list is part of the prompt
@@ -39,9 +43,10 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.core.db import get_sessionmaker
 from app.features.attachments import images
+from app.features.devices import permissions as perms
 from app.features.devices import relay, shared_screen
 from app.features.devices import service as devices
-from app.policy.models import Action, Risk
+from app.policy.models import Action, Decision, Risk
 from app.policy.shell_risk import classify, max_risk
 from app.tools import clixml
 from app.tools.base import Tool, ToolContext, ToolResult
@@ -90,7 +95,44 @@ def _info(device: relay.DeviceInfo) -> dict[str, Any]:
         "platform": device.platform,
         "shell_kind": device.shell_kind,
         "files": device.files,
+        "profile_name": device.profile_name,
+        "preset": device.preset,
+        "categories": perms.categories_for(device.categories, device.trust),
     }
+
+
+def is_watched(level: dict[str, perms.Level]) -> bool:
+    """The levels of the Watched preset (messages then say "a watched computer")."""
+    return level == perms.PRESETS["watched"].categories
+
+
+def levels(device: dict[str, Any] | None) -> dict[str, perms.Level]:
+    """The category levels of a device the last refresh saw. One it didn't see counts as
+    Watched (asked about), and run() checks it live."""
+    if device is None:
+        return dict(perms.PRESETS["watched"].categories)
+    found = device.get("categories")
+    return dict(found) if found else perms.categories_for(None, device.get("trust"))
+
+
+def device_layer(
+    device: dict[str, Any] | None, category: perms.Category, what: str
+) -> tuple[Decision | None, str | None, str | None]:
+    """(device_decision, its reason, blocked) of an action in `category` on this device.
+    "folders" is decided by the work folders, which needs the Desktop analyser; until the
+    device has one, it is left to the policy as Trusted (legacy) does (spec 25 §6.1)."""
+    level = levels(device)[category]
+    name = device["name"] if device else "this computer"
+    profile = (device or {}).get("profile_name") or "Watched"
+    if level == "deny":
+        if is_watched(levels(device)):
+            return None, None, f"{what} is not offered on the watched computer “{name}”"
+        return None, None, f"{what} is not allowed on “{name}” (profile {profile})"
+    if level == "ask":
+        return "ask", f"profile {profile} of “{name}” asks first", None
+    if level == "allow":
+        return "allow", f"profile {profile} of “{name}”", None
+    return None, None, None
 
 
 async def online_devices() -> list[relay.DeviceInfo]:
@@ -123,25 +165,39 @@ def shell_name(shell_kind: object) -> str:
     return _SHELL_NAMES.get(str(shell_kind), "PowerShell")
 
 
+def _profile_label(device: relay.DeviceInfo) -> str:
+    """ "profile Scoped (writes only in work folders)": short, it is in every request. The
+    profiles the migration gives (Watched, Trusted (legacy)) read as before: "watched",
+    "trusted"."""
+    if device.preset in ("watched", "legacy") or not device.profile_name:
+        return device.trust
+    hint = perms.preset_hint(device.preset)
+    return f"profile {device.profile_name}" + (f" ({hint})" if hint else "")
+
+
 def line(device: relay.DeviceInfo) -> str:
     if device.kind != "computer":
         return f"- {device.name}: phone (not controllable)"
     shell = shell_name(device.shell_kind)
+    level = perms.categories_for(device.categories, device.trust)
+    asks = ", every action is asked" if level["act"] == "ask" else ""
     if not device.control:
         control = "control is off (looking only)"
-    elif device.trust == "watched":
-        control = f"control allowed, every action is asked; no {shell}"
+    elif level["shell"] == "deny":
+        control = f"control allowed{asks}; no {shell}"
     elif device.shell:
-        control = f"control allowed, {shell} on"
+        control = f"control allowed{asks}, {shell} on"
     else:
-        control = f"control allowed, {shell} off"
-    # Files (device_file_get / device_file_put) work only on a trusted computer that offers them.
-    files = ", files on" if device.trust == "trusted" and device.files else ""
+        control = f"control allowed{asks}, {shell} off"
+    # Files (device_file_get / device_file_put): when the profile allows them and the
+    # computer offers them.
+    files = ", files on" if level["files"] != "deny" and device.files else ""
+    profile = _profile_label(device)
     if device.platform == "windows" and is_powershell(device.shell_kind):
         # A Windows computer reads as it always did: its shell is PowerShell.
-        return f"- {device.name}: computer, {device.trust}, {control}{files}"
+        return f"- {device.name}: computer, {profile}, {control}{files}"
     system = _OS_NAMES.get(device.platform, device.platform)
-    return f"- {device.name}: computer ({system}, shell: {shell}), {device.trust}, {control}{files}"
+    return f"- {device.name}: computer ({system}, shell: {shell}), {profile}, {control}{files}"
 
 
 def turn_context_section(lines: list[str]) -> str:
@@ -388,6 +444,7 @@ async def _check(ctx: ToolContext, name: str, need: Need) -> tuple[Any, str] | T
     error for the model. Updates what `actions()` decides from."""
     async with get_sessionmaker()() as db:
         device = await devices.by_name(db, name)
+        live = await devices.levels_of(db, device) if device is not None else None
     online = [d["name"] for d in (ctx.state.get(_DEVICES) or {}).values()]
     if device is None or device.kind != "computer":
         listing = ", ".join(online) or "none"
@@ -406,7 +463,16 @@ async def _check(ctx: ToolContext, name: str, need: Need) -> tuple[Any, str] | T
         )
     # The list actions() decides from is not updated here: within a step it stays what
     # the decisions were made from. The next step reads it again.
+    assert live is not None
     if need == "see":
+        if live["see"] == "deny":
+            return ToolResult(
+                content=f"Looking is not allowed on “{device.name}” (its permission profile).",
+                is_error=True,
+            )
+        decided = levels(before)["see"] if before is not None else "policy"
+        if perms.stricter(live["see"], decided):
+            return _stricter_now(device.name)
         return device, device.name
     if not offer.control:
         return ToolResult(
@@ -416,10 +482,11 @@ async def _check(ctx: ToolContext, name: str, need: Need) -> tuple[Any, str] | T
         )
     if need == "shell":
         shell = shell_name(offer.shell_kind)
-        if device.trust != "trusted":
+        if live["shell"] == "deny":
+            why = "it is a watched computer" if is_watched(live) else "its profile doesn't allow it"
             return ToolResult(
-                content=f"{shell} is not offered on “{device.name}”: it is a watched "
-                "computer. Use computer_act, or ask the user.",
+                content=f"{shell} is not offered on “{device.name}”: {why}. Use computer_act, "
+                "or ask the user.",
                 is_error=True,
             )
         if not offer.shell:
@@ -443,15 +510,32 @@ async def _check(ctx: ToolContext, name: str, need: Need) -> tuple[Any, str] | T
             "tool again.",
             is_error=True,
         )
-    # A device the decision didn't know counted as watched (asked about). One decided as
-    # trusted that isn't trusted now got no question: ask now.
-    if device.trust != "trusted" and before is not None and before.get("trust") == "trusted":
+    # A device the decision didn't know counted as watched (asked about). One whose profile
+    # became stricter since the decision got no question it now needs: ask now.
+    # (An unknown device's act was asked about; its shell went by the policy alone.)
+    decided = levels(before)[need] if before is not None else ("ask" if need == "act" else "policy")
+    if perms.stricter(live[need], decided):
+        return _stricter_now(device.name, watched=is_watched(live))
+    if live["act"] == "deny" and need == "act":
         return ToolResult(
-            content=f"“{device.name}” is a watched computer now, so the user is asked about "
-            "every action there. Call the tool again to ask them.",
+            content=f"Acting is not allowed on “{device.name}” (its permission profile).",
             is_error=True,
         )
     return device, device.name
+
+
+def _stricter_now(name: str, *, watched: bool = False) -> ToolResult:
+    if watched:
+        return ToolResult(
+            content=f"“{name}” is a watched computer now, so the user is asked about every "
+            "action there. Call the tool again to ask them.",
+            is_error=True,
+        )
+    return ToolResult(
+        content=f"The permission profile of “{name}” is stricter now, so the user may need to "
+        "be asked. Call the tool again.",
+        is_error=True,
+    )
 
 
 async def _send(
@@ -529,12 +613,19 @@ class ComputerLook(Tool):
 
     def actions(self, args: LookInput, ctx: ToolContext) -> list[Action]:
         what = {"screen": "the screen", "window": "a window", "windows": "the open windows"}
+        device = _known(ctx, args.device)
+        decision, reason, blocked = device_layer(device, "see", "Looking")
+        if device is None:
+            decision, reason, blocked = None, None, None  # as before: run() checks it live
         return [
             Action(
                 capability=SEE,
                 resource=_resource(ctx, args.device),
                 risk="safe",
                 summary=f"Look at {what[args.what]} on {args.device}",
+                device_decision=decision,
+                device_reason=reason,
+                blocked=blocked,
             )
         ]
 
@@ -758,8 +849,12 @@ class ComputerAct(Tool):
     def actions(self, args: ActInput, ctx: ToolContext) -> list[Action]:
         device = _known(ctx, args.device)
         blocked = _blocked_for_acting(ctx, args.device)
-        # A device this step's list doesn't know counts as watched.
-        watched = device is None or device.get("trust") != "trusted"
+        # A device this step's list doesn't know counts as watched (its profile asks).
+        level = levels(device)["act"]
+        watched = level == "ask"
+        if blocked is None and level == "deny":
+            blocked = device_layer(device, "act", "Acting")[2]
+        decision = "allow" if level == "allow" else None
         reaches_people = args.action in _REACHES_PEOPLE or (
             args.action == "open" and _is_url(args.target)
         )
@@ -772,6 +867,7 @@ class ComputerAct(Tool):
                 blocked=blocked,
                 always_ask=WATCHED_ASKS if watched else None,
                 contacts_people=reaches_people,
+                device_decision=decision,
             )
         ]
 
@@ -999,9 +1095,11 @@ class ComputerShell(Tool):
         rating = rate_command(args.command, kind)
         why = f" ({'; '.join(rating.reasons)})" if rating.reasons else ""
         blocked = _blocked_for_acting(ctx, args.device)
+        decision, reason = None, None
         if blocked is None and device is not None:
-            if device["trust"] != "trusted":
-                blocked = f"{shell} is not offered on the watched computer “{device['name']}”"
+            decision, reason, denied = device_layer(device, "shell", shell)
+            if denied:
+                blocked = denied
             elif not device["shell"]:
                 blocked = f"{shell} is switched off in Anemo Desktop on “{device['name']}”"
         return [
@@ -1012,6 +1110,8 @@ class ComputerShell(Tool):
                 summary=f"Run {shell} `{_short(args.command, 80)}` on {args.device}{why}",
                 blocked=blocked,
                 contacts_people=rating.network,
+                device_decision=decision,
+                device_reason=reason,
             )
         ]
 

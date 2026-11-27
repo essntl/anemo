@@ -40,7 +40,8 @@ async function addInUi(page: Page, name: string, kind: 'Computer' | 'Phone') {
  */
 async function askForThePasswordOnce(page: Page) {
   let asked = false
-  await page.route('**/api/devices/*/trust', async (route) => {
+  await page.route('**/api/devices/*/permissions', async (route) => {
+    if (route.request().method() !== 'PUT') return route.fallback()
     if (asked) return route.fallback()
     asked = true
     await route.fulfill({
@@ -51,7 +52,7 @@ async function askForThePasswordOnce(page: Page) {
   })
 }
 
-test('a computer is added with its token shown once, renamed, made trusted with the password, and deleted', async ({
+test('a computer is added with its token shown once, renamed, given a profile with the password, and deleted', async ({
   page,
   playwright,
 }) => {
@@ -64,18 +65,15 @@ test('a computer is added with its token shown once, renamed, made trusted with 
     playwright.request.newContext({ extraHTTPHeaders: { Authorization: `Bearer ${token}` } })
   try {
     await page.goto('/settings/devices')
-    // A computer is watched unless chosen otherwise.
-    await expect(page.getByRole('radiogroup', { name: 'Trust' }).getByRole('radio', { name: 'Watched' })).toHaveAttribute(
-      'aria-checked',
-      'true',
-    )
+    // A computer is Watched unless another profile is chosen.
+    await expect(page.getByRole('combobox', { name: 'Permission profile' })).toHaveText('Watched')
     const token = await addInUi(page, name, 'Computer')
     const added = page.getByRole('status').filter({ hasText: 'it is shown only this once' })
     await expect(added).toContainText('Paste it into Anemo Desktop on that computer')
     const row = page.getByTestId('device-row').filter({ hasText: name })
     await expect(row).toContainText('Offline')
     await expect(row).toContainText('never connected')
-    await expect(row.getByRole('combobox', { name: `Trust of “${name}”` })).toHaveText('Watched')
+    await expect(row.getByRole('combobox', { name: `Profile of “${name}”` })).toHaveText('Watched')
 
     // The token is a login for the REST API.
     device = await asDevice(token)
@@ -95,24 +93,34 @@ test('a computer is added with its token shown once, renamed, made trusted with 
     const renamedRow = page.getByTestId('device-row').filter({ hasText: renamed })
     await expect(renamedRow).toBeVisible()
 
-    // The trust level needs the password again.
+    // The profile needs the password again.
     await askForThePasswordOnce(page)
-    await renamedRow.getByRole('combobox', { name: `Trust of “${renamed}”` }).click()
-    await page.getByRole('option', { name: 'Trusted' }).click()
+    await renamedRow.getByRole('combobox', { name: `Profile of “${renamed}”` }).click()
+    await page.getByRole('option', { name: 'Trusted (legacy)' }).click()
     const dialog = page.getByRole('dialog', { name: "Confirm it's you" })
     await expect(dialog).toBeVisible()
     await dialog.getByLabel('Password').fill(PASSWORD)
     await dialog.getByRole('button', { name: 'Confirm' }).click()
     await expect(dialog).toHaveCount(0)
-    await expect(renamedRow.getByRole('combobox', { name: `Trust of “${renamed}”` })).toHaveText('Trusted')
-    await page.unroute('**/api/devices/*/trust')
+    await expect(renamedRow.getByRole('combobox', { name: `Profile of “${renamed}”` })).toHaveText('Trusted (legacy)')
+    await page.unroute('**/api/devices/*/permissions')
     await page.reload()
-    await expect(page.getByRole('combobox', { name: `Trust of “${renamed}”` })).toHaveText('Trusted')
+    await expect(page.getByRole('combobox', { name: `Profile of “${renamed}”` })).toHaveText('Trusted (legacy)')
     expect((await listDevices(page.request)).find((d) => d.name === renamed)?.trust).toBe('trusted')
 
-    // The device's own token can't change its trust level.
+    // Its permissions: Scoped brings the default work folders.
+    const renamedNow = page.getByTestId('device-row').filter({ hasText: renamed })
+    await renamedNow.getByRole('combobox', { name: `Profile of “${renamed}”` }).click()
+    await page.getByRole('option', { name: 'Scoped' }).click()
+    await renamedNow.getByRole('button', { name: 'Permissions' }).click()
+    const panel = page.getByTestId('device-permissions')
+    await expect(panel.getByTestId('work-folder').first()).toContainText('C:\\dev')
+    await expect(panel).toContainText('Always refused')
+
+    // The device's own token can't change its permissions.
     const id = (await listDevices(page.request)).find((d) => d.name === renamed)!.id
     expect((await device.put(`/api/devices/${id}/trust`, { data: { trust: 'watched' } })).status()).toBe(403)
+    expect((await device.put(`/api/devices/${id}/permissions`, { data: { automations_unrestricted: true } })).status()).toBe(403)
 
     // Delete: gone from the list, and its token stops working.
     await page.getByTestId('device-row').filter({ hasText: renamed }).getByRole('button', { name: 'Delete' }).click()
@@ -125,13 +133,13 @@ test('a computer is added with its token shown once, renamed, made trusted with 
   }
 })
 
-test('a phone has no trust level to choose', async ({ page }) => {
+test('a phone has no permission profile to choose', async ({ page }) => {
   await login(page)
   const name = `E2E Phone ${suffix()}`
   try {
     await page.goto('/settings/devices')
     await page.getByRole('radiogroup', { name: 'Kind' }).getByRole('radio', { name: 'Phone' }).click()
-    await expect(page.getByRole('radiogroup', { name: 'Trust' })).toHaveCount(0)
+    await expect(page.getByRole('combobox', { name: 'Permission profile' })).toHaveCount(0)
     await addInUi(page, name, 'Phone')
     await expect(page.getByRole('status').filter({ hasText: 'it is shown only this once' })).toContainText(
       'Paste it into Anemo Voice on that phone',
@@ -156,8 +164,8 @@ test('a wrong password in the password dialog is said there', async ({ page }) =
     await addInUi(page, name, 'Computer')
     await page.getByRole('button', { name: 'Done' }).click()
     await askForThePasswordOnce(page)
-    await page.getByRole('combobox', { name: `Trust of “${name}”` }).click()
-    await page.getByRole('option', { name: 'Trusted' }).click()
+    await page.getByRole('combobox', { name: `Profile of “${name}”` }).click()
+    await page.getByRole('option', { name: 'Trusted (legacy)' }).click()
     const dialog = page.getByRole('dialog', { name: "Confirm it's you" })
     await expect(dialog).toBeVisible()
     await dialog.getByLabel('Password').fill('not the password')
