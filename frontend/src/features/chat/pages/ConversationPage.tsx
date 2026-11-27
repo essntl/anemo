@@ -61,6 +61,7 @@ import { ReasoningControl } from '../components/ReasoningControl'
 import { type RunEvent, type RunStore, type RunView, shallowEqual, useRunSelector, useRunStore } from '../runStream'
 import { withWaiting } from '../timing'
 import { useStickToBottom } from '../useStickToBottom'
+import { VIRTUAL_FROM, VirtualMessages } from '../components/VirtualMessages'
 
 /** From this width up there is room for the browser next to the chat. */
 const WIDE = '(min-width: 1024px)'
@@ -317,6 +318,88 @@ function Conversation() {
     </>
   )
 
+  /** One message of the history (windowed in a long chat, VirtualMessages). */
+  const renderMessage = (m: (typeof list)[number]) => {
+    if (m.role === 'compaction') {
+      return <div key={m.id} className={enter(m.id)}><CompactionDivider message={m} /></div>
+    }
+    if (m.role === 'user' && m.event) {
+      return <div key={m.id} className={enter(m.id)}><EventCard event={m.event} /></div>
+    }
+    if (m.role === 'user') {
+      return (
+        <div key={m.id} className={enter(m.id)}>
+          <UserBubble text={m.text} attachments={m.attachments} references={m.references} skill={m.skill}
+            page={m.page ? { summary: m.page, conversationId, messageId: m.id } : null}
+            onEdit={canEditLast && m.id === lastUser?.id
+              ? (text) => editLast.mutate({ conversationId, text, modelId: modelOverride })
+              : undefined} />
+        </div>
+      )
+    }
+    const isLive = m.run_id === activeRunId && m.status === 'streaming'
+    const liveTiming = isLive && m.timing ? withWaiting(m.timing, live.waiting) : null
+    return (
+      <div key={m.id} className={enter(m.id)}>
+        {isLive ? (
+          <LiveAnswer
+            stream={stream}
+            onGrow={follow}
+            status={live.status === 'queued' || live.status === 'running' ? 'streaming' : live.status}
+            error={live.error}
+            modelLabel={live.modelLabel}
+            notice={live.notice}
+            activity={m.mode === 'agent' && m.run_id ? (
+              <RunActivity runId={m.run_id} live docked
+                timer={liveTiming && <LiveTiming timing={liveTiming} paused={live.status === 'paused'} />} />
+            ) : undefined}
+            questions={live.questions}
+            timing={liveTiming}
+          />
+        ) : (() => {
+          const versions = m.versions ?? []
+          const isLast = m.id === lastAssistant?.id && answerIsLast
+          const index = Math.min(viewing[m.id] ?? m.version, Math.max(versions.length - 1, 0))
+          // Another answer than the one the chat goes on from (only looked at).
+          const other = versions.length > 1 && index !== m.version ? versions[index] : null
+          const shown = other ?? m
+          const select = (version: number) => {
+            if (!isLast || activeRunId) return view(m.id, version === m.version ? null : version)
+            view(m.id, version) // shown at once, then kept by the server
+            selectVersion.mutate({ conversationId, messageId: m.id, version },
+              { onSettled: () => view(m.id, null) })
+          }
+          return (
+            <AssistantMessage
+              key={index}
+              text={shown.text}
+              reasoning={shown.reasoning}
+              status={shown.status}
+              error={shown.error}
+              modelLabel={shown.model_label}
+              questions={shown.questions}
+              files={shown.attachments}
+              timing={shown.timing}
+              activity={shown.mode === 'agent' && shown.run_id ? <RunActivity runId={shown.run_id} live={false} /> : undefined}
+              versions={versions.length > 1 ? { index, count: versions.length, onSelect: select } : undefined}
+              onRegenerate={
+                isLast && !activeRunId && !other
+                  ? () => regenerate.mutate({ conversationId, modelId: modelOverride })
+                  : undefined
+              }
+              onBranch={other ? undefined : () =>
+                branch.mutate({ conversationId, uptoSeq: m.seq }, { onSuccess: (copy) => void navigate(`/c/${copy.id}`) })
+              }
+              onFixDiagram={activeRunId || question ? undefined : (problem) =>
+                send.mutate({ conversationId, text: fixRequest(problem), modelId: modelOverride, mode, profileId })
+              }
+            />
+          )
+        })()}
+      </div>
+    )
+  }
+
   return (
     // From `md` up the chat (and what opens beside it) is one panel on the ground, like the sidebar.
     // chat-panel, glass: the background of Settings > Appearance shows through (styles/appearance.css).
@@ -355,86 +438,11 @@ function Conversation() {
               <GitBranch className="h-3.5 w-3.5" /> {t('Branched from another chat')}
             </Link>
           )}
-          {list.map((m) => {
-            if (m.role === 'compaction') {
-              return <div key={m.id} className={enter(m.id)}><CompactionDivider message={m} /></div>
-            }
-            if (m.role === 'user' && m.event) {
-              return <div key={m.id} className={enter(m.id)}><EventCard event={m.event} /></div>
-            }
-            if (m.role === 'user') {
-              return (
-                <div key={m.id} className={enter(m.id)}>
-                  <UserBubble text={m.text} attachments={m.attachments} references={m.references} skill={m.skill}
-                    page={m.page ? { summary: m.page, conversationId, messageId: m.id } : null}
-                    onEdit={canEditLast && m.id === lastUser?.id
-                      ? (text) => editLast.mutate({ conversationId, text, modelId: modelOverride })
-                      : undefined} />
-                </div>
-              )
-            }
-            const isLive = m.run_id === activeRunId && m.status === 'streaming'
-            const liveTiming = isLive && m.timing ? withWaiting(m.timing, live.waiting) : null
-            return (
-              <div key={m.id} className={enter(m.id)}>
-                {isLive ? (
-                  <LiveAnswer
-                    stream={stream}
-                    onGrow={follow}
-                    status={live.status === 'queued' || live.status === 'running' ? 'streaming' : live.status}
-                    error={live.error}
-                    modelLabel={live.modelLabel}
-                    notice={live.notice}
-                    activity={m.mode === 'agent' && m.run_id ? (
-                      <RunActivity runId={m.run_id} live docked
-                        timer={liveTiming && <LiveTiming timing={liveTiming} paused={live.status === 'paused'} />} />
-                    ) : undefined}
-                    questions={live.questions}
-                    timing={liveTiming}
-                  />
-                ) : (() => {
-                  const versions = m.versions ?? []
-                  const isLast = m.id === lastAssistant?.id && answerIsLast
-                  const index = Math.min(viewing[m.id] ?? m.version, Math.max(versions.length - 1, 0))
-                  // Another answer than the one the chat goes on from (only looked at).
-                  const other = versions.length > 1 && index !== m.version ? versions[index] : null
-                  const shown = other ?? m
-                  const select = (version: number) => {
-                    if (!isLast || activeRunId) return view(m.id, version === m.version ? null : version)
-                    view(m.id, version) // shown at once, then kept by the server
-                    selectVersion.mutate({ conversationId, messageId: m.id, version },
-                      { onSettled: () => view(m.id, null) })
-                  }
-                  return (
-                    <AssistantMessage
-                      key={index}
-                      text={shown.text}
-                      reasoning={shown.reasoning}
-                      status={shown.status}
-                      error={shown.error}
-                      modelLabel={shown.model_label}
-                      questions={shown.questions}
-                      files={shown.attachments}
-                      timing={shown.timing}
-                      activity={shown.mode === 'agent' && shown.run_id ? <RunActivity runId={shown.run_id} live={false} /> : undefined}
-                      versions={versions.length > 1 ? { index, count: versions.length, onSelect: select } : undefined}
-                      onRegenerate={
-                        isLast && !activeRunId && !other
-                          ? () => regenerate.mutate({ conversationId, modelId: modelOverride })
-                          : undefined
-                      }
-                      onBranch={other ? undefined : () =>
-                        branch.mutate({ conversationId, uptoSeq: m.seq }, { onSuccess: (copy) => void navigate(`/c/${copy.id}`) })
-                      }
-                      onFixDiagram={activeRunId || question ? undefined : (problem) =>
-                        send.mutate({ conversationId, text: fixRequest(problem), modelId: modelOverride, mode, profileId })
-                      }
-                    />
-                  )
-                })()}
-              </div>
-            )
-          })}
+          {list.length >= VIRTUAL_FROM ? (
+            <VirtualMessages items={list} scroller={scrollRef} render={renderMessage} onResize={follow} />
+          ) : (
+            list.map(renderMessage)
+          )}
         </div>
       </div>
 
