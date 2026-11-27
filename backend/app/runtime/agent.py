@@ -87,7 +87,7 @@ from app.runtime.streaming import (
     stream_with_fallback,
 )
 from app.tools import mcp_tool, registry
-from app.tools.base import Tool, ToolContext, ToolResult
+from app.tools.base import COMPACTED_AT, Tool, ToolContext, ToolResult
 from app.tools.builtin import computer
 from app.tools.builtin.ask import AskUserInput, clean_options
 from app.tools.builtin.plan import PlanInput
@@ -654,6 +654,8 @@ class AgentRun:
             return transcript  # nothing to summarize: trimming in the request builder applies
         run.transcript = [m.model_dump() for m in result.transcript]
         run.totals = {**run.totals, "compactions": run.totals.get("compactions", 0) + 1}
+        # Tool results from before now are summarized away (code_status reads this).
+        run.options = {**run.options, COMPACTED_AT: datetime.now(UTC).isoformat()}
         self._add_usage(db, run, result.model, result.usage, "summarize")
         await runs.emit(
             db,

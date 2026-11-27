@@ -24,6 +24,10 @@ from app.tools.schema import compact
 from app.web.settings import WebSettings
 from app.workspace.access import WorkspaceSettings
 
+# Run.options key: when the agent's context was last compacted (ISO time). Tool results
+# from before it are summarized away: tools that say "already shown" read it.
+COMPACTED_AT = "context_compacted_at"
+
 EmitFn = Callable[[str, dict[str, Any]], Awaitable[None]]
 RecordChangeFn = Callable[..., Awaitable[None]]
 AddImageFn = Callable[[str, PreparedImage], Awaitable[str]]
