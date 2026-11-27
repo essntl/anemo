@@ -202,7 +202,7 @@ async def test_on_a_watched_computer_the_agent_looks_unasked_and_every_action_as
     await wait_status(live.api, run_id, "waiting_approval")
     # The look went to the client and ran without asking (default levels).
     assert desk.actions == ["look"]
-    assert desk.commands[0]["what"] == "screen"
+    assert desk.commands[0]["what"] == "window"  # the window in front, unless asked for more
     assert "- Desk PC: computer, watched, control allowed" in turn_context_sent()
     calls = (await timeline(live.api, run_id))["tool_calls"]
     assert calls[0]["status"] == "succeeded" and calls[0]["approval"] is None

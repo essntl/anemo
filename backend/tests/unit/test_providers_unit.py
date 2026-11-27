@@ -56,6 +56,21 @@ def test_route_candidates_order_and_dedupe():
     assert candidate_ids(RouteRequest(task="dictation"), d) == [a]
 
 
+def test_small_background_tasks_take_the_background_model_before_the_chat_model():
+    chat, small, title = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    d = ModelDefaults(chat=chat, background=small)
+    for task in ("memory", "summarization", "title"):
+        assert candidate_ids(RouteRequest(task=task), d) == [small, chat]  # type: ignore[arg-type]
+    # A model set for the task itself still comes first; other tasks are unchanged.
+    assert candidate_ids(RouteRequest(task="title"), d.model_copy(update={"title": title})) == [
+        title,
+        small,
+        chat,
+    ]
+    assert candidate_ids(RouteRequest(task="agent"), d) == [chat]
+    assert candidate_ids(RouteRequest(task="inline"), d) == [chat]
+
+
 def _tool_conversation() -> list[Message]:
     return [
         Message.user("list files"),

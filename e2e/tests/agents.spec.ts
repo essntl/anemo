@@ -30,7 +30,8 @@ test('create an agent profile and pick it in the chat', async ({ page }) => {
     await dialog.getByRole('button', { name: 'Create profile' }).click()
     await expect(dialog).toHaveCount(0)
     await expect(page.getByText(name)).toBeVisible()
-    await expect(page.getByText('1 permission changed')).toBeVisible()
+    // (on this profile's card: other tests make profiles of their own at the same time)
+    await expect(page.getByRole('button', { name: new RegExp(`^${name}`) }).getByText('1 permission changed')).toBeVisible()
 
     // The chat offers it in Agent mode, and the permission chip reflects it.
     await page.goto('/')

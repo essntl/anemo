@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { login, signOutAfterEach, useStoppedTimer } from './helpers'
+import { ignoreAppEvents, login, signOutAfterEach, useStoppedTimer } from './helpers'
 
 /*
  * The focus timer: linked to a task, started, fast-forwarded to its end (Playwright's
@@ -79,6 +79,7 @@ test('the timer keeps going across pages and a reload', async ({ page }) => {
 })
 
 test('start and pause focus from the search box, edit Home from it', async ({ page }) => {
+  await ignoreAppEvents(page)
   await login(page)
   await useStoppedTimer(page)
   await page.goto('/stats')

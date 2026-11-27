@@ -22,6 +22,10 @@ export interface PendingAttachment {
 /** A new chat started from elsewhere with attachments already made (e.g. a sketch's image); see NewChatPage. */
 export interface NewChatState {
   attachments?: UploadedAttachment[]
+  /** `/new` in a chat: the same model, mode and agent profile as there. */
+  modelId?: string | null
+  mode?: 'chat' | 'agent'
+  profileId?: string | null
 }
 
 /** The address of an attachment's file, as the app serves it. */

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { answerPrompt, confirmWith, fakeModels, login, newChat, pickModel, send, signOutAfterEach } from './helpers'
+import { answerPrompt, confirmWith, fakeModels, login, newAgentChatWithLevels, newChat, pickModel, send, signOutAfterEach } from './helpers'
 
 signOutAfterEach()
 
@@ -152,16 +152,10 @@ test('the agent asks a question; tap a suggested answer, or type one in the mess
 test('agent asks for approval, then finishes after approval', async ({ page }) => {
   await login(page)
   const models = await fakeModels(page.request)
-  // Make file listing require approval for this test; restore the user's settings after.
-  const previous = ((await (await page.request.get('/api/settings')).json()) as {
-    permissions: { levels?: Record<string, string> }
-  }).permissions
-  const changed = await page.request.put('/api/settings/permissions', {
-    data: { ...previous, levels: { ...previous.levels, 'fs.read': 'ask' } },
-  })
-  expect(changed.ok()).toBeTruthy()
+  // File listing asks first in this chat (its own agent profile; the settings stay).
+  let profile = ''
   try {
-    await newChat(page, 'Agent', models.agent)
+    profile = await newAgentChatWithLevels(page, models.agent, { 'fs.read': 'ask' })
     await send(page, 'what is in my workspace?')
     await expect(page.getByText('Waiting for your approval')).toBeVisible()
     await expect(page.getByText(/The agent wants to: List/)).toBeVisible()
@@ -169,7 +163,8 @@ test('agent asks for approval, then finishes after approval', async ({ page }) =
     await expect(page.getByText('Here is what I found:')).toBeVisible({ timeout: 15_000 })
     await expect(page.getByRole('button', { name: /\d+ actions?$/ })).toBeVisible()
   } finally {
-    await page.request.put('/api/settings/permissions', { data: previous })
+    if (profile) await page.request.delete(`/api/profiles/${profile}`)
+    if (page.url().includes('/c/')) await page.request.delete(page.url().replace(/.*\/c\//, '/api/conversations/'))
   }
 })
 
@@ -203,7 +198,10 @@ test('file manager: create, edit, save, trash and restore', async ({ page }) => 
     await confirmWith(page, 'Move to trash')
     await expect(page.getByRole('button', { name: 'note.md' })).toHaveCount(0)
     await page.getByRole('button', { name: 'Trash', exact: true }).click()
-    await page.getByRole('dialog').getByRole('button', { name: 'Restore' }).first().click()
+    // Other tests' files may be in the trash too: restore this one.
+    const ours = page.getByRole('dialog').locator('div').filter({ hasText: `${folder}/note.md` })
+      .filter({ has: page.getByRole('button', { name: 'Restore' }) }).last()
+    await ours.getByRole('button', { name: 'Restore' }).click()
     await page.keyboard.press('Escape')
     await expect(page.getByRole('button', { name: 'note.md' })).toBeVisible()
   } finally {

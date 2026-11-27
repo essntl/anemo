@@ -52,10 +52,15 @@ class RouteRequest:
 
 # Tasks that need their own kind of model: they never fall back to the chat model.
 OWN_KIND_TASKS = frozenset({"embeddings", "transcription", "image"})
+# Small jobs in the background: without a model of their own they take the background
+# model (Settings > Models > Background tasks, usually small and cheap) before the chat
+# model, so a title or a memory extraction doesn't run on the biggest model.
+BACKGROUND_TASKS = frozenset({"title", "memory", "summarization"})
 
 
 def candidate_ids(req: RouteRequest, defaults: ModelDefaults) -> list[uuid.UUID]:
-    """Rule 1 - order: explicit choice, then the task default and its fallbacks,
+    """Rule 1 - order: explicit choice, then the task default and its fallbacks, for a
+    background task (titles, memory, summaries) the background model and its fallbacks,
     then (except for embeddings, transcription and images) the chat default and its fallbacks."""
     ids: list[uuid.UUID] = []
     if req.explicit_model_id:
@@ -64,6 +69,9 @@ def candidate_ids(req: RouteRequest, defaults: ModelDefaults) -> list[uuid.UUID]
     if primary:
         ids.append(primary)
     ids.extend(defaults.fallbacks.get(req.task, []))
+    if req.task in BACKGROUND_TASKS and defaults.background:
+        ids.append(defaults.background)
+        ids.extend(defaults.fallbacks.get("background", []))
     if req.task not in OWN_KIND_TASKS:
         if defaults.chat:
             ids.append(defaults.chat)

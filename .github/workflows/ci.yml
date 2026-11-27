@@ -11,6 +11,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Which jobs this change needs (.github/scripts/changed-jobs.sh: the same rules as the CI
+  # container's `changed`). A push to main runs everything; a docs-only PR runs nothing heavy.
+  changes:
+    name: What changed
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.jobs.outputs.backend }}
+      frontend: ${{ steps.jobs.outputs.frontend }}
+      browser: ${{ steps.jobs.outputs.browser }}
+      claude-runner: ${{ steps.jobs.outputs.claude-runner }}
+      extension: ${{ steps.jobs.outputs.extension }}
+      e2e: ${{ steps.jobs.outputs.e2e }}
+      desktop: ${{ steps.jobs.outputs.desktop }}
+      android: ${{ steps.jobs.outputs.android }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2 # a pull request's merge commit and its first parent, the base
+      - id: jobs
+        run: |
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            sh .github/scripts/changed-jobs.sh HEAD^1 | tee -a "$GITHUB_OUTPUT"
+          else
+            sh .github/scripts/changed-jobs.sh --all | tee -a "$GITHUB_OUTPUT"
+          fi
+
   app-versions:
     name: App versions (a changed app gets a new version, so it is released)
     if: github.event_name == 'pull_request'
@@ -23,6 +49,8 @@ jobs:
 
   backend:
     name: Backend (lint, types, tests, migrations)
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -38,15 +66,26 @@ jobs:
           PUID=$(id -u)
           EOF
           mkdir -p workspace-dev && chmod 777 workspace-dev
+      # Docker's layer cache in GitHub's cache (.github/ci/compose-cache*.yml): buildx needs
+      # the cache service's token and URLs, which only actions see, so pass them on.
+      - uses: docker/setup-buildx-action@v3
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            for (const [k, v] of Object.entries(process.env))
+              if (k.startsWith('ACTIONS_')) core.exportVariable(k, v)
       # The committed OpenAPI schema is mounted for the API contract test.
       - name: Lint, type-check, test (in the dev container, with Postgres and Valkey)
         run: >
-          docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm -e ENV=test
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml -f .github/ci/compose-cache-dev.yml
+          run --rm -e ENV=test
           -v "$PWD/frontend/src/api/openapi.json:/openapi.json:ro" -e OPENAPI_SNAPSHOT=/openapi.json app
           sh -c "ruff check . && ruff format --check . && mypy app && lint-imports && pytest -q -p no:logging -n auto && alembic check"
 
   frontend:
     name: Frontend (types, lint, tests, build)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -67,9 +106,21 @@ jobs:
 
   browser-service:
     name: Browser service (real Chromium)
+    needs: changes
+    if: needs.changes.outputs.browser == 'true'
     runs-on: ubuntu-latest
+    env:
+      COMPOSE_FILE: docker-compose.yml:.github/ci/compose-cache.yml
     steps:
       - uses: actions/checkout@v5
+      # Docker's layer cache in GitHub's cache (.github/ci/compose-cache*.yml): buildx needs
+      # the cache service's token and URLs, which only actions see, so pass them on.
+      - uses: docker/setup-buildx-action@v3
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            for (const [k, v] of Object.entries(process.env))
+              if (k.startsWith('ACTIONS_')) core.exportVariable(k, v)
       - name: Settings so compose can read the file
         run: printf 'APP_SECRET_KEY=%s\nPOSTGRES_PASSWORD=x\n' "$(openssl rand -hex 32)" > .env
       - run: docker compose --profile browser build browser
@@ -80,9 +131,21 @@ jobs:
 
   claude-runner:
     name: Claude runner (pinned Claude Code CLI, fake API)
+    needs: changes
+    if: needs.changes.outputs.claude-runner == 'true'
     runs-on: ubuntu-latest
+    env:
+      COMPOSE_FILE: docker-compose.yml:.github/ci/compose-cache.yml
     steps:
       - uses: actions/checkout@v5
+      # Docker's layer cache in GitHub's cache (.github/ci/compose-cache*.yml): buildx needs
+      # the cache service's token and URLs, which only actions see, so pass them on.
+      - uses: docker/setup-buildx-action@v3
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            for (const [k, v] of Object.entries(process.env))
+              if (k.startsWith('ACTIONS_')) core.exportVariable(k, v)
       - name: Settings so compose can read the file
         run: printf 'APP_SECRET_KEY=%s\nPOSTGRES_PASSWORD=x\n' "$(openssl rand -hex 32)" > .env
       - run: docker compose --profile claude build claude-runner
@@ -94,7 +157,10 @@ jobs:
   e2e:
     name: End-to-end (throwaway stack, scripted model)
     runs-on: ubuntu-latest
-    needs: [backend, frontend]
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
+    env:
+      COMPOSE_FILE: docker-compose.yml:.github/ci/compose-cache.yml
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -102,6 +168,18 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: e2e/package-lock.json
+      # Docker's layer cache in GitHub's cache (.github/ci/compose-cache*.yml): buildx needs
+      # the cache service's token and URLs, which only actions see, so pass them on.
+      - uses: docker/setup-buildx-action@v3
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            for (const [k, v] of Object.entries(process.env))
+              if (k.startsWith('ACTIONS_')) core.exportVariable(k, v)
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-e2e-${{ runner.os }}-${{ hashFiles('e2e/package-lock.json') }}
       - run: npm ci
         working-directory: e2e
       # Survives an unreachable Ubuntu mirror: see the script.
@@ -118,6 +196,8 @@ jobs:
 
   extension:
     name: Browser extension (types, lint, tests, build, e2e)
+    needs: changes
+    if: needs.changes.outputs.extension == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -129,6 +209,10 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: extension/package-lock.json
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-extension-${{ runner.os }}-${{ hashFiles('extension/package-lock.json') }}
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
@@ -142,6 +226,8 @@ jobs:
 
   desktop:
     name: Windows client (build, tests)
+    needs: changes
+    if: needs.changes.outputs.desktop == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -160,6 +246,8 @@ jobs:
 
   desktop-macos:
     name: macOS client (Apple Silicon build, tests, app bundle, bridge)
+    needs: changes
+    if: needs.changes.outputs.desktop == 'true'
     # macos-15 runners are Apple Silicon (arm64). No Screen Recording or Accessibility there:
     # what needs them is in docs/specs/09-desktop-macos-mac-testing.md.
     runs-on: macos-15
@@ -204,6 +292,8 @@ jobs:
 
   android:
     name: Android app (tests, debug build)
+    needs: changes
+    if: needs.changes.outputs.android == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -214,6 +304,21 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+          cache: gradle
       # The runner image has the Android SDK (ANDROID_HOME) with its licences accepted;
       # Gradle fetches the platform and build tools the project asks for.
       - run: ./gradlew test assembleDebug
+
+  # The one check branch protection needs: it runs every time, and fails when a job that ran
+  # failed or was cancelled. Jobs skipped because the change didn't touch them count as passed.
+  ci-ok:
+    name: CI passed
+    if: always()
+    needs: [changes, app-versions, backend, frontend, browser-service, claude-runner, e2e, extension, desktop, desktop-macos, android]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "results: ${{ join(needs.*.result, ' ') }}"
+          case " ${{ join(needs.*.result, ' ') }} " in
+            *" failure "*|*" cancelled "*) echo "::error::a CI job failed"; exit 1 ;;
+          esac

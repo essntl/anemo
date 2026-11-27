@@ -1,8 +1,8 @@
 # Development
 
-How to work on Anemo itself. The conventions for new code, and recipes for a tool, an
-endpoint, a job, a setting or a page, are in [CLAUDE.md](../CLAUDE.md); the design and the
-reasons behind it in [architecture.md](architecture.md).
+How to work on Anemo itself. Where things live, how to run one test, the recipes and the
+gotchas are in [code-map.md](code-map.md); the rules for new code in [CLAUDE.md](../CLAUDE.md);
+the design and the reasons behind it in [architecture.md](architecture.md).
 
 Requires Docker and Node 22. On Windows, a WSL2 checkout is strongly recommended
 (the Makefile needs `make`, which Git Bash does not include).
@@ -13,6 +13,19 @@ make test           # backend (in container) + frontend checks
 make lint
 make revision m="describe change"   # new Alembic migration
 make gen-api        # regenerate frontend API types after backend changes
+make fmt-changed    # fix and format only the backend .py files changed since origin/main
+```
+
+Only `backend/` is formatted with ruff (its settings are in `backend/pyproject.toml`). The side
+containers' Python (`claude-runner/`, `browser/`, `sandbox/`, `mcp-host/`) is formatted by hand;
+a `ruff.toml` in each keeps ruff from rewriting it when it is run on those folders.
+
+How big a request to the model is, and what it is made of (system prompt, tool specs, earlier
+messages, the new message and its turn context), rebuilt from a run in the database:
+
+```bash
+docker compose exec app python -m app.cli request-size            # the newest chat or agent run
+docker compose exec app python -m app.cli request-size <run id>
 ```
 
 Backend tests run in parallel ([pytest-xdist](https://pytest-xdist.readthedocs.io)):
@@ -37,6 +50,14 @@ sh e2e/run-isolated.sh              # start, test, remove
 KEEP=1 sh e2e/run-isolated.sh       # leave it running to look around
 E2E_BROWSER=1 sh e2e/run-isolated.sh  # also test the agents' browser
 ```
+
+The specs run in 4 Playwright workers (`E2E_WORKERS` to change it), all against the same
+single-user app, so a test must not change what other tests rely on. Keep a change private
+(`newAgentChatWithLevels` gives one chat its own permission levels instead of changing
+Settings) or, for what exists once (the focus timer, the Home layout), take its lock
+(`useStoppedTimer`, `useHomeLayout`; `e2e/tests/appLock.ts`). A test that checks the Island
+calls `ignoreAppEvents` first, so other tests' agent alerts don't show up in it. Look things
+up by name, not with `.first()` on a shared list.
 
 You can also point the tests at a running install
 (`cd e2e && E2E_PASSWORD=<password> npx playwright test`). Tests that need a model

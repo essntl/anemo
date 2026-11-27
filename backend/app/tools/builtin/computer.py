@@ -194,7 +194,7 @@ def _blocked_for_acting(ctx: ToolContext, name: str) -> str | None:
 
 # Caps on what a client sends, before any of it reaches the model (device-contracts §3).
 MAX_CONTROLS = 300
-MAX_TEXT = 40_000
+MAX_TEXT = 12_000  # the window's text (the controls come on top of it)
 MAX_WINDOWS = 200
 MAX_LABEL = 300  # a title, an app, a control's role or name
 MAX_VALUE = 1_000  # a control's value, a note
@@ -505,10 +505,10 @@ async def _state_result(
 class LookInput(BaseModel):
     device: str = Field(min_length=1, max_length=100, description=DEVICE_DESCRIPTION)
     what: Literal["screen", "window", "windows"] = Field(
-        "screen",
-        description="screen: a screenshot of the whole screen plus the controls of the window "
-        "in front; window: only that window (or window_ref); windows: the list of open "
-        "windows, no screenshot",
+        "window",
+        description="window (default): the window in front (or window_ref), its screenshot and "
+        "controls; screen: a screenshot of all screens together (small on several monitors) "
+        "plus the front window's controls; windows: the list of open windows, no screenshot",
     )
     window_ref: str | None = Field(
         None, max_length=40, description="With what='window': a window's ref from the list"

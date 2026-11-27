@@ -1,0 +1,5 @@
+# This package's Python is formatted by hand, not with ruff: without this file, ruff run
+# on it from backend/ (or an editor) would rewrite it with the backend's settings. Only
+# backend/ is formatted with ruff (backend/pyproject.toml; `make fmt`, `make fmt-changed`).
+extend-exclude = ["*"]
+force-exclude = true

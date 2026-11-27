@@ -1,4 +1,5 @@
 import { expect, type APIRequestContext, type Page, test } from '@playwright/test'
+import { appLock, releaseAppLocks } from './appLock'
 
 /*
  * Shared helpers. These tests run against a live instance that may also be in
@@ -54,6 +55,25 @@ export async function newChat(page: Page, mode: 'Chat' | 'Agent', modelId: strin
 }
 
 /**
+ * A new Agent-mode chat whose runs use the given permission levels (e.g. `{ 'tasks.write':
+ * 'ask' }`), through an agent profile of its own: the user's settings stay as they are, so
+ * tests running at the same time see the usual permissions. Returns the profile's id; the
+ * caller deletes it with `page.request.delete(`/api/profiles/${id}`)`.
+ */
+export async function newAgentChatWithLevels(page: Page, modelId: string, levels: Record<string, string>): Promise<string> {
+  const name = `e2e levels ${Math.random().toString(36).slice(2, 8)}`
+  const r = await page.request.post('/api/profiles', { data: { name, permission_levels: levels } })
+  expect(r.ok(), await r.text()).toBe(true)
+  const id = ((await r.json()) as { id: string }).id
+  await newChat(page, 'Agent', modelId)
+  await page.getByRole('combobox', { name: 'Agent profile' }).click()
+  await page.getByRole('option', { name }).click()
+  // As in pickModel: wait for the list to close, or Enter would open it again instead of sending.
+  await expect(page.getByRole('listbox')).toHaveCount(0)
+  return id
+}
+
+/**
  * On a phone the message box is one line until it is used: tapping into it brings up
  * its controls (the mode switch, the model button).
  */
@@ -104,12 +124,34 @@ export async function send(page: Page, text: string) {
   await page.keyboard.press('Enter')
 }
 
+/**
+ * Keeps this tab off the app's event stream (/api/events), for a test that checks what the
+ * Island shows: there is one user, so another worker's agent run that finishes or waits for
+ * approval would otherwise pop up here as an alert. Call it before `login`. (A 204 answer
+ * makes the browser's EventSource stop reconnecting.)
+ */
+export async function ignoreAppEvents(page: Page): Promise<void> {
+  await page.route('**/api/events?*', (route) => route.fulfill({ status: 204 }))
+}
+
 /** Sign out after each test, so test logins don't pile up under Settings > Active sessions. */
 export function signOutAfterEach() {
   test.afterEach(async ({ page }) => {
-    await restoreTimer(page)
-    await page.request.post('/api/auth/logout').catch(() => undefined)
+    try {
+      await restoreTimer(page)
+      await page.request.post('/api/auth/logout').catch(() => undefined)
+    } finally {
+      releaseAppLocks()
+    }
   })
+}
+
+/**
+ * For a test that changes or depends on the Home layout (one per user): waits until no
+ * other worker's test does, until the end of this test. Needs `signOutAfterEach`.
+ */
+export async function useHomeLayout(): Promise<void> {
+  await appLock('home-layout')
 }
 
 type TimerOut = { state: Record<string, unknown> | null; version: number }
@@ -120,8 +162,10 @@ const savedTimers = new WeakMap<Page, TimerOut['state']>()
  * browser extension). A test that uses it calls this after `login`: it starts from a
  * stopped timer, and `signOutAfterEach` puts back what was there (the instance may be in
  * real use, and a phase one test finished would otherwise still run in the next).
+ * It also takes the timer's lock, so no other worker's test uses the timer meanwhile.
  */
 export async function useStoppedTimer(page: Page): Promise<void> {
+  await appLock('focus-timer')
   const before = (await (await page.request.get('/api/focus/timer')).json()) as TimerOut
   savedTimers.set(page, before.state)
   const focus = (await (await page.request.get('/api/settings')).json()).focus as { focus_minutes: number }
