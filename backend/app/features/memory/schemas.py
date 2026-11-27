@@ -19,7 +19,9 @@ class MemorySettings(BaseModel):
     # off: nothing. suggest: saved as suggestions to approve. auto: saved right away.
     extraction: Literal["off", "suggest", "auto"] = "suggest"
     max_injected: int = Field(8, ge=0, le=30)  # relevant memories added per message
-    min_similarity: float = Field(0.3, ge=0.0, le=1.0)  # for meaning-based matches
+    # For meaning-based matches. 0.3 let unrelated memories in (a camera gimbal note with
+    # a question about CI).
+    min_similarity: float = Field(0.4, ge=0.0, le=1.0)
 
 
 class MemoryIn(BaseModel):

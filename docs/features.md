@@ -811,7 +811,9 @@ remembers is on the **Memory** page, where you can add, edit, archive and delete
   Memory** you can have them saved automatically, or switch this off.
 - **Used when relevant:** for each message, memories that fit it are put into the
   model's context, plus those marked *Always in context* and all *Instructions*.
-  A run's page lists which memories it was given.
+  Each memory is given once per chat: the ones always in context at the start of the
+  chat, the others with the first message they fit (a changed memory again). A run's
+  page lists which memories it was given.
 - **Search by meaning** needs an embedding model (Settings → Providers & Models →
   Embeddings, e.g. `text-embedding-3-small` or a local model in Ollama). Without
   one, memories are found by their words. After changing the model, use *Index all

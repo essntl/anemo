@@ -38,7 +38,7 @@ from app.providers.base import (
 )
 from app.providers.registry import make_adapter
 from app.providers.router import NoModelAvailable, ResolvedModel, RouteRequest, resolve
-from app.runtime import citations, turn_context
+from app.runtime import citations, memory_context, turn_context
 from app.runtime.history import (
     latest_user_attachment_kinds,
     load_history,
@@ -214,6 +214,10 @@ async def execute_chat_run(run_id: uuid.UUID) -> None:
         user_message = (
             await db.get(ChatMessage, run.user_message_id) if run.user_message_id else None
         )
+        # The chat's always-included memories go into the system prompt (as they were
+        # when it started); a turn gives only those it doesn't have yet.
+        memory_settings = await memory.get_settings(db)
+        memories = await memory_context.for_turn(db, run, memory_settings)
         context_text = (user_message.turn_context if user_message else None) or (
             turn_context.existing(history[-1]) if history and history[-1].role == "user" else None
         )
@@ -230,14 +234,20 @@ async def execute_chat_run(run_id: uuid.UUID) -> None:
                 ),
                 "",
             )
-            section, used = await memory.build_context(db, query, await memory.get_settings(db))
+            section, used = await memory.build_context(
+                db, query, memory_settings, given=memories.given
+            )
             general = await settings_service.get_section(db, GeneralSettings, "general")
             # A message started with a /skill carries the skill's instructions too.
             skill = skills.prompt_section(user_message.skill if user_message else None)
             context_text = turn_context.render(general.timezone, section, skill)
-            run.options = {**run.options, "memory_context": used}
+            run.options = {
+                **run.options,
+                "memory_context": memory_context.manifest(memories.snapshot, used),
+            }
             if user_message is not None:
                 user_message.turn_context = context_text
+                user_message.turn_memories = used
             if history and history[-1].role == "user":
                 history[-1] = turn_context.attach(history[-1], context_text)
         # Attachments are rendered per capability set (a fallback model may differ).
@@ -246,8 +256,10 @@ async def execute_chat_run(run_id: uuid.UUID) -> None:
             for vision in {bool(m.capabilities.get("vision")) for m in candidates}
         }
         # The chat's project: where its files are, and the user's instructions for it.
-        system = SYSTEM_PROMPT + projects.prompt_section(
-            await projects.for_conversation(db, run.conversation_id)
+        system = (
+            SYSTEM_PROMPT
+            + projects.prompt_section(await projects.for_conversation(db, run.conversation_id))
+            + memories.system_section
         )
         session_key = f"conv:{run.conversation_id}:chat"
         effort = await effort_for(db, run)

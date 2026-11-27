@@ -121,16 +121,19 @@ async def test_relevant_and_pinned_memories_reach_the_model(authed):
 
     script("Which language for my typescript project?", [TextDelta("TS."), Done("end")])
     run_id = await chat_turn(authed, cid, "Which language for my typescript project?")
-    # Memories are in the turn context at the end of the user's message, never in the
-    # system prompt (which must stay the same for the prompt cache).
+    # Pinned memories and instructions go into the system prompt, as they were when the
+    # chat started; the ones that fit the message into the turn context at its end.
     request = FakeAdapter.requests[-1]
-    assert "What you know about the user" not in (request.system or "")
+    system = request.system or ""
+    assert "What you know about the user" in system
+    assert "Lives in Rotterdam" in system and "British English" in system
+    assert "Prefers TypeScript" not in system
     context = request.messages[-1].content[-1].text
     assert context.startswith("<turn_context>") and context == request.turn_context
-    assert "What you know about the user" in context
     assert "Prefers TypeScript" in context  # relevant by keywords
-    assert "Lives in Rotterdam" in context and "British English" in context  # always included
+    assert "Rotterdam" not in context and "British English" not in context  # said once
     assert "Bruno" not in context  # unrelated
+    # The run's page still lists everything it was given, the system prompt's too.
     used = (await authed.get(f"/api/runs/{run_id}")).json()["memories_used"]
     assert len(used) == 3
     by_content = {m["content"]: m for m in await active(authed)}
@@ -140,10 +143,89 @@ async def test_relevant_and_pinned_memories_reach_the_model(authed):
     await authed.put("/api/settings/memory", json={"enabled": False})
     await chat_turn(authed, cid, "and again about typescript?")
     latest = FakeAdapter.requests[-1].messages[-1].content[-1].text
-    assert latest.startswith("<turn_context>") and "What you know about the user" not in latest
+    assert latest.startswith("<turn_context>") and "what you know about the user" not in latest
+    assert "Rotterdam" not in (FakeAdapter.requests[-1].system or "")
     # The earlier message still carries its own context, byte for byte.
     earlier = [m for m in FakeAdapter.requests[-1].messages if m.role == "user"][0]
     assert earlier.content[-1].text == context
+
+
+def _user_contexts(request) -> list[str]:
+    return [m.content[-1].text for m in request.messages if m.role == "user"]
+
+
+async def test_each_memory_reaches_the_model_once_per_conversation(authed):
+    cid = await setup(authed)
+    pinned = await add(authed, "Lives in Rotterdam.", pinned=True)
+    await add(authed, "Prefers TypeScript over JavaScript for new projects.")
+    script("typescript question one", [TextDelta("a"), Done("end")])
+    await chat_turn(authed, cid, "typescript question one")
+    first = FakeAdapter.requests[-1]
+    assert "Prefers TypeScript" in first.turn_context
+
+    # The same memory fits again: it isn't given again. The system prompt is the same.
+    await chat_turn(authed, cid, "typescript question two")
+    second = FakeAdapter.requests[-1]
+    assert second.system == first.system
+    assert "Prefers TypeScript" not in second.turn_context
+    assert "What you know about the user" not in second.turn_context
+
+    # A pinned memory added during the chat comes in the next turn context, once; one
+    # that changed comes again with its new text. The system prompt doesn't change.
+    await add(authed, "Works at Acme.", pinned=True)
+    await authed.patch(f"/api/memories/{pinned['id']}", json={"content": "Lives in Utrecht."})
+    await chat_turn(authed, cid, "anything new?")
+    third = FakeAdapter.requests[-1]
+    assert third.system == first.system and "Lives in Rotterdam" in third.system
+    assert "More of what you know about the user" in third.turn_context
+    assert "Works at Acme" in third.turn_context and "Lives in Utrecht" in third.turn_context
+    await chat_turn(authed, cid, "and now?")
+    fourth = FakeAdapter.requests[-1]
+    assert "Acme" not in fourth.turn_context and "Utrecht" not in fourth.turn_context
+    # Across the whole history each memory appears once.
+    history = "\n".join(_user_contexts(fourth)) + (fourth.system or "")
+    assert history.count("Works at Acme") == 1 and history.count("Prefers TypeScript") == 1
+
+    # A branch starts with the same system prompt and doesn't get them again either.
+    branch = (await authed.post(f"/api/conversations/{cid}/branch", json={"upto_seq": 8})).json()
+    await chat_turn(authed, branch["id"], "typescript in the branch")
+    forked = FakeAdapter.requests[-1]
+    assert forked.system == first.system
+    assert "Acme" not in forked.turn_context and "Prefers TypeScript" not in forked.turn_context
+
+
+async def test_a_chat_from_before_snapshots_keeps_its_system_prompt(authed):
+    """A chat whose turns carried every memory (before snapshots): its system prompt stays
+    without memories (its cache too), and new turns leave out what earlier ones gave."""
+    from app.features.conversations.models import ChatMessage, Conversation
+
+    cid = await setup(authed)
+    await add(authed, "Lives in Rotterdam.", pinned=True)
+    script("old chat", [TextDelta("a"), Done("end")])
+    await chat_turn(authed, cid, "old chat")
+    async with get_sessionmaker()() as db:
+        conv = await db.get(Conversation, uuid.UUID(cid))
+        conv.memory_snapshot = None
+        for m in await db.scalars(
+            select(ChatMessage).where(ChatMessage.conversation_id == conv.id)
+        ):
+            if m.role == "user":
+                # As the old code stored it: every memory in the turn context.
+                m.turn_context = m.turn_context.replace(
+                    "</turn_context>",
+                    "## What you know about the user\n- Lives in Rotterdam.\n</turn_context>",
+                )
+                m.turn_memories = None
+        await db.commit()
+    # Its first answer again: the snapshot isn't taken from it (its context has them).
+    r = await authed.post(f"/api/conversations/{cid}/regenerate")
+    await execute_run(uuid.UUID(r.json()["run_id"]))
+    assert "Rotterdam" not in (FakeAdapter.requests[-1].system or "")
+    await chat_turn(authed, cid, "next question")
+    request = FakeAdapter.requests[-1]
+    assert "Rotterdam" not in (request.system or "")
+    assert "Rotterdam" not in request.turn_context
+    assert "Rotterdam" in _user_contexts(request)[0]  # replayed as it was stored
 
 
 async def test_embeddings_index_and_reindex(authed):

@@ -37,7 +37,7 @@ from app.providers.base import (
     TextBlock,
 )
 from app.providers.router import NoModelAvailable, ResolvedModel, RouteRequest, resolve
-from app.runtime import subagents, turn_context
+from app.runtime import memory_context, subagents, turn_context
 from app.runtime.agent_prompt import (
     AUTOMATION_ON_ASK,
     AUTOMATION_RESULT,
@@ -110,6 +110,9 @@ async def snapshot_run(db: AsyncSession, run: Run, transcript: list[Message]) ->
         CHAT_SYSTEM_PROMPT if chat else build_system_prompt(profile, skills, settings.plan_review)
     )
     memory_settings = await memory.get_settings(db)
+    # The chat's always-included memories (as they were when it started) and what its
+    # earlier turns gave: each memory reaches the model once (runtime/memory_context.py).
+    memories = await memory_context.for_turn(db, run, memory_settings)
     if memory_settings.enabled:
         system += memory.MEMORY_TOOLS_HINT
     # The chat's project: where its files are, and the user's instructions for it.
@@ -165,8 +168,10 @@ async def snapshot_run(db: AsyncSession, run: Run, transcript: list[Message]) ->
     if has_computer:
         device_lines = computer.turn_context_section([computer.line(d) for d in online_devices])
         extra = "\n\n".join(p for p in (extra, device_lines) if p)
+    # Last, after everything else that is stable for the chat.
+    system += memories.system_section
     used = await _add_turn_context(
-        db, run, transcript, general.timezone, memory_settings, extra=extra
+        db, run, transcript, general.timezone, memory_settings, memories, extra=extra
     )
     navigation = await settings_service.get_section(db, NavigationSettings, "navigation")
     # Pictures cost money: a run nobody watches asks before each one (unless switched off).
@@ -232,12 +237,13 @@ async def _add_turn_context(
     transcript: list[Message],
     tz: str,
     memory_settings: MemorySettings,
+    memories: memory_context.TurnMemories,
     *,
     extra: str = "",
 ) -> list[dict[str, str]]:
     """Render the turn context for the run's user message, save it with that message
     (so later runs replay the same bytes) and put it at the end of the message in the
-    transcript. Returns the memories that went in."""
+    transcript. Returns the memories the run has (its system prompt's and its turn's)."""
     message = await db.get(ChatMessage, run.user_message_id) if run.user_message_id else None
     last = transcript[-1] if transcript and transcript[-1].role == "user" else None
     known = (message.turn_context if message else None) or turn_context.existing(last)
@@ -245,18 +251,26 @@ async def _add_turn_context(
         # Already rendered (and already in the history loaded from the database), e.g.
         # when an answer is regenerated: the same bytes are sent again.
         run.options = {**run.options, "turn_context": known}
-        return list(run.options.get("memory_context", []))
-    section, used = await memory.build_context(db, _last_user_text(transcript), memory_settings)
+        turn = (
+            message.turn_memories
+            if message is not None and message.turn_memories is not None
+            else run.options.get("memory_context", [])
+        )
+        return memory_context.manifest(memories.snapshot, list(turn))
+    section, used = await memory.build_context(
+        db, _last_user_text(transcript), memory_settings, given=memories.given
+    )
     # A message started with a /skill carries the skill's instructions too.
     skill = skill_prompt_section(message.skill if message else None)
     text = turn_context.render(tz, section, skill, extra)
     if message is not None:
         message.turn_context = text
+        message.turn_memories = used
     if transcript and transcript[-1].role == "user":
         transcript[-1] = turn_context.attach(transcript[-1], text)
         run.transcript = [m.model_dump() for m in transcript]
     run.options = {**run.options, "turn_context": text}
-    return used
+    return memory_context.manifest(memories.snapshot, used)
 
 
 async def resolve_models(db: AsyncSession, run: Run, needs: set[str]) -> list[ResolvedModel]:
