@@ -12,4 +12,9 @@
     <InternalsVisibleTo Include="Anemo.Desktop.Tests" />
   </ItemGroup>
 
+  <!-- The PowerShell parse helper (Permissions/PowerShellParser.cs): run from memory, never from a file an agent could change. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Permissions\parse-helper.ps1" LogicalName="Anemo.Desktop.Core.Permissions.parse-helper.ps1" />
+  </ItemGroup>
+
 </Project>

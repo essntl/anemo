@@ -34,15 +34,25 @@ public static class Wire
     };
 
     /// <summary>The first message; <paramref name="platform"/>: <c>windows</c> or <c>macos</c> (§2).</summary>
-    public static string Hello(string token, string version, string? lastId, string platform = "windows") => Json(new JsonObject
+    /// <param name="capabilities">What this client can do beyond its version (§2, 1.10.0): <c>profiles</c>, <c>shell.analyze</c>.</param>
+    public static string Hello(string token, string version, string? lastId, string platform = "windows", IReadOnlyList<string>? capabilities = null)
     {
-        ["type"] = "hello",
-        ["token"] = token,
-        ["kind"] = "computer",
-        ["version"] = version,
-        ["last_id"] = lastId,
-        ["platform"] = platform,
-    });
+        var hello = new JsonObject
+        {
+            ["type"] = "hello",
+            ["token"] = token,
+            ["kind"] = "computer",
+            ["version"] = version,
+            ["last_id"] = lastId,
+            ["platform"] = platform,
+        };
+        if (capabilities is { Count: > 0 })
+        {
+            hello["capabilities"] = new JsonArray(capabilities.Select(c => (JsonNode)JsonValue.Create(c)!).ToArray());
+        }
+
+        return Json(hello);
+    }
 
     public static string Ping() => Json(new JsonObject { ["type"] = "ping" });
 
@@ -59,7 +69,9 @@ public static class Wire
     /// <paramref name="codeInput"/>: the jobs Anemo starts take messages while they run
     /// (<c>code_input</c>, <c>code_input_withdraw</c>, 1.9.0); only where starting is offered.
     /// </summary>
-    public static string Offer(bool control, bool shell, bool code, bool codeStart, string shellKind = "powershell", bool files = false, bool codeInput = false) => Json(new JsonObject
+    /// <param name="profileVersion">The version of the permission profile in force (§9, 1.10.0); null: no profiles here.</param>
+    /// <param name="profilePending">A loosening waits for the user's confirmation on this computer.</param>
+    public static string Offer(bool control, bool shell, bool code, bool codeStart, string shellKind = "powershell", bool files = false, bool codeInput = false, int? profileVersion = null, bool profilePending = false) => Json(WithProfile(profileVersion, profilePending, new JsonObject
     {
         ["type"] = "device.offer",
         ["control"] = control,
@@ -72,7 +84,18 @@ public static class Wire
         ["shell_kind"] = shellKind,
         ["files"] = files,
         ["code_input"] = codeStart && codeInput,
-    });
+    }));
+
+    private static JsonObject WithProfile(int? version, bool pending, JsonObject offer)
+    {
+        if (version is { } v)
+        {
+            offer["profile_version"] = v;
+            offer["profile_pending"] = pending;
+        }
+
+        return offer;
+    }
 
     public static string Stopped() => Json(new JsonObject { ["type"] = "device.stopped" });
 

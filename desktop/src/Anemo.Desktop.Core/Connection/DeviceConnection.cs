@@ -61,6 +61,8 @@ public sealed class DeviceConnection
     private readonly string _platform; // hello.platform
     private readonly Func<string> _shellKind; // offer.shell_kind
     private readonly Func<DeviceInfo, bool> _filesOffered; // offer.files (§8)
+    private readonly Func<(int Version, bool Pending)>? _profile; // offer.profile_version, offer.profile_pending (§9)
+    private readonly IReadOnlyList<string> _capabilities; // hello.capabilities
     private readonly object _lock = new();
     private TaskCompletionSource _kick = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private bool _kicked;
@@ -83,8 +85,12 @@ public sealed class DeviceConnection
         ICodeJobsHost? codeJobs = null,
         string platform = "windows",
         Func<string>? shellKind = null,
-        Func<DeviceInfo, bool>? filesOffered = null)
+        Func<DeviceInfo, bool>? filesOffered = null,
+        Func<(int Version, bool Pending)>? profile = null,
+        IReadOnlyList<string>? capabilities = null)
     {
+        _profile = profile;
+        _capabilities = capabilities ?? [];
         _platform = platform;
         _filesOffered = filesOffered ?? (_ => false);
         _shellKind = shellKind ?? (() => "powershell");
@@ -260,7 +266,7 @@ public sealed class DeviceConnection
                 connectCts.CancelAfter(_options.WelcomeTimeout);
                 await ws.ConnectAsync(settings.Address.WebSocketUri, connectCts.Token);
                 var session = new Session(this, ws, sessionCts.Token);
-                await session.SendAsync(Wire.Hello(settings.Token, _version, _cursor, _platform));
+                await session.SendAsync(Wire.Hello(settings.Token, _version, _cursor, _platform, _capabilities));
                 var welcome = await session.ReceiveWelcomeAsync(connectCts.Token);
                 if (welcome is null)
                 {
@@ -378,7 +384,9 @@ public sealed class DeviceConnection
                 var code = Device is { } device && _owner._codeJobs?.Offered(device) == true;
                 var codeStart = Device is { } d && _owner._codeJobs?.OfferedStart(d) == true;
                 var files = Device is { } f && _owner._filesOffered(f);
-                await SendAsync(Wire.Offer(_owner._control.Effective, _owner._shellSwitchedOn(), code, codeStart, _owner._shellKind(), files, codeInput: _owner._platform == "windows"));
+                var profile = _owner._profile?.Invoke();
+                await SendAsync(Wire.Offer(_owner._control.Effective, _owner._shellSwitchedOn(), code, codeStart, _owner._shellKind(), files, codeInput: _owner._platform == "windows",
+                    profileVersion: profile?.Version, profilePending: profile?.Pending ?? false));
             }
             catch (Exception e) when (e is WebSocketException or OperationCanceledException or ObjectDisposedException)
             {

@@ -1,3 +1,4 @@
+using Anemo.Desktop.Core.Permissions;
 using Anemo.Desktop.Core.CodeJobs;
 using Anemo.Desktop.Core.Commands;
 using Anemo.Desktop.Core.Connection;
@@ -30,8 +31,12 @@ public sealed record DesktopAgentParts(
     string? HomeFolder = null,
     IUpdatePlatform? Updates = null,
     IReleaseFeed? ReleaseFeed = null,
-    UpdateOptions? UpdateOptions = null)
+    UpdateOptions? UpdateOptions = null,
+    PowerShellAnalyser? Analyser = null)
 {
+    /// <summary>The device's copy of its permission profile (spec 25), beside <c>settings.json</c>: the hard floor.</summary>
+    public string PermissionsFile => Path.Combine(DataFolder, "permissions.json");
+
     /// <summary>The system the client runs on (Windows unless the host says otherwise).</summary>
     public DesktopPlatform Os => TargetSystem ?? DesktopPlatform.Windows;
 
@@ -86,6 +91,10 @@ public sealed class DesktopAgent
         Control = new ControlState(parts.Time, _settings.AllowControl, _settings.PausedUntil);
         Control.Changed += SaveControlState;
         Files = new DeviceFiles(() => Settings, parts.Time, parts.Os, parts.HomeFolder, parts.DataFolder);
+        Permissions = new PermissionGuard(
+            new PermissionStore(parts.PermissionsFile),
+            parts.Os.IsMac ? null : parts.Analyser ?? DefaultAnalyser(parts),
+            () => Settings.ConfirmLoosenedPermissions);
         _codeControl = new CodeJobControl(
             () => Settings,
             parts.CodeHost ?? NoCodeHost.Instance,
@@ -101,7 +110,8 @@ public sealed class DesktopAgent
             parts.CommandLog,
             WithWorkFolder(parts.CommandOptions ?? new CommandOptions(), parts.DefaultWorkFolder, parts.Os),
             _codeControl,
-            Files);
+            Files,
+            Permissions);
         CodeJobs = new CodeJobSharing(
             () => Settings,
             new CodeJobStore(parts.CodeJobsStateFile, parts.Time, parts.Log),
@@ -121,7 +131,10 @@ public sealed class DesktopAgent
             CodeJobs,
             parts.Os.WireName,
             () => _shellKind.Value,
-            Files.Offered);
+            Files.Offered,
+            () => (Permissions.Version, Permissions.Pending),
+            Permissions.CanAnalyze ? ["profiles", "shell.analyze"] : ["profiles"]);
+        Permissions.Changed += Connection.OfferNow;
         _sharedScreen = new SharedScreenClient(parts.Http);
         Connection.CommandRunning += OnCommandRunning;
 
@@ -149,6 +162,19 @@ public sealed class DesktopAgent
 
     /// <summary>"Let Anemo read and write files" (device-contracts.md §8).</summary>
     public DeviceFiles Files { get; }
+
+    /// <summary>The device's permission profile and the shell's analyser (spec 25).</summary>
+    public PermissionGuard Permissions { get; }
+
+    /// <summary>The PowerShell analyser of this computer: its folders, the hard floor, the parse helper.</summary>
+    private static PowerShellAnalyser DefaultAnalyser(DesktopAgentParts parts)
+    {
+        var env = PathEnvironment.Current();
+        var zones = new PathZones(
+            PathZones.For(env, parts.DataFolder, AppContext.BaseDirectory),
+            OperatingSystem.IsWindows() ? FileRules.Resolve : path => path);
+        return new PowerShellAnalyser(new PowerShellParseHelper(), zones, env);
+    }
 
     /// <summary>"Share Claude Code jobs with Anemo".</summary>
     public CodeJobSharing CodeJobs { get; }

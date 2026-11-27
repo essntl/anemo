@@ -87,6 +87,15 @@ internal sealed class TrayApp : ApplicationContext
         _agent.Connection.StatusChanged += status => OnUi(() => OnStatus(status));
         _agent.Connection.CommandRunning += action => OnUi(() => OnCommand(action));
         _agent.Connection.NoticeReceived += text => OnUi(() => Balloon(text, ToolTipIcon.Info));
+        // "Confirm loosened permissions on this computer" (spec 25 §10): the notification, then a yes/no.
+        _agent.Permissions.ConfirmationNeeded += text => OnUi(() => AskToLoosen(text));
+        _tray.BalloonTipClicked += (_, _) =>
+        {
+            if (_agent.Permissions.PendingText is { } pending)
+            {
+                AskToLoosen(pending, notified: true);
+            }
+        };
         _agent.Control.Changed += () => OnUi(Refresh);
         _agent.Updates.Changed += () => OnUi(Refresh);
         _agent.Updates.RestartRequested += update => OnUi(() => QuitToInstall(update));
@@ -374,6 +383,29 @@ internal sealed class TrayApp : ApplicationContext
     }
 
     private void Balloon(string text, ToolTipIcon icon) => _tray.ShowBalloonTip(5000, "Anemo Desktop", text, icon);
+
+    /// <summary>
+    /// A loosening of this computer's permissions waits for the user: first a notification, and
+    /// on its click (or at once when it was clicked) the question. Until Allow the old profile holds.
+    /// </summary>
+    private void AskToLoosen(string text, bool notified = false)
+    {
+        if (!notified)
+        {
+            _tray.ShowBalloonTip(15000, "Anemo Desktop: allow more?", text + " Click to answer.", ToolTipIcon.Warning);
+            return;
+        }
+
+        var answer = MessageBox.Show(text, "Anemo Desktop", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
+        if (answer == DialogResult.Yes)
+        {
+            _agent.Permissions.Confirm();
+        }
+        else
+        {
+            _agent.Permissions.Reject();
+        }
+    }
 
     private void OnUi(Action action)
     {

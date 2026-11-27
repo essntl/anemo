@@ -69,4 +69,11 @@ public sealed record DesktopSettings
     /// at start and every 6 hours, download a new version and install it at quit. On by default.
     /// </summary>
     public bool AutoUpdate { get; init; } = true;
+
+    /// <summary>
+    /// "Confirm loosened permissions on this computer" (docs/specs/25-device-permission-profiles.md
+    /// §10, 1.10.0): a permission change from Anemo that loosens anything waits for a click here.
+    /// Only switched in this window, never by the server. Off by default.
+    /// </summary>
+    public bool ConfirmLoosenedPermissions { get; init; }
 }

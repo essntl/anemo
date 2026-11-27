@@ -14,6 +14,12 @@ public static class ResultCodes
     /// <summary>git or gh refused for want of a sign-in (a clone or fetch of a remote repository; 1.6.0).</summary>
     public const string Unauthenticated = "unauthenticated";
 
+    /// <summary>
+    /// A <c>shell</c> the server decided with a newer permission profile than this device's copy
+    /// (spec 25 §6.1, 1.10.0): the server syncs the profile and tries once more.
+    /// </summary>
+    public const string ProfileStale = "profile_stale";
+
     /// <summary>A file is already where a write would put one, and it wasn't asked to replace it (1.7.0, §8).</summary>
     public const string Exists = "exists";
 }
@@ -36,4 +42,6 @@ public sealed class CommandException : Exception
     public static CommandException Unauthenticated(string message) => new(ResultCodes.Unauthenticated, message);
 
     public static CommandException Exists(string message) => new(ResultCodes.Exists, message);
+
+    public static CommandException Stale(string message) => new(ResultCodes.ProfileStale, message);
 }

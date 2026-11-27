@@ -145,6 +145,7 @@ internal sealed partial class SettingsWindow : Window
         OwnerBox.Text = draft.GitHubOwner;
         OwnerBox.Tag = "The account gh is signed in as";
         FilesSwitch.IsChecked = draft.ShareFiles;
+        ConfirmLooseningSwitch.IsChecked = draft.ConfirmLoosenedPermissions;
         FileFoldersBox.Text = draft.FileFolders;
         FileFoldersBox.Tag = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         UpdateSwitch.IsChecked = draft.AutoUpdate;
@@ -166,6 +167,7 @@ internal sealed partial class SettingsWindow : Window
         CodeProjectsFolder = ProjectsBox.Text,
         GitHubOwner = OwnerBox.Text,
         ShareFiles = FilesSwitch.IsChecked == true,
+        ConfirmLoosenedPermissions = ConfirmLooseningSwitch.IsChecked == true,
         FileFolders = FileFoldersBox.Text,
         AutoUpdate = UpdateSwitch.IsChecked == true,
     };
