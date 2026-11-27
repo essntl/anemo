@@ -5,8 +5,15 @@ FROM python:3.13-slim
 
 # What MCP servers are usually started with: npx (Node) and uvx (Python).
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        ca-certificates curl git nodejs npm tini \
+        ca-certificates curl git tini \
     && rm -rf /var/lib/apt/lists/*
+# Node.js and npm (npx) from the official image, not Debian's packages: those brought 340
+# node-* packages, webpack, libssl-dev and a second Python for node-gyp.
+COPY --from=node:22-bookworm-slim /usr/local/bin/node /usr/local/bin/node
+COPY --from=node:22-bookworm-slim /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
+    && node --version && npm --version
 COPY --from=ghcr.io/astral-sh/uv:0.9 /uv /uvx /usr/local/bin/
 
 # hostd lives in its own virtualenv, out of the way of anything the servers install.
