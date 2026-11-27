@@ -155,8 +155,9 @@ def _analysis(verdict: str, **more: Any) -> dict[str, Any]:
 
 
 async def test_a_grant_for_the_next_hour_lets_the_command_through_but_not_in_automations(
-    authed, fake
-):  # noqa: F811
+    authed,
+    fake,  # noqa: F811 - the fixture of test_computer.py
+):
     pc = await _device(authed)
     async with get_sessionmaker()() as db:
         device = await db.get(Device, uuid.UUID(pc["id"]))
