@@ -17,14 +17,14 @@ from tests.conftest import requires_db
 
 pytestmark = requires_db
 
-DELETE = "Remove-Item C:\dev\logs\old.log"
+DELETE = "Remove-Item C:\\dev\\logs\\old.log"
 
 
 def _allowed(**more: Any) -> dict[str, Any]:
     return {
         "verdict": "allow",
-        "rule": "delete inside work folder C:\dev",
-        "effects": [{"kind": "delete", "path": "C:\dev\logs\old.log", "recursive": False}],
+        "rule": "delete inside work folder C:\\dev",
+        "effects": [{"kind": "delete", "path": "C:\\dev\\logs\\old.log", "recursive": False}],
         "unknown": [],
         "network": False,
         **more,
@@ -41,17 +41,21 @@ def _scoped(ctx: Any, name: str, *, relevance_check: bool = True) -> None:
 def test_what_the_relevance_check_looks_at() -> None:
     delete = _allowed()
     assert relevance.needs_check(delete, set())
-    read = {"effects": [{"kind": "read", "path": "C:\dev\x"}]}
+    read = {"effects": [{"kind": "read", "path": "C:\\dev\\x"}]}
     assert not relevance.needs_check(read, set())
-    write = {"effects": [{"kind": "write", "path": "C:\dev\out\a.txt"}]}
+    write = {"effects": [{"kind": "write", "path": "C:\\dev\\out\\a.txt"}]}
     assert relevance.needs_check(write, set())
-    assert not relevance.needs_check(write, {"c:\dev\out"})  # a folder the chat touched
-    assert relevance.needs_check({"effects": [{"kind": "run", "path": "C:\x", "recursive": True}]}, set())
+    assert not relevance.needs_check(write, {"c:\\dev\\out"})  # a folder the chat touched
+    assert relevance.needs_check(
+        {"effects": [{"kind": "run", "path": "C:\\x", "recursive": True}]}, set()
+    )
 
 
 def test_only_a_clear_no_asks() -> None:
     assert relevance.parse('{"ok": true}').ok
-    no = relevance.parse('Sure: {"ok": false, "why": "deletes photos while the task is about logs"}')
+    no = relevance.parse(
+        'Sure: {"ok": false, "why": "deletes photos while the task is about logs"}'
+    )
     assert not no.ok and no.why == "deletes photos while the task is about logs"
     assert relevance.parse("I am not sure").ok
 
@@ -64,7 +68,11 @@ async def test_the_relevance_check_fails_open(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setattr(relevance, "_check", slow)
     monkeypatch.setattr(relevance, "TIMEOUT_S", 0.05)
     verdict = await relevance.check(
-        device_name="PC", command=DELETE, analysis=_allowed(), conversation_id=None, automation_id=None
+        device_name="PC",
+        command=DELETE,
+        analysis=_allowed(),
+        conversation_id=None,
+        automation_id=None,
     )
     assert verdict.ok and verdict.unavailable
 
@@ -87,11 +95,14 @@ async def test_a_no_from_the_relevance_check_turns_the_allow_into_an_ask(fake, m
     assert _decide(SHELL, args, ctx, {"computer.shell": "autonomous"}) == "ask"
     action = SHELL.actions(args, ctx)[0]
     assert "relevance check" in (action.device_reason or "")
-    assert action.device is not None and action.device["relevance"] == "the task is about CI logs, not this"
+    assert (
+        action.device is not None
+        and action.device["relevance"] == "the task is about CI logs, not this"
+    )
     assert action.device["scopes"] == ["once"]
 
     # Switched off in the profile: no check, the allow stands.
-    other = computer.ShellInput(device="Main PC", command="Remove-Item C:\dev\logs\b.log")
+    other = computer.ShellInput(device="Main PC", command="Remove-Item C:\\dev\\logs\\b.log")
     _scoped(ctx, "Main PC", relevance_check=False)
     await SHELL.prepare(other, ctx)
     assert len(asked) == 1
@@ -104,13 +115,27 @@ async def test_an_automation_on_an_unrestricted_computer_works_as_scoped(fake): 
     fake.add("VM", "trusted", shell=True)
     robot = await _ctx(fake, automation_id=uuid.uuid4())
     info = robot.state["computers"]["vm"]
-    info.update(preset="unrestricted", profile_name="Unrestricted", categories=dict(perms.PRESETS["unrestricted"].categories))
+    info.update(
+        preset="unrestricted",
+        profile_name="Unrestricted",
+        categories=dict(perms.PRESETS["unrestricted"].categories),
+    )
     computer.as_automation(info)
     assert computer.levels(info)["shell"] == "folders" and computer.levels(info)["act"] == "ask"
     auto = {"computer.act": "autonomous"}
-    assert _decide(computer.ComputerAct(), computer.ActInput(device="VM", action="click", ref="c1"), robot, auto) == "ask"
+    assert (
+        _decide(
+            computer.ComputerAct(),
+            computer.ActInput(device="VM", action="click", ref="c1"),
+            robot,
+            auto,
+        )
+        == "ask"
+    )
     # With "Unrestricted for automations" on, it stays Unrestricted.
-    info.update(categories=dict(perms.PRESETS["unrestricted"].categories), automations_unrestricted=True)
+    info.update(
+        categories=dict(perms.PRESETS["unrestricted"].categories), automations_unrestricted=True
+    )
     computer.as_automation(info)
     assert computer.levels(info)["shell"] == "allow"
 
@@ -123,7 +148,13 @@ async def test_a_shell_command_is_in_the_activity_log(fake):  # noqa: F811
     def answer(action: str, fields: dict[str, Any]) -> dict[str, Any]:
         if action == "shell.analyze":
             return _allowed()
-        return {"exit_code": 0, "stdout": "", "stderr": "", "recycled": False, "work_folder": "C:\Users\a\AnemoWork"}
+        return {
+            "exit_code": 0,
+            "stdout": "",
+            "stderr": "",
+            "recycled": False,
+            "work_folder": "C:\\Users\\a\\AnemoWork",
+        }
 
     fake.answer = answer
     args = computer.ShellInput(device="Main PC", command=DELETE)
@@ -135,5 +166,5 @@ async def test_a_shell_command_is_in_the_activity_log(fake):  # noqa: F811
     assert entry is not None and entry.action == "device.shell"
     assert entry.summary.startswith("Ran on Main PC: Remove-Item")
     after = entry.after or {}
-    assert after["command"] == DELETE and after["rule"] == "delete inside work folder C:\dev"
+    assert after["command"] == DELETE and after["rule"] == "delete inside work folder C:\\dev"
     assert after["deletes"] == "permanent" and after["exit_code"] == 0 and entry.undo is None
