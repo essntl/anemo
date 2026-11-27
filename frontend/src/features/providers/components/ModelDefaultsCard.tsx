@@ -17,7 +17,7 @@ const TASKS: { key: TaskKey; label: string; hint: string; needs?: string }[] = [
   { key: 'title', label: msg('Titles'), hint: msg('Naming conversations. A small, fast model is ideal.') },
   { key: 'summarization', label: msg('Summaries'), hint: msg('Compacting long conversations and documents.') },
   { key: 'memory', label: msg('Memory'), hint: msg('Extracting memories from conversations.') },
-  { key: 'background', label: msg('Background tasks'), hint: msg('Indexing and other housekeeping.') },
+  { key: 'background', label: msg('Background tasks'), hint: msg('Indexing and other housekeeping; titles, summaries and memory use it when they have no model of their own.') },
   { key: 'inline', label: msg('Inline & formatting'), hint: msg('Anemo Companion: translate and explain on web pages, and formatting what it saves. A fast model is ideal.') },
   { key: 'automation', label: msg('Automations'), hint: msg('Scheduled agent jobs.'), needs: 'tools' },
   { key: 'embeddings', label: msg('Embeddings'), hint: msg('Semantic search and memory retrieval.'), needs: 'embeddings' },
