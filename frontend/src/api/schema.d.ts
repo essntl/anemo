@@ -3864,6 +3864,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/devices/{device_id}/grants/{grant_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Grant
+         * @description Revoke a "the next hour" grant at once (only tightens, so no password needed).
+         */
+        delete: operations["revoke_grant_api_devices__device_id__grants__grant_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/devices": {
         parameters: {
             query?: never;
@@ -7752,7 +7772,9 @@ export interface components {
              * @default once
              * @enum {string}
              */
-            scope: "once" | "run";
+            scope: "once" | "run" | "folder" | "hour" | "command";
+            /** Folder */
+            folder?: string | null;
             /** Reason */
             reason?: string | null;
             plan?: components["schemas"]["PlanIn"] | null;
@@ -23067,6 +23089,38 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DevicePermissionsOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_grant_api_devices__device_id__grants__grant_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+                grant_id: string;
+            };
+            cookie?: {
+                aiw_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

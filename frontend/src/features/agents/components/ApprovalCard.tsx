@@ -11,6 +11,8 @@ import { type ToolCallView, useDecide, useTimeline } from '../api'
 import { pendingApproval } from '../question'
 import { batchItems } from '../batch'
 import { BatchItems } from './BatchItems'
+import { type DeviceOptions, deviceOptions } from '../deviceOptions'
+import { DeviceApproval } from './DeviceApproval'
 
 const RISK_TEXT: Record<string, string> = { moderate: msg('moderate risk'), dangerous: msg('dangerous risk') }
 
@@ -25,6 +27,7 @@ export function ApprovalCard({ runId, call, docked }: { runId: string; call: Too
   const approvalId = call.approval!.id
   const busy = decide.isPending
   const items = batchItems(call)
+  const device: DeviceOptions | null = deviceOptions(call)
   useShortcut('chat.allow', () => decide.mutate({ approvalId, decision: 'approve', scope: 'once' }), Boolean(docked) && !busy)
   useShortcut('chat.deny', () => setDenying(true), Boolean(docked) && !busy && !denying)
   return (
@@ -39,6 +42,7 @@ export function ApprovalCard({ runId, call, docked }: { runId: string; call: Too
             {call.risk && call.risk !== 'safe' ? ` · ${RISK_TEXT[call.risk] ? t(RISK_TEXT[call.risk]) : t('{risk} risk', { risk: call.risk })}` : ''}
           </div>
           {items.length > 0 && <BatchItems items={items} />}
+          {device && <DeviceApproval options={device} />}
         </div>
       </div>
       {denying ? (
@@ -57,6 +61,10 @@ export function ApprovalCard({ runId, call, docked }: { runId: string; call: Too
           </Button>
           <Button size="sm" variant="ghost" onClick={() => setDenying(false)}>{t('Back')}</Button>
         </div>
+      ) : device ? (
+        <DeviceApproval.Buttons options={device} busy={busy}
+          onDecide={(scope, folder) => decide.mutate({ approvalId, decision: 'approve', scope, folder })}
+          onDeny={() => setDenying(true)} />
       ) : (
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Button size="sm" variant="primary" loading={busy}

@@ -16084,6 +16084,69 @@
         }
       }
     },
+    "/api/devices/{device_id}/grants/{grant_id}": {
+      "delete": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "Revoke Grant",
+        "description": "Revoke a \"the next hour\" grant at once (only tightens, so no password needed).",
+        "operationId": "revoke_grant_api_devices__device_id__grants__grant_id__delete",
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Device Id"
+            }
+          },
+          {
+            "name": "grant_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Grant Id"
+            }
+          },
+          {
+            "name": "aiw_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Aiw Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/devices": {
       "get": {
         "tags": [
@@ -29323,10 +29386,25 @@
             "type": "string",
             "enum": [
               "once",
-              "run"
+              "run",
+              "folder",
+              "hour",
+              "command"
             ],
             "title": "Scope",
             "default": "once"
+          },
+          "folder": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 400
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder"
           },
           "reason": {
             "anyOf": [

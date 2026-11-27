@@ -1225,8 +1225,8 @@ public sealed partial class PowerShellAnalyser
                 continue;
             }
 
-            var (v, why, folder) = _zones.Judge(raw.Path, raw.Kind, raw.Children, profile, folders);
-            effects.Add(new ShellEffect(raw.Kind, raw.Path, raw.Recursive || raw.Children, folder?.Path, folder?.Recycle ?? false));
+            var (v, why, folder, zone) = _zones.Judge(raw.Path, raw.Kind, raw.Children, profile, folders);
+            effects.Add(new ShellEffect(raw.Kind, raw.Path, raw.Recursive || raw.Children, folder?.Path, folder?.Recycle ?? false, zone));
             // The strictest effect decides; at the same verdict a change says more than a read.
             if (rule is null || v > verdict || (v == verdict && raw.Kind != EffectKind.Read && ruleKind == EffectKind.Read))
             {
@@ -1269,7 +1269,56 @@ public sealed partial class PowerShellAnalyser
             return new ShellAnalysis(Verdict.Ask, effects, found.Unknown, "this computer's permission profile asks before every command", found.Network, profile.Version);
         }
 
-        return new ShellAnalysis(verdict, effects, found.Unknown, rule ?? "changes nothing on this computer", found.Network, profile.Version);
+        var result = new ShellAnalysis(verdict, effects, found.Unknown, rule ?? "changes nothing on this computer", found.Network, profile.Version);
+        if (verdict == Verdict.Ask && shell == "folders" && effects.All(e => e.Protected is null))
+        {
+            var common = CommonFolder(found.Effects.Where(e => e.Kind != EffectKind.Read).Select(FolderOf));
+            if (common is not null && _zones.Grantable(common))
+            {
+                var parent = WinPath.Parent(common);
+                result = result with
+                {
+                    Folder = common,
+                    ParentFolder = !WinPath.Same(parent, common) && _zones.Grantable(parent) ? parent : null,
+                };
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>The folder an effect happens in: a folder whose content it changes, else the one holding its path.</summary>
+    private static string FolderOf(RawEffect e) =>
+        e.Children || (e.Kind == EffectKind.Run && !Path.GetFileName(e.Path).Contains('.')) ? e.Path : WinPath.Parent(e.Path);
+
+    /// <summary>The deepest folder holding all of these (null for none, or different drives).</summary>
+    internal static string? CommonFolder(IEnumerable<string> folders)
+    {
+        string[]? common = null;
+        foreach (var folder in folders)
+        {
+            var parts = folder.TrimEnd('\\').Split('\\');
+            if (common is null)
+            {
+                common = parts;
+                continue;
+            }
+
+            var n = 0;
+            while (n < common.Length && n < parts.Length && string.Equals(common[n], parts[n], StringComparison.OrdinalIgnoreCase))
+            {
+                n++;
+            }
+
+            common = common[..n];
+        }
+
+        if (common is null || common.Length == 0)
+        {
+            return null;
+        }
+
+        return common.Length == 1 ? common[0] + "\\" : string.Join('\\', common);
     }
 
     private bool MentionsHardFloor(string command) =>

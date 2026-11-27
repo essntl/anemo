@@ -93,7 +93,7 @@ public sealed class PathZones
     /// <paramref name="children"/>: the effect is on what is below the folder, not the folder
     /// itself (a wildcard, <c>Get-ChildItem x | Remove-Item</c>).
     /// </summary>
-    public (Verdict Verdict, string Rule, WorkFolder? Folder) Judge(
+    public (Verdict Verdict, string Rule, WorkFolder? Folder, string? Protected) Judge(
         string path, EffectKind kind, bool children, PermissionProfile profile, IReadOnlyList<(WorkFolder Folder, string Path)> workFolders)
     {
         var shell = profile.Level("shell");
@@ -106,18 +106,18 @@ public sealed class PathZones
         {
             if (Touches(p, path, takesBelow))
             {
-                return (Verdict.Deny, $"Anemo Desktop's own folder {p.Path}: never touched by an agent", null);
+                return (Verdict.Deny, $"Anemo Desktop's own folder {p.Path}: never touched by an agent", null, "hard");
             }
         }
 
         if (shell == "deny")
         {
-            return (Verdict.Deny, "the shell is off in this computer's permission profile", null);
+            return (Verdict.Deny, "the shell is off in this computer's permission profile", null, null);
         }
 
         if (shell == "policy")
         {
-            return (Verdict.Allow, "as the Agent Permissions say (Trusted (legacy))", null);
+            return (Verdict.Allow, "as the Agent Permissions say (Trusted (legacy))", null, null);
         }
 
         var unrestricted = shell == "allow";
@@ -130,8 +130,8 @@ public sealed class PathZones
                 {
                     var level = profile.Protected.TryGetValue(p.Key, out var set) ? set : "deny";
                     return level == "ask"
-                        ? (Verdict.Ask, $"the protected folder {p.Path}", null)
-                        : (Verdict.Deny, $"the protected folder {p.Path}: refused", null);
+                        ? (Verdict.Ask, $"the protected folder {p.Path}", null, "deny")
+                        : (Verdict.Deny, $"the protected folder {p.Path}: refused", null, "deny");
                 }
             }
 
@@ -150,30 +150,30 @@ public sealed class PathZones
 
                     if (Touches(p, path, takesBelow))
                     {
-                        return (Verdict.Ask, $"the protected folder {p.Path}", null);
+                        return (Verdict.Ask, $"the protected folder {p.Path}", null, "ask");
                     }
                 }
 
                 if (WinPath.IsDriveRoot(path))
                 {
-                    return (Verdict.Ask, $"the root of the drive {path[..2]}", null);
+                    return (Verdict.Ask, $"the root of the drive {path[..2]}", null, "ask");
                 }
             }
         }
 
         if (!changes)
         {
-            return (Verdict.Allow, "reads only", null);
+            return (Verdict.Allow, "reads only", null, null);
         }
 
         if (unrestricted)
         {
-            return (Verdict.Allow, "Unrestricted: the whole computer is a work folder", null);
+            return (Verdict.Allow, "Unrestricted: the whole computer is a work folder", null, null);
         }
 
         if (shell == "ask")
         {
-            return (Verdict.Ask, "this computer's permission profile asks before every command", null);
+            return (Verdict.Ask, "this computer's permission profile asks before every command", null, null);
         }
 
         // 4. Work folders: the deepest that holds the path. Deleting the work folder itself asks.
@@ -181,16 +181,16 @@ public sealed class PathZones
         if (holder.Folder is not null)
         {
             var verb = kind switch { EffectKind.Delete => "delete", EffectKind.Run => "runs", _ => "writes" };
-            return (Verdict.Allow, $"{verb} inside work folder {holder.Folder.Path}", holder.Folder);
+            return (Verdict.Allow, $"{verb} inside work folder {holder.Folder.Path}", holder.Folder, null);
         }
 
         if (kind == EffectKind.Delete && workFolders.Any(w => WinPath.Same(w.Path, path)))
         {
-            return (Verdict.Ask, $"deletes the work folder {path} itself", null);
+            return (Verdict.Ask, $"deletes the work folder {path} itself", null, null);
         }
 
         var what = kind switch { EffectKind.Delete => "deletes", EffectKind.Run => "runs a program in", _ => "writes" };
-        return (Verdict.Ask, $"{what} {path}, outside the work folders (read-only there)", null);
+        return (Verdict.Ask, $"{what} {path}, outside the work folders (read-only there)", null, null);
     }
 
     private static (WorkFolder? Folder, string Path) Holder(
@@ -200,6 +200,36 @@ public sealed class PathZones
             .OrderByDescending(w => w.Path.Length)
             .Select(w => ((WorkFolder?)w.Folder, w.Path))
             .FirstOrDefault();
+
+    /// <summary>
+    /// Whether a click in an approval may make <paramref name="folder"/> a work folder or grant
+    /// it for an hour (§6.2): never a drive's root, never inside a protected folder, and never a
+    /// folder that holds an ask-protected one (the user folder, Windows, AppData), so a click
+    /// can't open those up by accident. Deny-protected folders inside stay refused anyway.
+    /// </summary>
+    public bool Grantable(string folder)
+    {
+        if (WinPath.IsDriveRoot(folder))
+        {
+            return false;
+        }
+
+        foreach (var p in _protected)
+        {
+            var real = Real(p.Path);
+            if (WinPath.InsideOrSame(real, folder) && !(p.ExactOnly && !WinPath.Same(real, folder)))
+            {
+                return false;
+            }
+
+            if (p.Level is "ask" && WinPath.Inside(folder, real))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     private bool Touches(ProtectedFolder p, string path, bool takesBelow)
     {

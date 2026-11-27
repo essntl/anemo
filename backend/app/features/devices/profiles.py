@@ -8,7 +8,7 @@ what the server decided with.
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import func, select
@@ -100,6 +100,60 @@ async def active_grants(db: AsyncSession, device_id: uuid.UUID) -> list[DeviceGr
             .order_by(DeviceGrant.expires_at.desc())
         )
     )
+
+
+async def add_grant(
+    db: AsyncSession,
+    device: Device,
+    *,
+    folder: str | None,
+    command_hash: str | None,
+    approval_id: uuid.UUID | None,
+    minutes: int = 60,
+) -> DeviceGrant:
+    """A "the next hour" grant (spec 25 §6.2): writes, deletes and runs in `folder`, or
+    exactly the command with `command_hash`. Kept by the server only. Doesn't commit."""
+    grant = DeviceGrant(
+        id=uuid7(),
+        device_id=device.id,
+        expires_at=datetime.now(UTC) + timedelta(minutes=minutes),
+        folder=folder,
+        command_hash=command_hash,
+        approval_id=approval_id,
+    )
+    db.add(grant)
+    audit.record(
+        db,
+        "device.grant_added",
+        target_type="device",
+        target_id=device.id,
+        details={"name": device.name, "folder": folder, "command": bool(command_hash)},
+    )
+    return grant
+
+
+async def revoke_grant(db: AsyncSession, device_id: uuid.UUID, grant_id: uuid.UUID) -> None:
+    grant = await db.get(DeviceGrant, grant_id)
+    if grant is None or grant.device_id != device_id:
+        raise NotFound("Grant not found")
+    audit.record(
+        db,
+        "device.grant_revoked",
+        target_type="device",
+        target_id=device_id,
+        details={"folder": grant.folder, "command": bool(grant.command_hash)},
+    )
+    await db.delete(grant)
+    await db.commit()
+
+
+def with_work_folder(device: Device, folder: str) -> list[perms.WorkFolder]:
+    """The device's work folders plus `folder`, added from an approval ("This folder")."""
+    current = [perms.WorkFolder.model_validate(f) for f in device.work_folders or []]
+    if any(f.path.casefold() == folder.casefold() for f in current):
+        return current
+    added = f"approval:{datetime.now(UTC).date().isoformat()}"
+    return [*current, perms.WorkFolder(path=folder, recycle=True, added_from=added)]
 
 
 def effective(device: Device, profile: DeviceProfile) -> dict[str, Any]:
@@ -253,9 +307,11 @@ async def set_permissions(
     automations_unrestricted: bool | None = None,
     ip: str | None,
     audit_action: str | None = "device.permissions_changed",
+    commit: bool = True,
 ) -> tuple[bool, bool]:
-    """Change the device's profile and/or its own part. Commits. Returns (anything
-    changed, the old trust level changed): the caller tells the device."""
+    """Change the device's profile and/or its own part. Commits, unless `commit` is False
+    (part of a bigger change: an approval's "This folder"). Returns (anything changed, the
+    old trust level changed): the caller tells the device."""
     profile = await get_profile(db, profile_id or device.profile_id)
     before_profile = await get_profile(db, device.profile_id)
     before = effective(device, before_profile)
@@ -292,6 +348,9 @@ async def set_permissions(
                 "loosened": perms.loosens(before, after),
             },
         )
+    if not commit:
+        await db.flush()
+        return changed, old_trust != device.trust
     await db.commit()
     await db.refresh(device)
     return changed, old_trust != device.trust

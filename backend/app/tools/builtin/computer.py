@@ -48,6 +48,7 @@ from app.core.db import get_sessionmaker
 from app.features.attachments import images
 from app.features.devices import permissions as perms
 from app.features.devices import profile_sync, relay, shared_screen
+from app.features.devices import profiles as device_profiles
 from app.features.devices import service as devices
 from app.features.runs.models import Approval
 from app.policy.models import Action, Decision, Risk
@@ -83,6 +84,10 @@ _CONTROLS = "computer_controls"  # ctx.state: {casefolded name: {ref: descriptio
 _PASSWORDS = "computer_passwords"  # ctx.state: {casefolded name: refs of password fields}
 _WINDOWS = "computer_windows"  # ctx.state: {casefolded name: {window ref: title}}
 _ANALYSES = "computer_shell_analyses"  # ctx.state: {device id + command hash: shell.analyze answer}
+_GRANTS = "computer_device_grants"  # ctx.state: {device id: [active "next hour" grants]}
+_USED_GRANT = (
+    "computer_used_grant"  # ctx.state: {device id + command hash: the grant that allowed it}
+)
 # How long the server waits for the device's analysis before falling back (spec 25 §6.1).
 ANALYZE_TIMEOUT_S = 3.0
 NOT_CHECKED = " (Anemo Desktop couldn't check this command, so the old rules decided)"
@@ -269,8 +274,11 @@ async def _decision_fields(ctx: ToolContext, device: Any, command: str) -> dict[
     gave, or the rule that allowed it, and the profile version it was decided with."""
     fields: dict[str, Any] = {"profile_version": getattr(device, "permissions_version", 0)}
     approval = await _approval_of(ctx)
+    used = (ctx.state.get(_USED_GRANT) or {}).get(analysis_key(str(device.id), command))
     if approval is not None:
         fields["approval"] = approval
+    elif used is not None:
+        fields["approval"] = {"id": str(used.get("approval_id") or used["id"]), "scope": "hour"}
     else:
         known = _known(ctx, device.name)
         analysis = analysis_for(ctx, known, command) if known is not None else None
@@ -292,7 +300,91 @@ async def _approval_of(ctx: ToolContext) -> dict[str, Any] | None:
         )
     if approval is None:
         return None
-    return {"id": str(approval.id), "scope": "once"}
+    scope = approval.scope if approval.scope in ("folder", "hour", "command") else "once"
+    return {"id": str(approval.id), "scope": scope}
+
+
+async def _load_grants(ctx: ToolContext, device_id: str) -> None:
+    """The device's active "next hour" grants, for `actions()`. Never in an automation run
+    (spec 25 §9: automations use the profile and its work folders, never these grants)."""
+    if ctx.automation_id is not None:
+        return
+    async with get_sessionmaker()() as db:
+        rows = await device_profiles.active_grants(db, uuid.UUID(device_id))
+    ctx.state.setdefault(_GRANTS, {})[device_id] = [
+        {
+            "id": str(g.id),
+            "folder": g.folder,
+            "command_hash": g.command_hash,
+            "approval_id": str(g.approval_id) if g.approval_id else None,
+            "expires_at": g.expires_at.timestamp(),
+        }
+        for g in rows
+    ]
+
+
+def _grant_for(
+    ctx: ToolContext, device: dict[str, Any], command: str, analysis: dict[str, Any]
+) -> dict[str, Any] | None:
+    """An active grant that covers this command: the exact command (by its hash), or a
+    folder that holds every write, delete and run of a command the device could read and
+    that touches no protected folder (spec 25 §6.2)."""
+    now = datetime.now(UTC).timestamp()
+    grants = [
+        g for g in (ctx.state.get(_GRANTS) or {}).get(device["id"], []) if g["expires_at"] > now
+    ]
+    digest = hashlib.sha256(command.encode()).hexdigest()
+    for grant in grants:
+        if grant.get("command_hash") == digest:
+            return grant
+    effects = [e for e in analysis.get("effects") or [] if isinstance(e, dict)]
+    if analysis.get("unknown") or any(e.get("protected") for e in effects):
+        return None
+    changes = [str(e.get("path") or "") for e in effects if e.get("kind") != "read"]
+    if not changes:
+        return None
+    for grant in grants:
+        folder = grant.get("folder")
+        if folder and all(_win_inside_or_same(folder, path) for path in changes):
+            return grant
+    return None
+
+
+def _win_inside_or_same(folder: str, path: str) -> bool:
+    a, b = folder.rstrip("\\").casefold(), path.rstrip("\\").casefold()
+    return b == a or b.startswith(a + "\\")
+
+
+def _approval_options(
+    device: dict[str, Any], command: str, analysis: dict[str, Any], level: str
+) -> dict[str, Any]:
+    """What the approval of this command offers (spec 25 §6.2): Once always; This folder and
+    The next hour for a command the device could read, in a folder that isn't protected;
+    "this exact command" for one it couldn't read."""
+    folder = analysis.get("folder") if level == "folders" else None
+    opaque = bool(analysis.get("unknown"))
+    if opaque:
+        scopes = ["once", "command"]
+    elif folder:
+        scopes = ["once", "folder", "hour"]
+    else:
+        scopes = ["once"]
+    effects = [
+        {"kind": str(e.get("kind")), "path": str(e.get("path"))[:400]}
+        for e in (analysis.get("effects") or [])[:20]
+        if isinstance(e, dict)
+    ]
+    return {
+        "device_id": device["id"],
+        "device_name": device["name"],
+        "rule": str(analysis.get("rule") or "")[:300],
+        "effects": effects,
+        "unknown": [str(u)[:200] for u in (analysis.get("unknown") or [])[:5]],
+        "folder": folder,
+        "parent_folder": analysis.get("parent_folder") if folder else None,
+        "scopes": scopes,
+        "command_hash": hashlib.sha256(command.encode()).hexdigest(),
+    }
 
 
 def _blocked_for_acting(ctx: ToolContext, name: str) -> str | None:
@@ -1170,6 +1262,7 @@ class ComputerShell(Tool):
             return
         if "shell.analyze" not in (device.get("capabilities") or []):
             return
+        await _load_grants(ctx, device["id"])
         analyses: dict[str, Any] = ctx.state.setdefault(_ANALYSES, {})
         key = analysis_key(device["id"], args.command)
         if key in analyses:
@@ -1195,6 +1288,7 @@ class ComputerShell(Tool):
         why = f" ({'; '.join(rating.reasons)})" if rating.reasons else ""
         blocked = _blocked_for_acting(ctx, args.device)
         decision, reason = None, None
+        device_info: dict[str, Any] | None = None
         network = rating.network
         if blocked is None and device is not None:
             decision, reason, denied = device_layer(device, "shell", shell)
@@ -1213,6 +1307,20 @@ class ComputerShell(Tool):
                 why = f" ({rule})" if rule else ""
                 risk = _risk_of(analysis)
                 network = network or bool(analysis.get("network"))
+                grant = (
+                    _grant_for(ctx, device, args.command, analysis) if decision == "ask" else None
+                )
+                if grant is not None:
+                    # "The next hour" (spec 25 §6.2): approved earlier, for the folder or command.
+                    decision = "allow"
+                    covered = grant.get("folder") or "this exact command"
+                    reason = f"approved for the next hour on “{device['name']}”: {covered}"
+                    risk = "moderate"
+                    ctx.state.setdefault(_USED_GRANT, {})[
+                        analysis_key(device["id"], args.command)
+                    ] = grant
+                elif decision == "ask":
+                    device_info = _approval_options(device, args.command, analysis, level)
             elif blocked is None and level == "folders" and not is_powershell(kind):
                 # macOS has no analyser yet (spec 25 §10): on Scoped every zsh/bash command
                 # the rating doesn't call safe asks; read-only ones go through.
@@ -1231,6 +1339,7 @@ class ComputerShell(Tool):
                 contacts_people=network,
                 device_decision=decision,
                 device_reason=reason,
+                device=device_info,
             )
         ]
 

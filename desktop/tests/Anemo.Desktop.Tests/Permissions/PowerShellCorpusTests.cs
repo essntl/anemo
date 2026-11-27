@@ -272,6 +272,22 @@ public sealed class PowerShellCorpusTests : IClassFixture<AnalyserFixture>
         Assert.False((await _fixture.AnalyzeAsync(@"Remove-Item C:\dev\x", AnalyserFixture.Scoped)).RecycleDeletes);
     }
 
+    [Theory]
+    [InlineData(@"Remove-Item C:\Users\artem\Documents\notes\old.md", @"C:\Users\artem\Documents\notes", @"C:\Users\artem\Documents")]
+    [InlineData(@"Remove-Item C:\Users\artem\Documents\notes\a.md; Set-Content C:\Users\artem\Documents\notes\sub\b.md x", @"C:\Users\artem\Documents\notes", @"C:\Users\artem\Documents")]
+    [InlineData(@"Remove-Item C:\Users\artem\Documents\a.md", @"C:\Users\artem\Documents", null)]
+    [InlineData(@"Remove-Item C:\Users\artem\x.txt", null, null)]
+    [InlineData(@"Remove-Item C:\temp\a; Remove-Item D:\b", null, null)]
+    [InlineData(@"Remove-Item C:\Windows\Temp\x", null, null)]
+    [InlineData(@"iex 'Remove-Item C:\temp\x'", null, null)]
+    [InlineData(@"Remove-Item C:\dev\x", null, null)]
+    public async Task The_folder_the_approval_offers_is_never_a_protected_one(string command, string? folder, string? parent)
+    {
+        var analysis = await _fixture.AnalyzeAsync(command, AnalyserFixture.Scoped);
+        Assert.Equal(folder, analysis.Folder);
+        Assert.Equal(parent, analysis.ParentFolder);
+    }
+
     [Fact]
     public async Task Network_use_is_marked_but_does_not_change_the_verdict()
     {

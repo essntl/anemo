@@ -295,6 +295,12 @@ async def get_permissions(device_id: uuid.UUID, db: Db) -> DevicePermissionsOut:
     return await _permissions_out(db, await service.get(db, device_id))
 
 
+@router.delete("/{device_id}/grants/{grant_id}", status_code=204)
+async def revoke_grant(device_id: uuid.UUID, grant_id: uuid.UUID, db: Db) -> None:
+    """Revoke a "the next hour" grant at once (only tightens, so no password needed)."""
+    await profiles.revoke_grant(db, device_id, grant_id)
+
+
 @router.put("/{device_id}/permissions", response_model=DevicePermissionsOut)
 async def set_permissions(
     device_id: uuid.UUID, body: DevicePermissionsIn, request: Request, _: RecentAuth, db: Db
