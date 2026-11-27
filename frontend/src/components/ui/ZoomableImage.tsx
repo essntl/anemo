@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import * as RadixDialog from '@radix-ui/react-dialog'
-import { AnimatePresence, motion, useReducedMotion, type Variants } from 'motion/react'
+import { AnimatePresence, m, useReducedMotion, type Variants } from 'motion/react'
 import { Download, ExternalLink, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { t } from '@/lib/i18n'
@@ -98,12 +98,12 @@ export function ZoomableImage({ src, alt, className, title, filename }: {
               <RadixDialog.Content forceMount aria-describedby={undefined} onClick={close}
                 className="fixed inset-0 z-50 cursor-zoom-out focus:outline-none">
                 <RadixDialog.Title className="sr-only">{alt}</RadixDialog.Title>
-                <motion.div className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+                <m.div className="absolute inset-0 bg-black/80 backdrop-blur-sm"
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={fade} />
-                <motion.img src={src} alt={alt} draggable={false} custom={from} variants={image}
+                <m.img src={src} alt={alt} draggable={false} custom={from} variants={image}
                   initial="small" animate="large" exit="small"
                   className="fixed max-w-none select-none object-cover shadow-float" />
-                <motion.div className="absolute right-3 top-[max(0.75rem,env(safe-area-inset-top))] flex gap-2"
+                <m.div className="absolute right-3 top-[max(0.75rem,env(safe-area-inset-top))] flex gap-2"
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={fade}
                   onClick={(e) => e.stopPropagation()}>
                   <a href={src} target="_blank" rel="noreferrer" aria-label={t('Open in a new tab')} title={t('Open in a new tab')} className={iconButton}>
@@ -115,7 +115,7 @@ export function ZoomableImage({ src, alt, className, title, filename }: {
                   <RadixDialog.Close aria-label={t('Close')} title={t('Close (Esc)')} className={iconButton}>
                     <X />
                   </RadixDialog.Close>
-                </motion.div>
+                </m.div>
               </RadixDialog.Content>
             </RadixDialog.Portal>
           )}

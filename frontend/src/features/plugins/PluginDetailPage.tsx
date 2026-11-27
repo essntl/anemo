@@ -8,7 +8,7 @@
  * the sheet covers the screen. It draws at once from the list's data (api.ts seeds the
  * query), so the transition never shows a loading state; the rest fills in when it arrives.
  */
-import { motion } from 'motion/react'
+import { m } from 'motion/react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -128,14 +128,14 @@ export function PluginDetailPage() {
         <ChevronLeft className="h-4 w-4" />{t('All plugins')}
       </button>
       <div className="flex items-start gap-3.5">
-        <motion.div layoutId={heroLayoutId(plugin.id, 'icon', mode)} style={heroStyle(true, HERO_ICON, mode)} className="shrink-0">
+        <m.div layoutId={heroLayoutId(plugin.id, 'icon', mode)} style={heroStyle(true, HERO_ICON, mode)} className="shrink-0">
           <PluginIcon url={plugin.icon_url} size={56} />
-        </motion.div>
+        </m.div>
         <div className="min-w-0 flex-1">
-          <motion.h2 layoutId={heroLayoutId(plugin.id, 'name', mode)} style={heroStyle(true, HERO_NAME, mode)}
+          <m.h2 layoutId={heroLayoutId(plugin.id, 'name', mode)} style={heroStyle(true, HERO_NAME, mode)}
             className="w-fit max-w-full break-words text-[19px] font-bold tracking-tight">
             {plugin.name}
-          </motion.h2>
+          </m.h2>
           <p className="text-[13px] text-muted">
             {plugin.author.name && <>{plugin.author.name} · </>}
             <span className="tabular-nums">{t('Version {version}', { version: plugin.version })}</span>
@@ -205,7 +205,7 @@ export function PluginDetailPage() {
   )
 
   const sheet = (
-    <motion.section
+    <m.section
       layoutId={heroLayoutId(plugin.id, 'card', mode)}
       style={heroStyle(true, HERO, mode)}
       aria-label={plugin.name}
@@ -219,7 +219,7 @@ export function PluginDetailPage() {
     >
       {header}
       {content}
-    </motion.section>
+    </m.section>
   )
 
   return (

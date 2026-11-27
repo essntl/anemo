@@ -3,6 +3,9 @@
  * Island, the home widget grid, reordering the music queue, the Segmented control).
  * Everything else uses the CSS classes in styles/app.css.
  *
+ * Components use `m.div` (not `motion.div`): the features are loaded lazily by
+ * <LazyMotion> in app/App.tsx (lib/motionFeatures.ts), so they stay out of the first bundle.
+ *
  * Reduced motion: <MotionConfig reducedMotion="user"> (main.tsx) turns movement and
  * layout animations off for people who asked their system for less motion; opacity
  * still fades, so shapes cross-fade instead of morphing.

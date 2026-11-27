@@ -1,5 +1,5 @@
 import { useId, useRef, type KeyboardEvent, type ReactNode } from 'react'
-import { motion } from 'motion/react'
+import { m } from 'motion/react'
 import { cn } from '@/lib/cn'
 import { spring } from '@/lib/motion'
 
@@ -96,7 +96,7 @@ export function Segmented<T extends string>({
             )}
           >
             {active && (
-              <motion.span
+              <m.span
                 layoutId={`segmented-${id}`}
                 transition={spring.snappy}
                 // Dark: a step lighter than the track, so the chosen option looks raised, not pressed in.

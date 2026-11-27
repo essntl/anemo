@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router'
 import * as RadixDialog from '@radix-ui/react-dialog'
-import { motion } from 'motion/react'
+import { m } from 'motion/react'
 import { LayoutGrid, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { t } from '@/lib/i18n'
@@ -44,23 +44,23 @@ export function PagesFolder({ pages, onNavigate }: { pages: PageEntry[]; onNavig
         // Keeps the bar's place while it is open, so the chats above don't jump.
         <div aria-hidden className="h-12 shrink-0" />
       ) : (
-        <motion.button type="button" layoutId={SHAPE} transition={MORPH} onClick={() => setOpen(true)}
+        <m.button type="button" layoutId={SHAPE} transition={MORPH} onClick={() => setOpen(true)}
           aria-haspopup="dialog" aria-label={here ? t('Pages, on {page}', { page: here.title ?? here.label }) : t('Pages')}
           style={{ borderRadius: 14 }}
           className="flex h-12 w-full shrink-0 items-center gap-3 border border-border bg-surface-2 px-3.5 text-left">
-          <motion.span layout="position" className={cn('flex min-w-0 flex-1 items-center gap-2.5 text-[15px] font-medium', here ? 'text-accent' : 'text-text')}>
+          <m.span layout="position" className={cn('flex min-w-0 flex-1 items-center gap-2.5 text-[15px] font-medium', here ? 'text-accent' : 'text-text')}>
             <span className="shrink-0 [&>svg]:h-5 [&>svg]:w-5">{here?.icon ?? <LayoutGrid />}</span>
             <span className="truncate">{here?.label ?? t('Pages')}</span>
-          </motion.span>
+          </m.span>
           {/* A count on a page is never folded away: it shows on the bar too. */}
           {/* layout="position": while the card shrinks back into the bar, these keep their shape. */}
-          <motion.span layout="position" className="flex shrink-0 items-center gap-1.5">
+          <m.span layout="position" className="flex shrink-0 items-center gap-1.5">
             {pages.map((p) => p.badge && <span key={p.to} className="flex scale-90 empty:hidden">{p.badge}</span>)}
-          </motion.span>
-          <motion.span layout="position" aria-hidden className="grid shrink-0 grid-cols-2 gap-0.5 rounded-md bg-surface-hover p-1 text-muted [&_svg]:h-2.5 [&_svg]:w-2.5">
+          </m.span>
+          <m.span layout="position" aria-hidden className="grid shrink-0 grid-cols-2 gap-0.5 rounded-md bg-surface-hover p-1 text-muted [&_svg]:h-2.5 [&_svg]:w-2.5">
             {pages.filter((p) => p !== here).slice(0, 4).map((p) => <span key={p.to}>{p.icon}</span>)}
-          </motion.span>
-        </motion.button>
+          </m.span>
+        </m.button>
       )}
 
       {/* A dialog inside the menu's dialog: Esc and a tap outside fold only the card.
@@ -74,9 +74,9 @@ export function PagesFolder({ pages, onNavigate }: { pages: PageEntry[]; onNavig
           <RadixDialog.Overlay className="fade fixed inset-0 z-50 bg-black/45 backdrop-blur-[3px]" onClick={() => setOpen(false)} />
           <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4">
             <RadixDialog.Content asChild aria-describedby={undefined}>
-              <motion.div layoutId={SHAPE} transition={MORPH} style={{ borderRadius: 24 }}
+              <m.div layoutId={SHAPE} transition={MORPH} style={{ borderRadius: 24 }}
                 className="pointer-events-auto relative w-[min(100%,21rem)] overflow-hidden border border-border bg-card p-3 shadow-float focus:outline-none">
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { delay: 0.1, duration: 0.16 } }}>
+                <m.div initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { delay: 0.1, duration: 0.16 } }}>
                   <div className="mb-2 flex items-center justify-between pl-2">
                     <RadixDialog.Title className="text-[15px] font-semibold">{t('Pages')}</RadixDialog.Title>
                     <RadixDialog.Close aria-label={t('Close pages')}
@@ -97,8 +97,8 @@ export function PagesFolder({ pages, onNavigate }: { pages: PageEntry[]; onNavig
                       </NavLink>
                     ))}
                   </nav>
-                </motion.div>
-              </motion.div>
+                </m.div>
+              </m.div>
             </RadixDialog.Content>
           </div>
         </RadixDialog.Portal>

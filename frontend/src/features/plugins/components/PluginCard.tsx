@@ -1,4 +1,4 @@
-import { motion } from 'motion/react'
+import { m } from 'motion/react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Switch } from '@/components/ui/Switch'
 import { cn } from '@/lib/cn'
@@ -26,7 +26,7 @@ export function PluginCard({ plugin, hero, mode, onOpen }: { plugin: PluginOut; 
   const warm = () => prefetchPlugin(qc, plugin.id)
 
   return (
-    <motion.article
+    <m.article
       layoutId={heroLayoutId(plugin.id, 'card', mode)}
       style={heroStyle(hero, HERO, mode)}
       aria-labelledby={`plugin-${plugin.id}-name`}
@@ -43,14 +43,14 @@ export function PluginCard({ plugin, hero, mode, onOpen }: { plugin: PluginOut; 
         className="absolute inset-0 z-0 rounded-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" />
 
       <div className="pointer-events-none flex items-start gap-3">
-        <motion.div layoutId={heroLayoutId(plugin.id, 'icon', mode)} style={heroStyle(hero, HERO_ICON, mode)} className="shrink-0">
+        <m.div layoutId={heroLayoutId(plugin.id, 'icon', mode)} style={heroStyle(hero, HERO_ICON, mode)} className="shrink-0">
           <PluginIcon url={plugin.icon_url} size={40} />
-        </motion.div>
+        </m.div>
         <div className="min-w-0 flex-1">
-          <motion.h3 layoutId={heroLayoutId(plugin.id, 'name', mode)} id={`plugin-${plugin.id}-name`}
+          <m.h3 layoutId={heroLayoutId(plugin.id, 'name', mode)} id={`plugin-${plugin.id}-name`}
             style={heroStyle(hero, HERO_NAME, mode)} className="w-fit max-w-full truncate text-[15px] font-semibold">
             {plugin.name}
-          </motion.h3>
+          </m.h3>
           <p className="text-[12px] tabular-nums text-subtle">{plugin.version}</p>
         </div>
         <div className="pointer-events-auto relative z-10 pt-1" onClick={(e) => e.stopPropagation()}>
@@ -64,6 +64,6 @@ export function PluginCard({ plugin, hero, mode, onOpen }: { plugin: PluginOut; 
         <PluginBadges plugin={plugin} />
         {plugin.status === 'error' && plugin.error && <span className="sr-only">{plugin.error}</span>}
       </div>
-    </motion.article>
+    </m.article>
   )
 }

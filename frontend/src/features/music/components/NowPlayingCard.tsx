@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from 'react'
-import { motion } from 'motion/react'
+import { m } from 'motion/react'
 import { Loader2, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume1, Volume2, VolumeX } from 'lucide-react'
 import { Slider } from '@/components/ui/Slider'
 import { cn } from '@/lib/cn'
@@ -101,10 +101,10 @@ export function NowPlayingCard({ onYouTubeCheck }: { onYouTubeCheck: () => void 
         <Artwork track={p.track} fill className="scale-125 opacity-30 blur-3xl" />
       )}
       <div className="relative">
-        <motion.div key={p.track?.id ?? 'none'} initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: p.playing ? 1 : 0.96 }}
+        <m.div key={p.track?.id ?? 'none'} initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: p.playing ? 1 : 0.96 }}
           transition={spring.smooth} className="mx-auto aspect-square w-full max-w-[300px] overflow-hidden rounded-panel shadow-[0_24px_48px_rgb(0_0_0/0.4)]">
           <Artwork track={p.track} className="h-full w-full bg-white/10 [&_svg]:text-white/50" />
-        </motion.div>
+        </m.div>
         <div className="mt-5 min-h-[52px] text-center">
           <h2 className="line-clamp-2 text-[24px] font-bold leading-tight tracking-tight md:text-[28px]">{p.track?.title ?? t('Nothing playing')}</h2>
           <p className="mt-0.5 truncate text-[14px] text-white/75">
