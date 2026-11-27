@@ -1,7 +1,7 @@
 """How big the built-in tool specs are as the model receives them.
 
 Every agent request starts with the tool list, so its size is paid on every request
-(cached or not). `python -m app.cli tool-spec-sizes` prints it per tool; a unit test
+(cached or not). `python -m app.cli request-size --tools` prints it per tool; a unit test
 keeps the total under a budget (tests/unit/test_tool_spec_size.py).
 """
 

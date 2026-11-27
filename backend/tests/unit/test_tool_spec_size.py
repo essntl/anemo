@@ -14,7 +14,7 @@ from app.tools.spec_size import spec_sizes
 
 # Total characters of every offered built-in tool spec (compact JSON). A bit above the
 # size when it was set (90,205 chars, ~27.3k tokens); raise it on purpose when a new tool
-# needs the room, not by accident. `python -m app.cli tool-spec-sizes` shows what is big.
+# needs the room, not by accident. `python -m app.cli request-size --tools` shows what is big.
 TOTAL_BUDGET = 92_500
 
 
@@ -109,7 +109,7 @@ def test_the_tool_specs_stay_within_their_budget():
     total = sum(row[3] for row in spec_sizes())
     assert total <= TOTAL_BUDGET, (
         f"The tool specs grew to {total} chars (budget {TOTAL_BUDGET}); "
-        "see `python -m app.cli tool-spec-sizes`"
+        "see `python -m app.cli request-size --tools`"
     )
 
 
