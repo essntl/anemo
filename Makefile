@@ -7,7 +7,7 @@ SNAPSHOT = -v "$$PWD/frontend/src/api/openapi.json:/openapi.json:ro" -e OPENAPI_
 # runs them in one process, as plain `pytest` does.
 n ?= auto
 
-.PHONY: up down dev build logs test test-backend test-frontend coverage e2e lint fmt migrate revision gen-api backup
+.PHONY: up down dev build logs test test-backend test-frontend coverage e2e lint fmt fmt-changed migrate revision gen-api backup
 
 up:            ## Production stack (records the checkout's commit for the update notice)
 	APP_COMMIT=$$(git rev-parse HEAD 2>/dev/null) docker compose up -d --build
@@ -31,8 +31,15 @@ e2e:           ## every end-to-end test, against a throwaway stack
 
 lint:
 	$(RUN) sh -c "ruff check . && ruff format --check . && mypy app && lint-imports"
-fmt:
+fmt:           ## fix and format all of backend/ (the side containers' Python is not formatted)
 	$(RUN) sh -c "ruff check --fix . && ruff format ."
+# Only the backend .py files that differ from origin/main (base=<ref> for another), so a
+# format run never touches code the change didn't. The container sees backend/ only.
+base ?= origin/main
+fmt-changed:   ## fix and format only the backend .py files changed since origin/main
+	@files=$$(git diff --name-only --diff-filter=d $(base) -- 'backend/*.py' | sed 's|^backend/||' | tr '\n' ' '); \
+	if [ -z "$$files" ]; then echo "no changed backend .py files"; \
+	else echo "$$files"; $(RUN) sh -c "ruff check --fix $$files && ruff format $$files"; fi
 
 migrate:
 	$(DEV) run --rm migrate

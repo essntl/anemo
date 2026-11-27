@@ -9,6 +9,9 @@ claude-code-check run a short agent conversation on the Claude subscription prov
 tool-spec-sizes   print the size of every built-in tool spec as the model receives it
 usage-report      tokens per kind of work and per model (uncached, cached, written,
                   output) and the biggest requests (`usage-report --help` for options)
+request-size [RUN_ID]  the size of a run's first model request: system prompt, tool
+                  specs (the biggest listed), earlier messages, the new message and its
+                  turn context (default: the newest chat or agent run)
 """
 
 import asyncio
@@ -26,6 +29,29 @@ def _hash_password() -> int:
         return 1
     # Single quotes stop Docker Compose from interpolating the '$' characters.
     print(f"ADMIN_PASSWORD_HASH='{PasswordHasher().hash(pw)}'")
+    return 0
+
+
+async def _request_size(args: list[str]) -> int:
+    import uuid
+
+    import app.db.models  # noqa: F401 - every table, so the ORM can resolve foreign keys
+    from app.core.db import get_sessionmaker
+    from app.core.errors import NotFound
+    from app.runtime.request_size import first_request, report
+
+    try:
+        run_id = uuid.UUID(args[0]) if args else None
+    except ValueError:
+        print(f"Not a run id: {args[0]}", file=sys.stderr)
+        return 2
+    async with get_sessionmaker()() as db:
+        try:
+            size = await first_request(db, run_id)
+        except NotFound as exc:
+            print(exc.message, file=sys.stderr)
+            return 1
+    print(report(size))
     return 0
 
 
@@ -62,6 +88,8 @@ def main(argv: list[str]) -> int:
         from app.features.usage.report import main as usage_report
 
         return usage_report(argv[2:])
+    if cmd == "request-size":
+        return asyncio.run(_request_size(argv[2:]))
     if cmd == "export-openapi":
         import json
 

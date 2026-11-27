@@ -1339,6 +1339,63 @@ async def pick_up(db: AsyncSession, run: Run) -> bool:
     return True
 
 
+async def run_tools(
+    db: AsyncSession,
+    run: Run,
+    policy: Policy,
+    ceiling: Policy | None,
+    ancestors: list[Policy],
+    *,
+    web: WebSettings,
+    skills: list[str],
+    has_chat: bool,
+) -> list[Tool]:
+    """The tools a run is offered, from its snapshot (`run.policy`): the built-in set for
+    its kind and settings, its MCP tools, then an automation's allow-list and a sub-agent's chosen tools. Also used by
+    `python -m app.cli request-size`, to show the request a run sent."""
+    assert run.policy is not None  # the snapshot is taken before the run is driven
+    # An event trigger started it (or the run it works for, for a sub-agent).
+    top = await db.get(Run, run.root_run_id) if run.root_run_id else run
+    event_started = bool((top or run).options.get("event"))
+    tools = registry.toolset_for(
+        run.kind,
+        policy,
+        ceiling,
+        has_skills=bool(skills),
+        has_search=bool(web.search_url()),
+        has_memory=bool(run.policy.get("memory")),
+        is_automation=run.automation_id is not None,
+        unattended=run.automation_id is not None or bool(run.policy.get("automation")),
+        has_browser=bool(run.policy.get("browser")),
+        has_computer=bool(run.policy.get("computer")),
+        can_spawn=run.kind == "agent"
+        and run.depth < min(policy.limits.max_subagent_depth, subagents.ABSOLUTE_MAX_DEPTH),
+        can_ask=run.kind == "agent" and run.automation_id is None and run.depth == 0,
+        has_chat=has_chat,
+        has_phone=run.depth == 0
+        and run.options.get("source") == "voice"
+        and bool(run.options.get("device_id")),
+        event_started=event_started,
+        ancestors=ancestors,
+        off=run.policy.get("off") or (),
+    )
+    if run.kind == "agent":
+        for tool in await mcp_tool.for_run(db, run.policy.get("mcp_tools") or []):
+            probe = Action(capability=tool.capability, risk="safe")
+            verdict = evaluate(probe, policy, ceiling=ceiling, ancestors=ancestors)
+            if verdict.decision != "deny":
+                tools.append(tool)
+    unattended_by = run.policy.get("automation")  # the automation's settings, if any
+    tools = registry.allowed(
+        tools, (unattended_by or {}).get("tools"), unattended=unattended_by is not None
+    )
+    # A sub-agent given a task-specific list: only those (it can only narrow the set).
+    chosen = (run.options.get("subagent") or {}).get("tools")
+    if chosen:
+        tools = registry.allowed(tools, chosen)
+    return tools
+
+
 async def _prepare(run_id: uuid.UUID) -> AgentRun | None:
     """Pick the run up and build its loop from the snapshot (taken now for a new run).
     None when there is nothing to drive."""
@@ -1382,50 +1439,16 @@ async def _prepare(run_id: uuid.UUID) -> AgentRun | None:
         except NoModelAvailable as exc:
             await finalize(db, run, "failed", error=exc.message)
             return None
-        # An event trigger started it (or the run it works for, for a sub-agent).
-        top = await db.get(Run, run.root_run_id) if run.root_run_id else run
-        event_started = bool((top or run).options.get("event"))
-        tools = registry.toolset_for(
-            run.kind,
-            policy,
-            ceiling,
-            has_skills=bool(skills),
-            has_search=bool(web.search_url()),
-            has_memory=bool(run.policy.get("memory")),
-            is_automation=run.automation_id is not None,
-            unattended=run.automation_id is not None or bool(run.policy.get("automation")),
-            has_browser=bool(run.policy.get("browser")),
-            has_computer=bool(run.policy.get("computer")),
-            can_spawn=run.kind == "agent"
-            and run.depth < min(policy.limits.max_subagent_depth, subagents.ABSOLUTE_MAX_DEPTH),
-            can_ask=run.kind == "agent" and run.automation_id is None and run.depth == 0,
+        tools = await run_tools(
+            db, run, policy, ceiling, ancestors, web=web, skills=skills,
             has_chat=answer_message is not None,
-            has_phone=run.depth == 0
-            and run.options.get("source") == "voice"
-            and bool(run.options.get("device_id")),
-            event_started=event_started,
-            ancestors=ancestors,
-            off=run.policy.get("off") or (),
-        )
+        )  # fmt: skip
         uses_browser = bool(run.policy.get("browser"))
         in_project = run.policy.get("project")
         project_id = uuid.UUID(in_project["id"]) if in_project else None
         # The browser belongs to the conversation, so it survives between turns.
         browser_session = run.conversation_id or run.id
-        if run.kind == "agent":
-            for tool in await mcp_tool.for_run(db, run.policy.get("mcp_tools") or []):
-                probe = Action(capability=tool.capability, risk="safe")
-                verdict = evaluate(probe, policy, ceiling=ceiling, ancestors=ancestors)
-                if verdict.decision != "deny":
-                    tools.append(tool)
         unattended_by = run.policy.get("automation")  # the automation's settings, if any
-        tools = registry.allowed(
-            tools, (unattended_by or {}).get("tools"), unattended=unattended_by is not None
-        )
-        # A sub-agent given a task-specific list: only those (it can only narrow the set).
-        chosen = (run.options.get("subagent") or {}).get("tools")
-        if chosen:
-            tools = registry.allowed(tools, chosen)
         automation_id = run.automation_id
         on_ask = (run.policy.get("automation") or {}).get("on_ask", "pause")
         effort = await effort_for(db, run)
