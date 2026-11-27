@@ -14,6 +14,7 @@ import { matchesShortcut, SHORTCUTS } from '@/features/shortcuts/registry'
 import { SkillIcon } from '@/features/skills/icons'
 import { localSkills, matchSkills, slashQuery, typedCommand } from '@/features/skills/slash'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
+import { useToastLift } from '@/components/ui/useToastLift'
 import { cn } from '@/lib/cn'
 import { t } from '@/lib/i18n'
 import { COMMANDS, type CommandHost, type CommandOption, type CommandSpec, commandOf, matchCommands, matchOptions } from '../commands'
@@ -136,6 +137,8 @@ export function Composer({
   const fileRef = useRef<HTMLInputElement>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const width = useWidth(rootRef)
+  // Notices rise above the box where it is docked at the bottom (a chat), not over it.
+  useToastLift(rootRef)
   const narrow = width !== null && width < NARROW
   const options = controls?.options ?? []
   // A narrow box at rest is one line: "+", the text, the microphone and send. Being

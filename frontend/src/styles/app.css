@@ -331,6 +331,10 @@
 
 .toast { animation: rise-in var(--motion-in) var(--ease-out); }
 .toast[data-leaving] { animation: rise-out var(--motion-out) var(--ease-in) forwards; }
+/* A notice's time left (ToastHost): shrinks from full width; its duration and pause come
+   inline. Kept with reduced motion: it says how long a notice stays, nothing flies. */
+.toast-time { animation: toast-time linear forwards; }
+@keyframes toast-time { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 
 /* Chat: a new message rises into place; a status that is still going has a light
    sweeping across its text; three dots breathe in a wave while the model starts. */

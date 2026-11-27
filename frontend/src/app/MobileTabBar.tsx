@@ -1,7 +1,8 @@
-import { useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import * as RadixDialog from '@radix-ui/react-dialog'
 import { NavLink, useLocation } from 'react-router'
 import { House, Inbox, LayoutGrid, MessagesSquare, Plus, Settings } from 'lucide-react'
+import { useToastLift } from '@/components/ui/useToastLift'
 import { cn } from '@/lib/cn'
 import { t } from '@/lib/i18n'
 import { InboxBadge } from './badges'
@@ -60,13 +61,16 @@ function MoreSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (open:
  */
 export function MobileTabBar() {
   const [more, setMore] = useState(false)
+  // Notices rise above the tabs on phones (hidden from md up, where this lifts nothing).
+  const bar = useRef<HTMLElement>(null)
+  useToastLift(bar)
   const { pathname } = useLocation()
   const { pinned, more: rest } = usePages()
   const inMore = [...pinned, ...rest].some((p) => !['/home', '/notifications'].includes(p.to) && (pathname === p.to || pathname.startsWith(`${p.to}/`)))
     || pathname.startsWith('/settings')
   return (
     <>
-      <nav aria-label={t('Main')} className="flex h-14 shrink-0 items-stretch border-t border-border bg-surface px-1 md:hidden">
+      <nav ref={bar} aria-label={t('Main')} className="flex h-14 shrink-0 items-stretch border-t border-border bg-surface px-1 md:hidden">
         <Tab to="/home" label={t('Home')} icon={<House />} />
         <Tab to="/chats" label={t('Chats')} icon={<MessagesSquare />} />
         <NavLink to="/" end aria-label={t('New chat')} className="flex flex-1 items-center justify-center">
