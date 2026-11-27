@@ -10,6 +10,10 @@ export default defineConfig({
   testDir: './tests',
   timeout: 60_000,
   fullyParallel: false,
+  // Files run side by side, a file's tests one after another. Tests that use something the
+  // single user has once (focus timer, Home layout) take a lock (tests/appLock.ts), so this
+  // can go higher than the CPU count suggests; E2E_WORKERS overrides it.
+  workers: Number(process.env.E2E_WORKERS) || 4,
   retries: 0,
   reporter: [['list']],
   use: {
