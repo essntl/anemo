@@ -16,6 +16,8 @@
 #   claude-runner/  extension/                       their own job
 #   desktop/  bridge/                                desktop, desktop-macos
 #   android/                                         android
+#   docker-compose.yml, docker-compose.dev.yml        backend, browser, claude-runner, e2e
+#   docker-compose.prebuilt.yml, deploy/             nothing (no job uses them)
 #   anything else (compose, .github, scripts, the Makefile, …)   every job
 set -eu
 
@@ -43,6 +45,11 @@ else
       extension/*) add extension ;;
       desktop/*|bridge/*) add desktop ;;
       android/*) add android ;;
+      # Compose: only the jobs that build or start containers. The prebuilt and deploy/
+      # files are for installs; no job uses them.
+      docker-compose.yml|docker-compose.dev.yml|.github/ci/compose-cache*.yml)
+        add backend browser claude-runner e2e ;;
+      docker-compose.prebuilt.yml|deploy/*) ;;
       *) add $JOBS; break ;;
     esac
   done <<EOF
