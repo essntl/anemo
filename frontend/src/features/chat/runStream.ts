@@ -7,10 +7,10 @@
  * sends Last-Event-ID, so nothing is received twice.
  */
 import { useEffect, useReducer, useRef } from 'react'
-import { formatCount } from '@/lib/format'
 import { t } from '@/lib/i18n'
 import type { QuestionMark } from './api'
 import type { Waiting } from './timing'
+import { formatCount } from '@/lib/format'
 
 export const TERMINAL = ['completed', 'failed', 'cancelled']
 
