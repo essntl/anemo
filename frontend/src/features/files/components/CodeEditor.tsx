@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import CodeMirror, { EditorView, type Extension } from '@uiw/react-codemirror'
+import { registerScrollToLine } from './codeView'
 import { css } from '@codemirror/lang-css'
 import { html } from '@codemirror/lang-html'
 import { javascript } from '@codemirror/lang-javascript'
@@ -7,6 +8,15 @@ import { json } from '@codemirror/lang-json'
 import { markdown } from '@codemirror/lang-markdown'
 import { python } from '@codemirror/lang-python'
 import { yaml } from '@codemirror/lang-yaml'
+
+registerScrollToLine((element, number) => {
+  const view = EditorView.findFromDOM(element)
+  if (!view) return false
+  const line = view.state.doc.line(Math.max(1, Math.min(view.state.doc.lines, number)))
+  view.dispatch({ selection: { anchor: line.from }, effects: EditorView.scrollIntoView(line.from, { y: 'start', yMargin: 12 }) })
+  view.focus()
+  return true
+})
 
 /** Pick syntax highlighting from the file extension. */
 function languageFor(path: string): Extension[] {

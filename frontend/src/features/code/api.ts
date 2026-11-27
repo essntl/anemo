@@ -62,12 +62,25 @@ export function useCodeJobs(filters: CodeFilters) {
 }
 
 /** A job and its whole thread. */
+function jobQuery(id: string) {
+  return {
+    queryKey: codeJobKey(id),
+    queryFn: async () => unwrap(await api.GET('/api/code/jobs/{job_id}', { params: { path: { job_id: id } } })),
+  }
+}
+
 export function useCodeJob(id: string | null) {
-  return useQuery({
-    queryKey: codeJobKey(id ?? 'none'),
-    enabled: Boolean(id),
-    queryFn: async () => unwrap(await api.GET('/api/code/jobs/{job_id}', { params: { path: { job_id: id! } } })),
-  })
+  return useQuery({ ...jobQuery(id ?? 'none'), enabled: Boolean(id) })
+}
+
+/** Loads a job and its events before it is opened (the list, on hover or focus), so
+ * opening it shows it at once. Data already loaded and recent is not fetched again. */
+export function usePrefetchCodeJob(): (id: string) => void {
+  const qc = useQueryClient()
+  return useCallback((id: string) => {
+    void qc.prefetchQuery({ ...jobQuery(id), staleTime: 30_000 })
+    void qc.prefetchQuery(eventsQuery(qc, id))
+  }, [qc])
 }
 
 const EVENTS_PAGE = 2000

@@ -6,6 +6,7 @@ import { ConversationPage } from '@/features/chat/pages/ConversationPage'
 import { SettingsIndex, SettingsLayout } from '@/features/settings/pages/SettingsLayout'
 import { AppLayout } from './AppLayout'
 import type { RouteHandle } from './mobileNavStore'
+import { staysOnPage } from './pageTransition'
 import { RouteError } from './RouteError'
 import { StartPage } from './StartPage'
 
@@ -110,23 +111,16 @@ export const router = createBrowserRouter([
  * Page changes cross-fade (the .page rules in styles/app.css). React Router does this
  * per navigation (`viewTransition: true`), so it is switched on here for all of them,
  * except where it would get in the way:
- *  - the address only changes after the `?` or `#` (tabs, filters, search as you type);
+ *  - it stays on the same page (staysOnPage: a tab, a filter, another item of the page);
  *  - a dialog, menu or the phone drawer is open: it has its own closing animation, and
  *    the page area would be drawn on top of it during a transition;
  *  - the user asked the system for less motion.
  */
-function samePage(to: To | null): boolean {
-  if (to === null) return true
-  const path = typeof to === 'string' ? to : to.pathname
-  if (path === undefined || path === '' || path.startsWith('?') || path.startsWith('#')) return true
-  return path.split(/[?#]/)[0] === window.location.pathname
-}
-
 const navigate = router.navigate.bind(router)
 router.navigate = ((to: To | number | null, options?: Parameters<typeof navigate>[1]) => {
   if (typeof to === 'number') return navigate(to)
   const still =
-    samePage(to) ||
+    staysOnPage(to, window.location.pathname) ||
     document.querySelector('[role="dialog"]') !== null ||
     window.matchMedia('(prefers-reduced-motion: reduce)').matches
   // Links pass `viewTransition: undefined`, so it has to be filled in after their options.

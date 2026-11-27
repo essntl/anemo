@@ -38,11 +38,12 @@ describe('a sketch as context for a message', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Add to the message' }))
     await userEvent.click(screen.getByRole('button', { name: /Sketch…/ }))
-    // Only sketches are offered.
+    // The picker loads when first opened. Only sketches are offered.
+    const kitchen = await screen.findByRole('button', { name: /Kitchen plan/ })
     expect(screen.queryByText('Shopping list')).toBeNull()
-    await userEvent.click(screen.getByRole('button', { name: /Kitchen plan/ }))
+    await userEvent.click(kitchen)
 
-    expect(sketchForChat).toHaveBeenCalledWith('sk-1', expect.anything())
+    await vi.waitFor(() => expect(sketchForChat).toHaveBeenCalledWith('sk-1', expect.anything()))
     expect(screen.getByText('Kitchen plan.png')).toBeInTheDocument() // shown while it is made
     finish(attachment)
     await vi.waitFor(() => expect(document.querySelector('img[src="/api/attachments/att-7/content"]')).not.toBeNull())

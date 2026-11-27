@@ -16,7 +16,7 @@ import { cn } from '@/lib/cn'
 import { formatCost, formatDuration, formatWhen } from '@/lib/format'
 import { msg, plural, t } from '@/lib/i18n'
 import { withoutAgent } from './agents'
-import { type CodeFilters, useCodeJobs } from './api'
+import { type CodeFilters, useCodeJobs, usePrefetchCodeJob } from './api'
 import { NewJobDialog } from './NewJobDialog'
 import { CodeUsageBar } from './UsageMeter'
 import { StateBadge } from './parts'
@@ -48,9 +48,11 @@ function ThreadRow({ thread, selected, search }: { thread: CodeThread; selected:
   const branch = job.branch
   const followUps = thread.jobs.length - 1
   const queued = useCodeQueue((s) => s.byThread[thread.id])
+  const prefetch = usePrefetchCodeJob()
   return (
     <li>
       <Link to={`/code/${job.id}${search}`} aria-current={selected ? 'page' : undefined} data-testid="code-thread"
+        onPointerEnter={() => prefetch(job.id)} onFocus={() => prefetch(job.id)}
         className={cn('block rounded-lg px-3 py-2 hover:bg-surface-hover', selected && 'bg-accent-soft hover:bg-accent-soft')}>
         <div className="flex min-w-0 items-start gap-2">
           <span className="min-w-0 flex-1 break-words text-[13.5px] font-medium leading-snug [overflow-wrap:anywhere] line-clamp-2">{thread.first.title || t('(no title)')}</span>

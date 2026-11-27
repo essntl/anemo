@@ -6,7 +6,7 @@
  * (the second "Marriage" in the outline is the second "Marriage" on the page), never by
  * a link's slug, which two headings can share and which changes with every character.
  */
-import { EditorView } from '@uiw/react-codemirror'
+import { scrollToLine } from '@/features/files/components/codeView'
 import type { OutlineItem } from './outline'
 import { revealElement } from './passage'
 
@@ -53,13 +53,9 @@ export function jumpToHeading(root: HTMLElement, outline: OutlineItem[], index: 
     return true
   }
   const editor = root.querySelector<HTMLElement>('.cm-editor')
-  const view = editor ? EditorView.findFromDOM(editor) : null
   const item = outline[index]
-  if (!view || !item) return false
-  const line = view.state.doc.line(Math.min(view.state.doc.lines, item.line + lineOffset + 1))
-  view.dispatch({ selection: { anchor: line.from }, effects: EditorView.scrollIntoView(line.from, { y: 'start', yMargin: 12 }) })
-  view.focus()
-  return true
+  if (!editor || !item) return false
+  return scrollToLine(editor, item.line + lineOffset + 1)
 }
 
 /**

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ComponentProps } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router'
 import { AppWindow, ExternalLink, GitBranch, Star, X, PanelRight } from 'lucide-react'
@@ -58,7 +58,7 @@ import { useChatModel } from '../chatModel'
 import { ChatOptionsSheet } from '../components/ChatOptionsSheet'
 import { ModelPicker } from '../components/ModelPicker'
 import { ReasoningControl } from '../components/ReasoningControl'
-import { type RunEvent, type RunView, useRunStream } from '../runStream'
+import { type RunEvent, type RunStore, type RunView, shallowEqual, useRunSelector, useRunStore } from '../runStream'
 import { withWaiting } from '../timing'
 import { useStickToBottom } from '../useStickToBottom'
 
@@ -66,6 +66,29 @@ import { useStickToBottom } from '../useStickToBottom'
 const WIDE = '(min-width: 1024px)'
 
 /** Opens the agent's browser for this chat in a window of its own. */
+/** The live view without the streaming text, for the page (see LiveAnswer). */
+function withoutText(view: RunView) {
+  const { text: _text, reasoning: _reasoning, ...rest } = view
+  return rest
+}
+const liveText = (view: RunView) => view.text
+const liveReasoning = (view: RunView) => view.reasoning
+const liveTextLength = (view: RunView) => view.text.length
+
+/** The answer being written: the one part of the chat that re-renders for each delta. */
+function LiveAnswer({ stream, onGrow, ...props }: Omit<ComponentProps<typeof AssistantMessage>, 'text' | 'reasoning'> & { stream: RunStore; onGrow: () => void }) {
+  const text = useRunSelector(stream, liveText)
+  const reasoning = useRunSelector(stream, liveReasoning)
+  useLayoutEffect(onGrow, [text, reasoning, onGrow])
+  return <AssistantMessage {...props} text={text} reasoning={reasoning} />
+}
+
+/** What the assistant is doing (only the state), for anything that shows it, e.g. plugins. */
+function ReportActivity({ stream, running }: { stream: RunStore; running: boolean }) {
+  useReportAssistantActivity(running, useRunSelector(stream, liveTextLength))
+  return null
+}
+
 function popOutBrowser(conversationId: string) {
   window.open(`/browser/${conversationId}`, `anemo-browser-${conversationId}`, 'popup,width=1320,height=940')
 }
@@ -177,7 +200,9 @@ function Conversation() {
       void refreshTimeline(qc, activeRunId)
     }
   }
-  const live = useRunStream(activeRunId, onFinished, onEvent)
+  const stream = useRunStore(activeRunId, onFinished, onEvent)
+  // All but the text: the page doesn't re-render for every delta (LiveAnswer does).
+  const live = useRunSelector(stream, withoutText, shallowEqual)
   // The agent asked something: a message is the answer.
   const question = pendingQuestion(useTimeline(activeRunId).data?.tool_calls)
   const answer = useDecide(activeRunId ?? '')
@@ -193,7 +218,7 @@ function Conversation() {
     }
     previousRun.current = activeRunId
   }, [activeRunId, conversationId, qc])
-  const scrollRef = useStickToBottom([messages.data?.length, live.text, live.reasoning])
+  const { ref: scrollRef, follow } = useStickToBottom(messages.data?.length)
 
   const list = messages.data ?? []
   // Messages already there when the chat opened stay still; new ones rise into place.
@@ -238,7 +263,6 @@ function Conversation() {
   // A paused agent run: a message resumes it (the agent reads the message first).
   const paused = Boolean(activeRunId) && live.status === 'paused'
   // What the assistant is doing (only the state), for anything that shows it, e.g. plugins.
-  useReportAssistantActivity(Boolean(activeRunId) && !paused && !question, live.text.length)
 
   // Phones while the Dynamic Island shows: the header takes two rows (see below).
   const stacked = island && !desktop
@@ -297,7 +321,8 @@ function Conversation() {
     // From `md` up the chat (and what opens beside it) is one panel on the ground, like the sidebar.
     // chat-panel, glass: the background of Settings > Appearance shows through (styles/appearance.css).
     <div className="chat-panel glass flex h-full md:mx-3 md:my-3 md:h-[calc(100%-1.5rem)] md:overflow-hidden md:rounded-panel md:border md:border-border md:bg-surface md:shadow-soft">
-    <div className="flex h-full min-w-0 flex-1 flex-col">
+      {/* Keyed by the chat (ConversationPage): another chat fades in where this one was. */}
+    <div className="swap-in flex h-full min-w-0 flex-1 flex-col">
       <header className="shrink-0 border-b border-border">
         <div className="flex h-12 items-center gap-1 px-1.5 md:h-14 md:px-6">
           <MenuButton />
@@ -321,6 +346,7 @@ function Conversation() {
 
       {/* relative: what is positioned in the history (an sr-only label, a tooltip) is placed and
           clipped in here; otherwise it lands on the page under the chat and makes it scroll. */}
+      <ReportActivity stream={stream} running={Boolean(activeRunId) && !paused && !question} />
       <div ref={scrollRef} className="relative min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-3xl flex-col gap-(--msg-gap) px-3 py-5 md:px-6 md:py-8">
           {conversation.data?.branched_from_id && (
@@ -352,9 +378,9 @@ function Conversation() {
             return (
               <div key={m.id} className={enter(m.id)}>
                 {isLive ? (
-                  <AssistantMessage
-                    text={live.text}
-                    reasoning={live.reasoning}
+                  <LiveAnswer
+                    stream={stream}
+                    onGrow={follow}
                     status={live.status === 'queued' || live.status === 'running' ? 'streaming' : live.status}
                     error={live.error}
                     modelLabel={live.modelLabel}

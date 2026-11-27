@@ -330,6 +330,11 @@
 /* Chat: a new message rises into place; a status that is still going has a light
    sweeping across its text; three dots breathe in a wave while the model starts. */
 .msg-in { animation: rise-in 260ms var(--ease-out); }
+
+/* Another item of the same page (a Code job, a chat, a document, a settings page): its
+   area fades in where it is, without moving (so nothing shifts), the page around it
+   staying still (app/pageTransition.ts). One transition for all of them. */
+.swap-in { animation: fade-in 160ms var(--ease-out); }
 .shimmer {
   background: linear-gradient(90deg, var(--text-muted) 0%, var(--text-muted) 40%, var(--text) 50%, var(--text-muted) 60%, var(--text-muted) 100%);
   background-size: 200% 100%;
@@ -494,7 +499,7 @@
 ::view-transition-new(page) { animation: page-in 180ms var(--ease-out) 60ms both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .drawer, .drawer-right, .fade, .sheet, .pop, .toast, .msg-in, .shimmer, .wave > span, .eq-bar { animation: none !important; }
+  .drawer, .drawer-right, .fade, .sheet, .pop, .toast, .msg-in, .swap-in, .shimmer, .wave > span, .eq-bar { animation: none !important; }
   /* The reasoning slider keeps its colours and glow; nothing sweeps, breathes or flies. */
   .effort-sheen::before, .effort-halo { animation: none !important; }
   .effort-sheen, .effort-sparks { display: none !important; }

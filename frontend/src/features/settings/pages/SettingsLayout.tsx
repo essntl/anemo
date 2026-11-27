@@ -1,6 +1,6 @@
 import { PageHeader } from '@/components/ui/PageHeader'
 import type { ReactNode } from 'react'
-import { Link, Navigate, NavLink, Outlet, useMatch } from 'react-router'
+import { Link, Navigate, NavLink, Outlet, useLocation, useMatch } from 'react-router'
 import { ChevronLeft, ChevronRight, ShieldCheck } from 'lucide-react'
 import { DESKTOP, useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
@@ -39,6 +39,7 @@ export function SettingsIndex() {
  */
 export function SettingsLayout() {
   const isIndex = useMatch('/settings') !== null
+  const { pathname } = useLocation()
   const desktop = useMediaQuery(DESKTOP)
   const sections = visibleSections(useOffPages())
   const section = useMatch('/settings/:section')?.params.section
@@ -67,7 +68,8 @@ export function SettingsLayout() {
           ))}
         </nav>
       </div>
-      <div className={cn('min-w-0 flex-1', isIndex && 'hidden md:block')}>
+      {/* Another settings page fades in where the last one was; the list beside it stays. */}
+      <div key={pathname} className={cn('swap-in min-w-0 flex-1', isIndex && 'hidden md:block')}>
         <Outlet />
       </div>
     </div>

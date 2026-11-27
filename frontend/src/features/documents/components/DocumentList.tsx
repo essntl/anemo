@@ -10,7 +10,7 @@ import { NewSketchDialog } from '@/features/sketch/NewSketchDialog'
 import { cn } from '@/lib/cn'
 import { formatWhen } from '@/lib/format'
 import { plural, rich, t } from '@/lib/i18n'
-import { type DocumentSummary, type SketchLayout, useCreateDocument, useDocuments } from '../api'
+import { type DocumentSummary, type SketchLayout, useCreateDocument, useDocuments, usePrefetchDocument } from '../api'
 
 /**
  * Documents grouped by folder. New documents go into `currentFolder`. With a project
@@ -25,6 +25,7 @@ export function DocumentList({ currentFolder, projectFolder, projectName, outsid
   const navigate = useNavigate()
   const documents = useDocuments()
   const create = useCreateDocument()
+  const prefetch = usePrefetchDocument()
   const [query, setQuery] = useState('')
 
   const everything = documents.data?.documents ?? []
@@ -108,6 +109,7 @@ export function DocumentList({ currentFolder, projectFolder, projectName, outsid
             )}
             {groups.get(folder)?.map((doc) => (
               <NavLink key={doc.id} to={`/documents/${doc.id}`}
+                onPointerEnter={() => prefetch(doc.id)} onFocus={() => prefetch(doc.id)}
                 className={({ isActive }) =>
                   cn('flex items-start gap-2 rounded-control px-2 py-(--list-row-y) text-[13.5px] transition-colors',
                     isActive ? 'bg-accent-soft text-accent' : 'hover:bg-surface-hover')}>

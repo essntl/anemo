@@ -8,6 +8,7 @@
  * timeline: a list beside the thread (a switcher in the top bar on narrower screens)
  * picks the agent whose events are shown, kept in the address as `?agent=<call id>`.
  */
+import { DelayedLoading } from '@/components/ui/DelayedLoading'
 import { type ReactNode, useCallback, useMemo, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router'
 import {
@@ -208,7 +209,7 @@ function JobPart({ job, index, last, agent, agents, onMain }: { job: CodeJob; in
         <FromChat job={job} />
         <Prompt text={job.prompt} images={job.images ?? []} />
         <div className="min-w-0">
-          {events.isPending && <p className="px-2 py-1 text-[12.5px] text-muted">{t('Loading…')}</p>}
+          {events.isPending && <DelayedLoading className="px-2 py-1 text-[12.5px]" />}
           {events.isError && (
             <p className="px-2 py-1 text-[12.5px] text-error">
               {errorMessage(events.error)}{' '}
@@ -415,7 +416,8 @@ export function CodeThreadView({ jobId, backTo }: { jobId: string; backTo: strin
   return (
     // The thread scrolls; the bar over it and the follow-up box under it stay. The list of
     // agents is a column of its own beside both, so the box is centred under the thread.
-    <div className="flex h-full flex-col">
+    // Keyed by the job (CodePage): another job fades in where this one was.
+    <div className="swap-in flex h-full flex-col">
       <TopBar thread={thread} backTo={backTo}
         switcher={nav && !wide ? <AgentSwitcher agents={agents} selected={selected} onSelect={select} /> : undefined} />
       <AgentNavContext.Provider value={nav}>
@@ -424,7 +426,7 @@ export function CodeThreadView({ jobId, backTo }: { jobId: string; backTo: strin
             <div className="relative min-h-0 flex-1">
               <div ref={scroller} className="h-full overflow-y-auto overscroll-contain">
                 <div ref={content} className="mx-auto max-w-3xl px-2 pb-6 pt-4 md:px-6">
-                  {detail.isPending && <p className="p-2 text-[13px] text-muted">{t('Loading…')}</p>}
+                  {detail.isPending && <DelayedLoading className="p-2 text-[13px]" />}
                   {detail.isError && (
                     <div className="p-2 text-[13px]">
                       <p className="text-error">{errorMessage(detail.error)}</p>

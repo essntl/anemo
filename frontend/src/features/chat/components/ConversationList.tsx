@@ -9,7 +9,7 @@ import { useShiftHeld } from '@/hooks/useShiftHeld'
 import { cn } from '@/lib/cn'
 import { dayLabel } from '@/lib/format'
 import { t } from '@/lib/i18n'
-import { type Conversation, useConversations, useDeleteConversation } from '../api'
+import { type Conversation, useConversations, useDeleteConversation, usePrefetchChat } from '../api'
 import { useChatActions } from '../chatActions'
 import { formatRemaining, useNow } from '../remaining'
 
@@ -47,6 +47,7 @@ function QuickDelete({ conv }: { conv: Conversation }) {
 
 function Item({ conv, quickDelete }: { conv: Conversation; quickDelete: boolean }) {
   const actions = useChatActions(conv)
+  const prefetch = usePrefetchChat()
   // The open chat stays in sight, also when it is further down than the list shows.
   const open = useMatch(`/c/${conv.id}`) !== null
   const row = useRef<HTMLDivElement>(null)
@@ -57,6 +58,8 @@ function Item({ conv, quickDelete }: { conv: Conversation; quickDelete: boolean 
     <div ref={row} className="group relative">
       <NavLink
         to={`/c/${conv.id}`}
+        onPointerEnter={() => prefetch(conv.id)}
+        onFocus={() => prefetch(conv.id)}
         className={({ isActive }) =>
           cn(
             'flex h-[calc(var(--nav-row-h)+0.25rem)] items-center gap-2 rounded-control pl-3 pr-9 text-[13px] pointer-coarse:h-11 pointer-coarse:pr-11 pointer-coarse:text-[15px]',

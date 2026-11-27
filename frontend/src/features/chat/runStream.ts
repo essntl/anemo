@@ -6,7 +6,7 @@
  * drop, or switching conversations. EventSource reconnects automatically and
  * sends Last-Event-ID, so nothing is received twice.
  */
-import { useEffect, useReducer, useRef } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { t } from '@/lib/i18n'
 import type { QuestionMark } from './api'
 import type { Waiting } from './timing'
@@ -132,13 +132,41 @@ const EVENT_TYPES = [
   'memory.saved', // a memory tool saved something (shown as a notice with Undo)
 ]
 
-/** Subscribes to a run's events while `runId` is set. Calls `onFinished` once at the end. */
-export function useRunStream(
+/**
+ * A run's live view kept outside React state: a component re-renders only for the part
+ * it selects (useRunSelector). Text deltas arrive ~50 times a second; when the whole
+ * chat page re-rendered for each, every earlier message did too.
+ */
+export interface RunStore {
+  get: () => RunView
+  subscribe: (listener: () => void) => () => void
+}
+
+function createRunStore(): RunStore & { set: (view: RunView) => void } {
+  let view = initialRunView
+  const listeners = new Set<() => void>()
+  return {
+    get: () => view,
+    set: (next) => {
+      if (next === view) return
+      view = next
+      for (const listener of listeners) listener()
+    },
+    subscribe: (listener) => {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
+  }
+}
+
+/** Subscribes to a run's events while `runId` is set. Calls `onFinished` once at the end.
+ * The view is in the returned store; the component calling this does not re-render. */
+export function useRunStore(
   runId: string | null,
   onFinished?: (view: RunView) => void,
   onEvent?: (event: RunEvent) => void,
-): RunView {
-  const [view, dispatch] = useReducer(runReducer, initialRunView)
+): RunStore {
+  const [store] = useState(createRunStore)
   // Kept in a ref so a new callback on re-render does not restart the stream.
   const finished = useRef(onFinished)
   const eventHook = useRef(onEvent)
@@ -148,25 +176,58 @@ export function useRunStream(
   })
 
   useEffect(() => {
-    dispatch({ type: 'reset' })
+    store.set(initialRunView)
     if (!runId) return
-    let state = initialRunView
     const source = new EventSource(`/api/runs/${runId}/events`)
     const handle = (type: string) => (e: MessageEvent<string>) => {
       const event: RunEvent = { type, data: JSON.parse(e.data) as Record<string, unknown> }
-      state = runReducer(state, event)
-      dispatch(event)
+      store.set(runReducer(store.get(), event))
       eventHook.current?.(event)
-      if (type === 'run.status' && TERMINAL.includes(state.status)) {
+      if (type === 'run.status' && TERMINAL.includes(store.get().status)) {
         source.close()
-        finished.current?.(state)
+        finished.current?.(store.get())
       }
     }
     for (const type of EVENT_TYPES) source.addEventListener(type, handle(type) as EventListener)
     return () => source.close()
-  }, [runId])
+  }, [runId, store])
 
-  return view
+  return store
+}
+
+/**
+ * The part of a run's view a component shows; it re-renders when that part changes
+ * (`equal` decides; shallowEqual for an object). `select` must be a module-level
+ * function: the value is kept per view, not per selector.
+ */
+export function useRunSelector<T>(store: RunStore, select: (view: RunView) => T, equal: (a: T, b: T) => boolean = Object.is): T {
+  const last = useRef<{ view: RunView; value: T } | null>(null)
+  const snapshot = () => {
+    const view = store.get()
+    const before = last.current
+    if (before?.view === view) return before.value
+    const value = select(view)
+    last.current = { view, value: before && equal(before.value, value) ? before.value : value }
+    return last.current.value
+  }
+  return useSyncExternalStore(store.subscribe, snapshot)
+}
+
+/** Each field the same (Object.is): for selectors that return an object. */
+export function shallowEqual<T extends object>(a: T, b: T): boolean {
+  const keys = Object.keys(a) as (keyof T)[]
+  return keys.length === Object.keys(b).length && keys.every((k) => Object.is(a[k], b[k]))
+}
+
+const wholeView = (view: RunView) => view
+
+/** The whole live view, re-rendering on every event (fine for small views). */
+export function useRunStream(
+  runId: string | null,
+  onFinished?: (view: RunView) => void,
+  onEvent?: (event: RunEvent) => void,
+): RunView {
+  return useRunSelector(useRunStore(runId, onFinished, onEvent), wholeView)
 }
 
 /** " (the reason)" for the fallback notice, shortened; nothing when there is none. */
