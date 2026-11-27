@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
 import { Markdown } from './Markdown'
@@ -26,5 +26,14 @@ describe('a sketch embedded in Markdown', () => {
     const { container } = show(`![Kitchen plan](https://example.com/documents/${ID})`)
     expect(container.querySelector('img')).toBeNull()
     expect(screen.getByRole('button', { name: /show image from example\.com/ })).toBeInTheDocument()
+  })
+})
+
+describe('code highlighting', () => {
+  it('highlights a fenced block once highlight.js has loaded (it loads on demand)', async () => {
+    const { container } = show('Try:\n\n```python\ndef hello():\n    return 1\n```\n')
+    expect(screen.getByText('python')).toBeInTheDocument() // the block shows at once
+    await waitFor(() => expect(container.querySelector('.hljs-keyword')).not.toBeNull())
+    expect(container.querySelector('.hljs-keyword')?.textContent).toBe('def')
   })
 })

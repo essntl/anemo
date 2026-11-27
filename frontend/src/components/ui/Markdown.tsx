@@ -1,7 +1,6 @@
 import { createContext, createElement, memo, useContext, useMemo, useRef, useState, type ComponentPropsWithoutRef } from 'react'
-import ReactMarkdown, { type ExtraProps, type Options } from 'react-markdown'
+import ReactMarkdown, { type ExtraProps } from 'react-markdown'
 import { Link } from 'react-router'
-import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
 import { Check, Copy, Image as ImageIcon, PenLine } from 'lucide-react'
 import { DiagramBlock } from '@/components/diagrams/DiagramBlock'
@@ -9,6 +8,7 @@ import { protectDollars } from '@/components/diagrams/dollars'
 import { isFenceClosed } from '@/components/diagrams/fence'
 import { isDiagramLanguage } from '@/components/diagrams/languages'
 import { useMath } from '@/components/diagrams/useMath'
+import { lazyModule } from '@/hooks/lazyModule'
 import { documentLink, embeddedSketchId, isAppLink, sketchPreviewUrl } from '@/lib/appLinks'
 import { useFenceRenderer } from '@/lib/fenceRenderers'
 import { stripCitationMarkup } from '@/lib/citations'
@@ -128,7 +128,10 @@ function Table({ children }: ComponentPropsWithoutRef<'table'>) {
 
 // Kept the same between renders, so a drawn diagram isn't mounted again on every update.
 const COMPONENTS = { pre: CodeBlock, a: Anchor, table: Table, img: MarkdownImage }
-const HIGHLIGHT: NonNullable<Options['rehypePlugins']>[number] = [rehypeHighlight, { detect: false, ignoreMissing: true }]
+// highlight.js loads with the first text that has a fenced code block (``` or ~~~);
+// until then such a block shows unhighlighted.
+const useHighlight = lazyModule(() => import('./highlight'))
+const FENCE = /```|~~~/
 
 /**
  * Renders Markdown: GFM tables and task lists, highlighted code, ```mermaid diagrams,
@@ -143,7 +146,8 @@ export const Markdown = memo(function Markdown({ text, streaming = false, fences
   const source = useMemo(() => (math ? protectDollars(cleaned) : cleaned), [math, cleaned])
   const context = useMemo(() => ({ text: source, streaming, fences }), [source, streaming, fences])
   const remarkPlugins = useMemo(() => [remarkGfm, ...(math?.remarkPlugins ?? [])], [math])
-  const rehypePlugins = useMemo(() => [...(math?.rehypePlugins ?? []), HIGHLIGHT], [math])
+  const highlight = useHighlight(FENCE.test(cleaned))
+  const rehypePlugins = useMemo(() => [...(math?.rehypePlugins ?? []), ...(highlight ? [highlight.HIGHLIGHT] : [])], [math, highlight])
   return (
     <div className="markdown">
       <SourceContext.Provider value={context}>
