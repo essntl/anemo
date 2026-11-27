@@ -198,7 +198,10 @@ test('file manager: create, edit, save, trash and restore', async ({ page }) => 
     await confirmWith(page, 'Move to trash')
     await expect(page.getByRole('button', { name: 'note.md' })).toHaveCount(0)
     await page.getByRole('button', { name: 'Trash', exact: true }).click()
-    await page.getByRole('dialog').getByRole('button', { name: 'Restore' }).first().click()
+    // Other tests' files may be in the trash too: restore this one.
+    const ours = page.getByRole('dialog').locator('div').filter({ hasText: `${folder}/note.md` })
+      .filter({ has: page.getByRole('button', { name: 'Restore' }) }).last()
+    await ours.getByRole('button', { name: 'Restore' }).click()
     await page.keyboard.press('Escape')
     await expect(page.getByRole('button', { name: 'note.md' })).toBeVisible()
   } finally {

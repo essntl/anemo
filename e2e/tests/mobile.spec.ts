@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { answerPrompt, confirmWith, fakeModels, login, openMessageBox, pickModel, recordAnimations, removeTrack, signOutAfterEach, startMusic, useHomeLayout } from './helpers'
+import { answerPrompt, confirmWith, fakeModels, login, openMessageBox, pickModel, recordAnimations, removeTrack, signOutAfterEach, startMusic, useHomeLayout, ignoreAppEvents } from './helpers'
 
 /*
  * Phone layout and installable-app checks. Runs in the "mobile" project
@@ -566,6 +566,7 @@ test('installable: manifest, icons and a service worker that never caches /api',
 })
 
 test('the Island sits in the top bar, at the right where that end is free, and plays and pauses', async ({ page, baseURL }) => {
+  await ignoreAppEvents(page)
   await login(page)
   try {
     await startMusic(page, baseURL!)

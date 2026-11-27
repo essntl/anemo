@@ -124,6 +124,16 @@ export async function send(page: Page, text: string) {
   await page.keyboard.press('Enter')
 }
 
+/**
+ * Keeps this tab off the app's event stream (/api/events), for a test that checks what the
+ * Island shows: there is one user, so another worker's agent run that finishes or waits for
+ * approval would otherwise pop up here as an alert. Call it before `login`. (A 204 answer
+ * makes the browser's EventSource stop reconnecting.)
+ */
+export async function ignoreAppEvents(page: Page): Promise<void> {
+  await page.route('**/api/events?*', (route) => route.fulfill({ status: 204 }))
+}
+
 /** Sign out after each test, so test logins don't pile up under Settings > Active sessions. */
 export function signOutAfterEach() {
   test.afterEach(async ({ page }) => {
