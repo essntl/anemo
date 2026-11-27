@@ -350,7 +350,7 @@ SCRATCH_DANGEROUS = [  # (cwd, command): must stay dangerous
     (".", "find . -delete"),
     (".", "find scratch -delete"),
     (".", "find scratch/x -L -delete"),
-    (".", "find scratch/x -exec rm -rf /workspace/notes \;"),
+    (".", r"find scratch/x -exec rm -rf /workspace/notes \;"),
     (".", "git clean -fdx"),
     (".", "git -C scratch clean -fdx"),
     (".", "git --work-tree=notes -C scratch/x clean -fdx"),
