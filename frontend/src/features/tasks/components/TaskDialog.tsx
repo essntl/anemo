@@ -38,11 +38,15 @@ import { askAboutSubtasks, openSubtasksLeft, parentCandidates } from '../relatio
 import { repeatOptions } from '../repeat'
 import { BlockedByEditor, ChecklistEditor, SubtaskList } from './TaskStructure'
 
-// The notes editor (Tiptap, ~500 kB) loads when a task is opened, not with every page
-// that can open one (Home, Tasks, Calendar).
-const RichEditor = lazy(() =>
-  import('@/features/documents/components/RichEditor').then((m) => ({ default: m.RichEditor })),
-)
+// The notes editor (Tiptap, ~500 kB) is not loaded with the pages that can open a task
+// (Home, Tasks, Calendar), but once the browser is idle after them, so the first task
+// opened doesn't show an empty space first.
+const loadEditor = () => import('@/features/documents/components/RichEditor')
+const RichEditor = lazy(() => loadEditor().then((m) => ({ default: m.RichEditor })))
+if (typeof window !== 'undefined') {
+  const idle = window.requestIdleCallback ?? ((fn: () => void) => window.setTimeout(fn, 2000))
+  idle(() => void loadEditor())
+}
 
 const NEW_PROJECT = '__new__'
 

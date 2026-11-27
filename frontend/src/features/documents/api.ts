@@ -1,3 +1,4 @@
+import { useCallback } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError, type Schemas, unwrap } from '@/api/client'
 import { t } from '@/lib/i18n'
@@ -21,12 +22,19 @@ export function useDocuments() {
   })
 }
 
+const documentQuery = (id: string) => ({
+  queryKey: documentKey(id),
+  queryFn: async () => unwrap(await api.GET('/api/documents/{document_id}', { params: { path: { document_id: id } } })),
+})
+
 export function useDocument(id: string) {
-  return useQuery({
-    queryKey: documentKey(id),
-    queryFn: async () =>
-      unwrap(await api.GET('/api/documents/{document_id}', { params: { path: { document_id: id } } })),
-  })
+  return useQuery(documentQuery(id))
+}
+
+/** Loads a document before it is opened (the list, on hover or focus). Recent data is kept. */
+export function usePrefetchDocument(): (id: string) => void {
+  const qc = useQueryClient()
+  return useCallback((id: string) => void qc.prefetchQuery({ ...documentQuery(id), staleTime: 30_000 }), [qc])
 }
 
 export function useCreateDocument() {

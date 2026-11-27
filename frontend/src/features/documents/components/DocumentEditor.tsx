@@ -105,7 +105,8 @@ function EditorSession({ doc, server, onServerChanged, onLoadOther, list }: Sess
   )
 
   return (
-    <div ref={page} className="flex h-full min-w-0 flex-col">
+    // Keyed by the document (DocumentsPage): another one fades in where this one was.
+    <div ref={page} className="swap-in flex h-full min-w-0 flex-col">
       <DocumentHeader list={list} heading={heading}>
         <div className="hidden shrink-0 rounded-lg bg-surface-2 p-0.5 sm:inline-flex" role="radiogroup" aria-label={t('Editor')}>
           {(['rich', 'source'] as const).map((m) => (

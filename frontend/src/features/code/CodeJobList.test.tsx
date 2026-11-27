@@ -12,6 +12,7 @@ let state: ListState = {}
 const asked: CodeFilters[] = []
 const refetch = vi.fn()
 vi.mock('./api', () => ({
+  usePrefetchCodeJob: () => () => undefined,
   useCodeUsage: () => ({ data: state.usage }),
   useCodeJobs: (filters: CodeFilters) => {
     asked.push(filters)

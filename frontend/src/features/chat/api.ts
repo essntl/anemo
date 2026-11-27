@@ -1,3 +1,4 @@
+import { useCallback } from 'react'
 import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type Schemas, unwrap } from '@/api/client'
 import { type AllSettings, settingsKey, useSettings } from '@/features/settings/api'
@@ -61,22 +62,34 @@ export function useChatTags() {
   })
 }
 
+const conversationQuery = (id: string) => ({
+  queryKey: conversationKey(id),
+  queryFn: async () =>
+    unwrap(await api.GET('/api/conversations/{conversation_id}', { params: { path: { conversation_id: id } } })),
+})
+
+const messagesQuery = (id: string) => ({
+  queryKey: messagesKey(id),
+  queryFn: async () =>
+    unwrap(await api.GET('/api/conversations/{conversation_id}/messages', { params: { path: { conversation_id: id } } })),
+})
+
 export function useConversation(id: string) {
-  return useQuery({
-    queryKey: conversationKey(id),
-    queryFn: async () =>
-      unwrap(await api.GET('/api/conversations/{conversation_id}', { params: { path: { conversation_id: id } } })),
-  })
+  return useQuery(conversationQuery(id))
 }
 
 export function useMessages(id: string) {
-  return useQuery({
-    queryKey: messagesKey(id),
-    queryFn: async () =>
-      unwrap(
-        await api.GET('/api/conversations/{conversation_id}/messages', { params: { path: { conversation_id: id } } }),
-      ),
-  })
+  return useQuery(messagesQuery(id))
+}
+
+/** Loads a chat before it is opened (the sidebar, on hover or focus), so opening it
+ * shows its messages at once instead of an empty page first. Recent data is kept. */
+export function usePrefetchChat(): (id: string) => void {
+  const qc = useQueryClient()
+  return useCallback((id: string) => {
+    void qc.prefetchQuery({ ...conversationQuery(id), staleTime: 30_000 })
+    void qc.prefetchQuery({ ...messagesQuery(id), staleTime: 30_000 })
+  }, [qc])
 }
 
 /**

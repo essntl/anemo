@@ -11,6 +11,7 @@ const mutate = vi.hoisted(() => vi.fn())
 vi.mock('../api', () => ({
   useDocuments: () => ({ data: { documents, folders: [] }, isSuccess: true, error: null }),
   useCreateDocument: () => ({ mutate, isPending: false, error: null }),
+  usePrefetchDocument: () => () => undefined,
 }))
 
 const { DocumentList } = await import('./DocumentList')

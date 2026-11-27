@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/api/client'
 import { ApiError } from '@/api/client'
-import { type CodeJobDetail, codeKey, codeJobKey, mayHaveStarted, useCancelJob, useCodeJobs, useFollowUp, useStartJob } from './api'
+import { type CodeJobDetail, codeEventsKey, codeKey, codeJobKey, mayHaveStarted, useCancelJob, useCodeJobs, useFollowUp, usePrefetchCodeJob, useStartJob } from './api'
 import { codeJob } from './testJobs'
 
 afterEach(() => vi.restoreAllMocks())
@@ -114,5 +114,26 @@ describe('starting, following up and cancelling', () => {
     await act(async () => void (await result.current.mutateAsync('r')))
     expect(posted[0].path).toBe('/api/code/jobs/{job_id}/cancel')
     expect(client.getQueryData<CodeJobDetail>(codeJobKey('r'))?.thread[0].state).toBe('cancelled')
+  })
+})
+
+describe('usePrefetchCodeJob', () => {
+  it('loads a job and its events before it is opened, once', async () => {
+    const asked: string[] = []
+    vi.spyOn(api, 'GET').mockImplementation((async (path: string) => {
+      asked.push(path)
+      const data = path.endsWith('/events') ? { events: [], has_more: false } : { job: codeJob({ id: 'j1' }), thread: [] }
+      return { data, response: { ok: true, status: 200 } as Response }
+    }) as unknown as typeof api.GET)
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    const { result } = renderHook(() => usePrefetchCodeJob(), { wrapper })
+
+    act(() => result.current('j1'))
+    await waitFor(() => expect(client.getQueryData(codeJobKey('j1'))).toBeDefined())
+    await waitFor(() => expect(client.getQueryData(codeEventsKey('j1'))).toBeDefined())
+    const count = asked.length
+    act(() => result.current('j1')) // hovered again: already there
+    expect(asked.length).toBe(count)
   })
 })

@@ -162,7 +162,7 @@ export function SketchSession({ doc, server, onServerChanged, onLoadOther, list 
   )
 
   return (
-    <div className="flex h-full min-w-0 flex-col">
+    <div className="swap-in flex h-full min-w-0 flex-col">
       <DocumentHeader list={list} heading={heading}>
         <Button size="sm" variant="ghost" className="shrink-0 max-sm:hidden" icon={<MessageSquare className="h-4 w-4" />}
           loading={asking} disabled={unreadable} onClick={() => void askAbout()}>
