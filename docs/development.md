@@ -58,3 +58,4 @@ it inside the worker. See `docs/architecture.md` sections F, K and L.
 Frontend: React + TypeScript + Vite + Tailwind v4. Colors are semantic tokens
 (`bg-surface`, `text-muted`, `bg-accent`) defined in
 `frontend/src/styles/tokens.css`; never use raw colors in components.
+
