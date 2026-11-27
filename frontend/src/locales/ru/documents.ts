@@ -169,5 +169,8 @@ const messages: Messages = {
   "Apply {n} selected | Apply {n} selected": "Применить {n} выбранное | Применить {n} выбранных | Применить {n} выбранных",
   "Looking at {n} document… | Looking at {n} documents…": "Просматриваю {n} документ… | Просматриваю {n} документа… | Просматриваю {n} документов…",
   "{n} document couldn’t be looked at (the model didn’t answer in time). | {n} documents couldn’t be looked at (the model didn’t answer in time).": "Не удалось просмотреть {n} документ (модель не ответила вовремя). | Не удалось просмотреть {n} документа (модель не ответила вовремя). | Не удалось просмотреть {n} документов (модель не ответила вовремя).",
+  "List view": "Вид списка",
+  "Last change": "Последнее изменение",
+  "Recent": "Недавние",
 }
 export default messages
