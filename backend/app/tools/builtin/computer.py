@@ -101,6 +101,11 @@ def _info(device: relay.DeviceInfo) -> dict[str, Any]:
     }
 
 
+def is_watched(level: dict[str, perms.Level]) -> bool:
+    """The levels of the Watched preset (messages then say "a watched computer")."""
+    return level == perms.PRESETS["watched"].categories
+
+
 def levels(device: dict[str, Any] | None) -> dict[str, perms.Level]:
     """The category levels of a device the last refresh saw. One it didn't see counts as
     Watched (asked about), and run() checks it live."""
@@ -120,6 +125,8 @@ def device_layer(
     name = device["name"] if device else "this computer"
     profile = (device or {}).get("profile_name") or "Watched"
     if level == "deny":
+        if is_watched(levels(device)):
+            return None, None, f"{what} is not offered on the watched computer “{name}”"
         return None, None, f"{what} is not allowed on “{name}” (profile {profile})"
     if level == "ask":
         return "ask", f"profile {profile} of “{name}” asks first", None
@@ -159,13 +166,13 @@ def shell_name(shell_kind: object) -> str:
 
 
 def _profile_label(device: relay.DeviceInfo) -> str:
-    """ "profile Scoped (writes only in work folders)": short, it is in every request."""
-    name = device.profile_name or ("Watched" if device.trust != "trusted" else "Trusted (legacy)")
-    preset = device.preset or (
-        None if device.profile_name else ("watched" if device.trust != "trusted" else "legacy")
-    )
-    hint = perms.preset_hint(preset)
-    return f"profile {name}" + (f" ({hint})" if hint else "")
+    """ "profile Scoped (writes only in work folders)": short, it is in every request. The
+    profiles the migration gives (Watched, Trusted (legacy)) read as before: "watched",
+    "trusted"."""
+    if device.preset in ("watched", "legacy") or not device.profile_name:
+        return device.trust
+    hint = perms.preset_hint(device.preset)
+    return f"profile {device.profile_name}" + (f" ({hint})" if hint else "")
 
 
 def line(device: relay.DeviceInfo) -> str:
@@ -476,9 +483,10 @@ async def _check(ctx: ToolContext, name: str, need: Need) -> tuple[Any, str] | T
     if need == "shell":
         shell = shell_name(offer.shell_kind)
         if live["shell"] == "deny":
+            why = "it is a watched computer" if is_watched(live) else "its profile doesn't allow it"
             return ToolResult(
-                content=f"{shell} is not offered on “{device.name}”: its permission profile "
-                "doesn't allow it. Use computer_act, or ask the user.",
+                content=f"{shell} is not offered on “{device.name}”: {why}. Use computer_act, "
+                "or ask the user.",
                 is_error=True,
             )
         if not offer.shell:
@@ -507,7 +515,7 @@ async def _check(ctx: ToolContext, name: str, need: Need) -> tuple[Any, str] | T
     # (An unknown device's act was asked about; its shell went by the policy alone.)
     decided = levels(before)[need] if before is not None else ("ask" if need == "act" else "policy")
     if perms.stricter(live[need], decided):
-        return _stricter_now(device.name)
+        return _stricter_now(device.name, watched=is_watched(live))
     if live["act"] == "deny" and need == "act":
         return ToolResult(
             content=f"Acting is not allowed on “{device.name}” (its permission profile).",
@@ -516,7 +524,13 @@ async def _check(ctx: ToolContext, name: str, need: Need) -> tuple[Any, str] | T
     return device, device.name
 
 
-def _stricter_now(name: str) -> ToolResult:
+def _stricter_now(name: str, *, watched: bool = False) -> ToolResult:
+    if watched:
+        return ToolResult(
+            content=f"“{name}” is a watched computer now, so the user is asked about every "
+            "action there. Call the tool again to ask them.",
+            is_error=True,
+        )
     return ToolResult(
         content=f"The permission profile of “{name}” is stricter now, so the user may need to "
         "be asked. Call the tool again.",
@@ -1085,7 +1099,7 @@ class ComputerShell(Tool):
         if blocked is None and device is not None:
             decision, reason, denied = device_layer(device, "shell", shell)
             if denied:
-                blocked = f"{shell} is not offered on “{device['name']}” (its permission profile)"
+                blocked = denied
             elif not device["shell"]:
                 blocked = f"{shell} is switched off in Anemo Desktop on “{device['name']}”"
         return [

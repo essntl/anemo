@@ -41,7 +41,7 @@ from app.features.devices.models import Device
 from app.features.runs.models import Run, ToolCall
 from app.policy.models import Action
 from app.tools.base import COMPACTED_AT, Tool, ToolContext, ToolResult
-from app.tools.builtin.computer import device_layer, known_device, levels
+from app.tools.builtin.computer import device_layer, is_watched, known_device, levels
 from app.tools.untrusted import untrusted, untrusted_note
 
 SEE = "code.see"
@@ -82,6 +82,8 @@ def _watched_note(ctx: ToolContext, name: str) -> str:
     (run() refuses it)."""
     device = known_device(ctx, name)
     if device is not None and levels(device)["code"] == "deny":
+        if is_watched(levels(device)):
+            return " (refused: a watched computer)"
         return " (refused: its permission profile doesn't allow Claude Code)"
     return ""
 
@@ -115,10 +117,10 @@ async def _refuse_watched(device: Device) -> ToolResult | None:
         live = await devices.levels_of(db, device)
     if live["code"] != "deny":
         return None
+    what = "is a watched computer" if is_watched(live) else "doesn't allow them (its profile)"
     return ToolResult(
-        content=f"“{device.name}” doesn't allow Claude Code jobs (its permission profile, e.g. "
-        "Watched): they are only started and cancelled on computers whose profile allows them "
-        "(they run with bypassPermissions). Ask the user.",
+        content=f"“{device.name}” {what}: Claude Code jobs are only started and cancelled on "
+        "computers whose profile allows them (they run with bypassPermissions). Ask the user.",
         is_error=True,
     )
 

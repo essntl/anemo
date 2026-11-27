@@ -164,8 +164,17 @@ async def set_trust(
     it the Watched profile, trusted the Trusted (legacy) one. The router asks for the
     password first (re-auth)."""
     device = await get(db, device_id)
+    old = device.trust
     profile = await profiles.profile_for_trust(db, trust)
-    await set_permissions(db, device, profile_id=profile.id, ip=ip)
+    audit.record(
+        db,
+        "device.trust_changed",
+        ip=ip,
+        target_type="device",
+        target_id=device.id,
+        details={"name": device.name, "from": old, "to": trust},
+    )
+    await set_permissions(db, device, profile_id=profile.id, ip=ip, audit_action=None)
     return device
 
 

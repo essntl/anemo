@@ -252,7 +252,7 @@ async def set_permissions(
     protected_overrides: dict[str, str] | None = None,
     automations_unrestricted: bool | None = None,
     ip: str | None,
-    audit_action: str = "device.permissions_changed",
+    audit_action: str | None = "device.permissions_changed",
 ) -> tuple[bool, bool]:
     """Change the device's profile and/or its own part. Commits. Returns (anything
     changed, the old trust level changed): the caller tells the device."""
@@ -278,6 +278,7 @@ async def set_permissions(
     changed = after != before
     if changed:
         device.permissions_version += 1
+    if changed and audit_action:
         audit.record(
             db,
             audit_action,

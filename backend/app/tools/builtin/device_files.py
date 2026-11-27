@@ -44,7 +44,7 @@ from app.features.settings import service as settings_service
 from app.features.settings.sections import FilesSettings
 from app.policy.models import Action
 from app.tools.base import Tool, ToolContext, ToolResult
-from app.tools.builtin.computer import device_layer, known_device, levels
+from app.tools.builtin.computer import device_layer, is_watched, known_device, levels
 from app.tools.builtin.workspace import backup_file, path_action, path_exists
 from app.workspace import files, fs_guard
 
@@ -103,6 +103,10 @@ def _blocked(ctx: ToolContext, name: str) -> str | None:
     if device["kind"] != "computer":
         return f"“{device['name']}” is a phone, not a computer"
     if levels(device)["files"] == "deny":
+        if is_watched(levels(device)):
+            return (
+                f"“{device['name']}” is a watched computer: files are copied only with trusted ones"
+            )
         return f"Files are not copied with “{device['name']}” (its permission profile)"
     if not device.get("files"):
         return (
@@ -148,6 +152,11 @@ async def _computer(ctx: ToolContext, name: str) -> Any:
     if device is None or device.kind != "computer" or live is None:
         return _error(f"There is no computer named “{name}”.")
     if live["files"] == "deny":
+        if is_watched(live):
+            return _error(
+                f"“{device.name}” is a watched computer: files are only copied to and from "
+                "trusted computers. Ask the user."
+            )
         return _error(
             f"Files are not copied to and from “{device.name}”: its permission profile doesn't "
             "allow it. Ask the user."

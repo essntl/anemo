@@ -67,8 +67,15 @@ PRESETS: dict[Preset, PresetSpec] = {
     ),
     "watched": PresetSpec(
         name="Watched",
-        description="Every look and every action asks first; no shell, files or Claude Code.",
-        categories={"see": "ask", "act": "ask", "shell": "deny", "files": "deny", "code": "deny"},
+        description="Every action asks first; no shell, files or Claude Code. Looking follows "
+        "your Agent Permissions.",
+        categories={
+            "see": "policy",
+            "act": "ask",
+            "shell": "deny",
+            "files": "deny",
+            "code": "deny",
+        },
         relevance_check=False,
     ),
     "legacy": PresetSpec(

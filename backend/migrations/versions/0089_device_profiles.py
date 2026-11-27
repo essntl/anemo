@@ -37,7 +37,7 @@ _PRESETS = {
     ),
     "watched": (
         "Watched",
-        {"see": "ask", "act": "ask", "shell": "deny", "files": "deny", "code": "deny"},
+        {"see": "policy", "act": "ask", "shell": "deny", "files": "deny", "code": "deny"},
         False,
     ),
     "legacy": (
