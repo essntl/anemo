@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.features.attachments.service import render_blocks
+from app.features.conversations import compaction
 from app.features.conversations.models import ChatMessage
 from app.features.settings import service as settings_service
 from app.features.triggers import render as event_render
@@ -42,13 +43,26 @@ async def load_history(
     db: AsyncSession, conversation_id: uuid.UUID, before_seq: int, *, with_context: bool = True
 ) -> list[Message]:
     """The conversation as model input. `with_context`: each user message carries the
-    turn context it was first sent with (runtime/turn_context.py), byte for byte."""
+    turn context it was first sent with (runtime/turn_context.py), byte for byte.
+
+    A compacted chat starts with its newest summary, then the messages from the one it
+    kept on (docs/specs/24-chat-compaction.md)."""
+    history: list[Message] = []
+    start = 0
+    newest = await compaction.latest(db, conversation_id, before_seq)
+    if newest is not None:
+        start = int((newest.compaction or {}).get("kept_from_seq", newest.seq))
+        history.append(Message.user(compaction.summary_message_text(newest.text_plain)))
     rows = await db.scalars(
         select(ChatMessage)
-        .where(ChatMessage.conversation_id == conversation_id, ChatMessage.seq < before_seq)
+        .where(
+            ChatMessage.conversation_id == conversation_id,
+            ChatMessage.seq >= start,
+            ChatMessage.seq < before_seq,
+            ChatMessage.role != compaction.ROLE,
+        )
         .order_by(ChatMessage.seq)
     )
-    history: list[Message] = []
     for row in rows:
         if row.role == "assistant" and row.status not in ("complete", "cancelled"):
             continue  # failed turns are not part of the context

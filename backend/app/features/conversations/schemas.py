@@ -145,6 +145,17 @@ class PageContentOut(PageSummary):
     content: str
 
 
+class CompactionSummary(BaseModel):
+    """A compaction row (role "compaction"): where the model reads on, and how big the
+    context was before and after (estimates). Numbers are None while it is written."""
+
+    kept_from_seq: int | None = None
+    tokens_before: int | None = None
+    tokens_after: int | None = None
+    focus: str | None = None
+    auto: bool = False
+
+
 class MessageOut(BaseModel):
     id: uuid.UUID
     seq: int
@@ -170,6 +181,21 @@ class MessageOut(BaseModel):
     # Assistant messages: how long the answer took, from its run. None for user
     # messages and answers without a run (e.g. copied into a branched chat).
     timing: RunTiming | None = None
+    compaction: CompactionSummary | None = None  # role "compaction" only
+
+
+class CompactIn(BaseModel):
+    focus: str | None = Field(None, max_length=2000, description="What to keep in detail")
+
+
+class ContextOut(BaseModel):
+    """How big the chat's history is for the model, and when it is compacted."""
+
+    tokens: int  # an estimate (characters / 4)
+    compact_at: int
+    auto_compact: bool
+    # The chat's model is on the Claude subscription: Claude Code compacts it itself.
+    compacts_itself: bool
 
 
 class VersionIn(BaseModel):
@@ -206,6 +232,11 @@ class TurnOut(BaseModel):
     run_id: uuid.UUID
     user_message: MessageOut | None
     assistant_message: MessageOut
+
+
+class CompactOut(BaseModel):
+    run_id: uuid.UUID
+    message: MessageOut  # the compaction row, being written
 
 
 class TagCount(BaseModel):

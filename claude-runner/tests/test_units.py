@@ -1,6 +1,8 @@
 """Unit tests that need no CLI: the CLI's environment and launch flags, and how
 CLI errors are classified."""
 
+import json
+
 import launch
 from sessions import classify_error, render_gone, start_error
 
@@ -50,6 +52,17 @@ def test_fixed_launch_options() -> None:
                                     resume=None, fork=False, resume_at=None, drops_turn=None)
     assert "no-session-persistence" in oneshot["extra_args"]
     assert launch.MCP_TOOL_TIMEOUT_MS > launch.IDLE_S * 1000  # the runner always ends it first
+    assert "autoCompactWindow" not in kw["settings"]  # Claude Code's own default
+
+
+def test_the_compact_window_reaches_claude_codes_settings() -> None:
+    kw = launch.options_kwargs(model="m", effort=None, system_file=None, persist=True,
+                               resume=None, fork=False, resume_at=None, drops_turn=None,
+                               compact_window=250_000)
+    settings = json.loads(kw["settings"])
+    assert settings["autoCompactWindow"] == 250_000
+    assert settings["disableClaudeAiConnectors"] is True
+    assert "autoCompactWindow" not in launch.SETTINGS  # the shared defaults stay as they were
 
 
 def test_usage_limit_is_not_retryable_and_names_the_reset() -> None:

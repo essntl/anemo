@@ -74,6 +74,24 @@ Other OpenAI-compatible servers (Ollama, vLLM, …) get no level, so the button 
 shown for their models. On the Claude subscription a new level starts its Claude Code
 session again (resumed, so the next answer misses the prompt cache once).
 
+## Long chats: /compact
+
+A chat's later messages re-read everything said before, so a long chat costs more with
+every message. Typing **/compact** (optionally followed by what to keep in detail, e.g.
+`/compact the API design`) and Enter has the chat's model write a structured summary
+(goal, decisions, current state, open tasks, identifiers, numbers); from then on the
+model reads that summary and the last turns instead of the whole chat. The chat itself
+stays as it was, with a divider *Compacted here (312k → 14k tokens)* that opens to the
+summary; search and `read_chat` still find the original messages.
+
+**Settings → General → Long chats** does it by itself when a chat reaches a size
+(default 250k tokens, 20k–2M), always before a new message, never while the agent works.
+From 85 % of that size a line under the message box says so. Long agent runs, sub-agents
+and automations summarize their own steps at that size too (or near the model's limit,
+whichever comes first). Chats on the Claude subscription are compacted by Claude Code
+itself: the setting becomes its auto-compact window, and /compact is refused there.
+Details: [specs/24-chat-compaction.md](specs/24-chat-compaction.md).
+
 ## Projects and organising chats
 
 A **project** keeps one piece of work together: its chats, tasks, calendar events,

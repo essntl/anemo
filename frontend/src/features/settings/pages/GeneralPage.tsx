@@ -6,7 +6,7 @@ import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Field, Input } from '@/components/ui/Input'
 import { useLogout, useRevokeSession, useSessions } from '@/features/auth/api'
 import { TokensCard } from '@/features/auth/TokensCard'
-import { useSaveGeneral, useSettings } from '../api'
+import { useSaveGeneral, useSaveSection, useSettings } from '../api'
 import { Select } from '@/components/ui/Select'
 import { useHasKeyboard, useShortcutSheet } from '@/features/shortcuts/sheetStore'
 import { dateLocale, LANGUAGES, t } from '@/lib/i18n'
@@ -89,6 +89,48 @@ function GeneralForm({ initial }: { initial: General }) {
   )
 }
 
+type ChatSettings = Schemas['ChatSettings']
+
+/** Long chats (docs/specs/24-chat-compaction.md): when a chat is summarized by itself. */
+function LongChatsForm({ initial }: { initial: ChatSettings }) {
+  const save = useSaveSection('chat')
+  const [form, setForm] = useState<ChatSettings>(initial)
+  // Shown and typed in thousands of tokens.
+  const [thousands, setThousands] = useState(String(Math.round(initial.compact_at_tokens / 1000)))
+  const value = Number(thousands) * 1000
+  const valid = Number.isFinite(value) && value >= 20_000 && value <= 2_000_000
+  const next = { ...form, compact_at_tokens: valid ? value : form.compact_at_tokens }
+  const dirty = valid && JSON.stringify(next) !== JSON.stringify(initial)
+  return (
+    <Card>
+      <CardHeader title={t('Long chats')}
+        description={t('A long chat is summarized, so every message no longer re-reads all of it. The chat itself stays as it is; /compact in the message box does it at once.')} />
+      <CardBody className="flex flex-col gap-4">
+        <label className="flex items-center gap-2 text-[13px]">
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-[var(--accent)]"
+            checked={form.auto_compact}
+            onChange={(e) => setForm({ ...form, auto_compact: e.target.checked })}
+          />
+          {t('Compact a chat by itself when it gets long')}
+        </label>
+        <Field label={t('Compact at (thousands of tokens)')}
+          hint={t('Between 20 and 2000. Chats on the Claude subscription use it as Claude Code’s own compaction point.')}>
+          <Input type="number" inputMode="numeric" min={20} max={2000} value={thousands}
+            aria-invalid={!valid} onChange={(e) => setThousands(e.target.value)} />
+        </Field>
+        {save.isError && <p className="text-[13px] text-error">{errorMessage(save.error)}</p>}
+        <div>
+          <Button variant="primary" disabled={!dirty} loading={save.isPending} onClick={() => save.mutate(next)}>
+            {t('Save')}
+          </Button>
+        </div>
+      </CardBody>
+    </Card>
+  )
+}
+
 function SessionsCard() {
   const sessions = useSessions()
   const revoke = useRevokeSession()
@@ -143,6 +185,9 @@ export function GeneralPage() {
     <div className="flex flex-col gap-(--card-gap)">
       {settings.data && (
         <GeneralForm key={JSON.stringify(settings.data.general)} initial={settings.data.general} />
+      )}
+      {settings.data && (
+        <LongChatsForm key={JSON.stringify(settings.data.chat)} initial={settings.data.chat} />
       )}
       <ShortcutsCard />
       <SessionsCard />

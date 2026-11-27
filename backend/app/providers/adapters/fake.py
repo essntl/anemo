@@ -66,6 +66,26 @@ def _last_user_text(req: ChatRequest) -> str:
     return ""
 
 
+# The first words of runtime/chat_compaction.py's INSTRUCTION.
+COMPACT_INSTRUCTION = "Write a summary of our conversation so far."
+
+
+def _fake_compaction(req: ChatRequest, prompt: str) -> str:
+    decisions = [
+        line.strip()
+        for m in req.messages
+        for text in _texts(m.content)
+        if COMPACT_INSTRUCTION not in text
+        for line in text.splitlines()
+        if line.strip().startswith("Decision:")
+    ]
+    lines = ["## Decisions", *(f"- {d}" for d in dict.fromkeys(decisions))]
+    focus = prompt.partition("Keep these in full detail:")[2].strip()
+    if focus:
+        lines += ["## Kept in detail", f"- {focus}"]
+    return "\n".join(lines)
+
+
 def _first_user_text(req: ChatRequest) -> str:
     for msg in req.messages:
         if msg.role == "user":
@@ -102,6 +122,16 @@ class FakeAdapter:
     async def stream_chat(self, req: ChatRequest) -> AsyncIterator[ProviderEvent]:
         prompt = _last_user_text(req)
         FakeAdapter.requests = [*FakeAdapter.requests[-19:], req]
+        if COMPACT_INSTRUCTION in prompt:
+            # A chat's compaction (runtime/chat_compaction.py): what a model would keep,
+            # made checkable: every "Decision: ..." line of the chat, and the focus.
+            yield TextDelta(_fake_compaction(req, prompt))
+            yield Usage(
+                input_tokens=sum(len(m.model_dump_json()) for m in req.messages) // 4,
+                output_tokens=40,
+            )
+            yield Done("end")
+            return
         if _first_user_text(req).startswith("Summarize the agent history below"):
             yield TextDelta("- Fake summary of the earlier work.")
             yield Usage(input_tokens=100, output_tokens=10)

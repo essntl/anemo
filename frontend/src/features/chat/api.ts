@@ -178,6 +178,43 @@ export function useSendTurn() {
   })
 }
 
+export const contextKey = (id: string) => ['conversation-context', id] as const
+export type ChatContext = Schemas['ContextOut']
+
+/** How big the chat's history is for the model, and when it is compacted. */
+export function useChatContext(conversationId: string | null) {
+  return useQuery({
+    queryKey: contextKey(conversationId ?? ''),
+    queryFn: async () =>
+      unwrap(
+        await api.GET('/api/conversations/{conversation_id}/context', {
+          params: { path: { conversation_id: conversationId ?? '' } },
+        }),
+      ),
+    enabled: Boolean(conversationId),
+  })
+}
+
+/** `/compact [focus]`: the chat's model summarizes the chat so far (a run of its own). */
+export function useCompact() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (v: { conversationId: string; focus: string | null }) =>
+      unwrap(
+        await api.POST('/api/conversations/{conversation_id}/compact', {
+          params: { path: { conversation_id: v.conversationId } },
+          body: { focus: v.focus },
+        }),
+      ),
+    onSuccess: (out, v) => {
+      qc.setQueryData<ChatMessage[]>(messagesKey(v.conversationId), (old = []) => [...old, out.message])
+      qc.setQueryData<Conversation>(conversationKey(v.conversationId), (old) =>
+        old ? { ...old, active_run_id: out.run_id } : old,
+      )
+    },
+  })
+}
+
 export function useRegenerate() {
   const apply = useApplyTurn()
   const qc = useQueryClient()

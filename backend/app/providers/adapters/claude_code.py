@@ -532,6 +532,7 @@ class ClaudeCodeAdapter:
                 "tools": tools,
                 "claude_session_id": None if p.new_session else state.get("claude_session_id"),
                 "fork": p.fork,
+                "compact_window": req.compact_window,
                 "input": {"type": "tool_results", "results": p.results}
                 if p.kind == "results"
                 else {"type": "message", "content": content, "uuid": p.prompt_uuid},

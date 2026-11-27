@@ -132,8 +132,14 @@ def child_env(source: dict[str, str]) -> dict[str, str]:
     return env
 
 
-def settings_json() -> str:
-    return json.dumps(SETTINGS, sort_keys=True)
+def settings_json(compact_window: int | None = None) -> str:
+    """The settings every process gets. `compact_window`: Claude Code compacts the
+    conversation when it nears this many tokens (`autoCompactWindow`; Anemo's Settings >
+    General > Long chats, docs/specs/24-chat-compaction.md §5). None: Claude Code's own."""
+    settings = dict(SETTINGS)
+    if compact_window is not None:
+        settings["autoCompactWindow"] = compact_window
+    return json.dumps(settings, sort_keys=True)
 
 
 def system_prompt_file(text: str, digest: str) -> Path:
@@ -158,6 +164,7 @@ def options_kwargs(
     fork: bool,
     resume_at: str | None,
     drops_turn: str | None,
+    compact_window: int | None = None,
 ) -> dict[str, Any]:
     """ClaudeAgentOptions for one process (the MCP bridge is added by the caller).
 
@@ -185,7 +192,7 @@ def options_kwargs(
         "strict_mcp_config": True,
         # --setting-sources "": no user, project or local settings files.
         "setting_sources": [],
-        "settings": settings_json(),
+        "settings": settings_json(compact_window),
         # Every prompt is delivered as written: no "@path" file mentions are expanded
         # (they would make Claude Code read local files, such as its own login).
         "verbatim_prompts": True,
