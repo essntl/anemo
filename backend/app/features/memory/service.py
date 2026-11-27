@@ -2,6 +2,7 @@
 
 import re
 import uuid
+from collections.abc import Collection, Iterable
 from datetime import UTC, datetime
 from typing import Any
 
@@ -189,10 +190,29 @@ def _recency(memory: Memory, now: datetime) -> float:
     return 0.5 + 0.5 * 0.5 ** (age_days / RECENCY_HALF_LIFE_DAYS)  # 1.0 fresh .. 0.5 very old
 
 
+# A memory as the model got it: (id, content). One the conversation was given already is
+# left out of later turns; one whose text changed since is given again.
+MemoryKey = tuple[str, str]
+
+
+def key(memory: Memory) -> MemoryKey:
+    return (str(memory.id), memory.content)
+
+
+def keys(manifest: Iterable[dict[str, str]]) -> set[MemoryKey]:
+    """The keys of a manifest ([{id, content}], as runs and messages keep them)."""
+    return {(m["id"], m["content"]) for m in manifest if "id" in m and "content" in m}
+
+
 async def relevant(
-    db: AsyncSession, query: str, settings: MemorySettings, exclude: set[uuid.UUID]
+    db: AsyncSession,
+    query: str,
+    settings: MemorySettings,
+    exclude: set[uuid.UUID],
+    given: Collection[MemoryKey] = (),
 ) -> list[Memory]:
-    """Active memories related to `query`, best first. Empty when nothing really fits."""
+    """Active memories related to `query`, best first. Empty when nothing really fits.
+    `given`: memories the conversation already has, left out."""
     if settings.max_injected == 0 or not query.strip():
         return []
     hits = await index.search(
@@ -210,6 +230,7 @@ async def relevant(
         for m in await db.scalars(
             select(Memory).where(Memory.id.in_(wanted), Memory.status == "active")
         )
+        if key(m) not in given
     }
     now = datetime.now(UTC)
     scored = [
@@ -228,6 +249,15 @@ them or mention that you have a memory unless asked.
 {lines}
 """
 
+# A later turn's memories: only those the conversation wasn't given yet.
+MORE_MEMORY_SECTION = """
+## More of what you know about the user
+Saved memories that fit this message, besides those given earlier in this conversation \
+(one with the same subject as an earlier one is its newer version). Use them when they \
+help; do not recite them or mention that you have a memory unless asked.
+{lines}
+"""
+
 MEMORY_TOOLS_HINT = """
 When the user asks you to remember, change or forget something about themselves, use \
 the memory tools right away and confirm briefly. Also remember lasting preferences \
@@ -235,22 +265,47 @@ and facts they state in passing. Never store passwords, keys or other secrets.
 """
 
 
-async def build_context(
-    db: AsyncSession, query: str, settings: MemorySettings
+def _used(memories: list[Memory]) -> list[dict[str, str]]:
+    """Mark the memories as used now; their manifest. Part of a bigger change: no commit."""
+    now = datetime.now(UTC)
+    for memory in memories:
+        memory.last_used_at = now
+        memory.use_count += 1
+    return [{"id": str(m.id), "content": m.content} for m in memories]
+
+
+async def always_section(
+    db: AsyncSession, settings: MemorySettings
 ) -> tuple[str, list[dict[str, str]]]:
-    """The system prompt section with memories for this message, and what went in
-    (kept on the run, so the user can see why the assistant knew something)."""
+    """The section with the always-included memories (pinned, instructions) for the
+    system prompt of a chat that starts now, and what went in. Doesn't commit."""
     if not settings.enabled:
         return "", []
     always = await always_included(db)
-    related = await relevant(db, query, settings, exclude={m.id for m in always})
+    if not always:
+        return "", []
+    lines = "\n".join(f"- {m.content}" for m in always)
+    return MEMORY_SECTION.format(lines=lines), _used(always)
+
+
+async def build_context(
+    db: AsyncSession,
+    query: str,
+    settings: MemorySettings,
+    *,
+    given: Collection[MemoryKey] = (),
+) -> tuple[str, list[dict[str, str]]]:
+    """The turn-context section with memories for this message, and what went in (kept
+    on the run, so the user can see why the assistant knew something). `given`: the
+    memories this conversation already has (its system prompt, earlier turns): they are
+    left out, so each reaches the model once. Doesn't commit."""
+    if not settings.enabled:
+        return "", []
+    always = [m for m in await always_included(db) if key(m) not in given]
+    related = await relevant(db, query, settings, exclude={m.id for m in always}, given=given)
     used = [*always, *related]
     if not used:
         return "", []
-    now = datetime.now(UTC)
-    for memory in used:
-        memory.last_used_at = now
-        memory.use_count += 1
     lines = "\n".join(f"- {m.content}" for m in used)
-    manifest = [{"id": str(m.id), "content": m.content} for m in used]
-    return MEMORY_SECTION.format(lines=lines), manifest
+    section = MORE_MEMORY_SECTION if given else MEMORY_SECTION
+    return section.format(lines=lines), _used(used)

@@ -9283,7 +9283,7 @@ export interface components {
             max_injected: number;
             /**
              * Min Similarity
-             * @default 0.3
+             * @default 0.4
              */
             min_similarity: number;
         };

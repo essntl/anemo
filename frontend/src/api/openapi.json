@@ -33024,7 +33024,7 @@
             "maximum": 1.0,
             "minimum": 0.0,
             "title": "Min Similarity",
-            "default": 0.3
+            "default": 0.4
           }
         },
         "type": "object",
