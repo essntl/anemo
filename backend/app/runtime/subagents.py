@@ -99,6 +99,7 @@ async def spawn(
     profile_name: str | None,
     max_depth: int,
     budget: dict[str, Any],
+    tools: list[str] | None = None,
 ) -> Run:
     """Create and queue a sub-agent run. Adds to the caller's transaction.
     Raises SpawnRefused when a cap is reached."""
@@ -141,6 +142,8 @@ async def spawn(
                 "ancestors": [snapshot.get("policy"), *(snapshot.get("ancestors") or [])],
                 "budget": budget,
                 "automation": snapshot.get("automation"),
+                # The tools the parent chose for the task (None: all it may give).
+                "tools": sorted(set(tools)) if tools else None,
             }
         },
     )

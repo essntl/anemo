@@ -19,6 +19,12 @@ class SubagentInput(BaseModel):
     profile: str | None = Field(
         None, max_length=100, description="Name of an agent profile to use (default: yours)"
     )
+    tools: list[str] | None = Field(
+        None,
+        max_length=60,
+        description='Only these of your tools, by name (e.g. ["web_search", '
+        '"read_web_page"]): a short list makes it faster and cheaper. Default: all of yours',
+    )
 
 
 class RunSubagent(Tool):
@@ -28,7 +34,8 @@ class RunSubagent(Tool):
         "Use it for larger pieces that can be done independently (researching several "
         "things, working through separate files); several can run at the same time if "
         "you call it more than once in one step. A sub-agent has the same tools and may "
-        "do no more than you may. For small things, just do them yourself."
+        "do no more than you may; give it only the tools its task needs. For small things, "
+        "just do them yourself."
     )
     capability = "agent.spawn"
     Input = SubagentInput
