@@ -5,7 +5,8 @@ an event block (no new message role, so providers need no change). The runtime t
 the block into text that says the system added it, with the payload inside an
 untrusted-data block (runtime/history.py), and the app shows it as an event card. The
 turn is answered by an agent run that knows which event started it
-(`options["event"]`), so it can't set or change triggers or schedules itself.
+(`options["event"]`), so it can't set or change schedules or an automation's triggers;
+it may set the chat's next wake-me (tools/builtin/triggers.py, trigger_access).
 """
 
 from typing import Any

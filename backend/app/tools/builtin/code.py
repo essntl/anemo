@@ -403,6 +403,12 @@ def _status_text(job: CodeJobOut, recent: list[str], *, show_report: bool = True
         f"Project: {job.project} ({job.dir or '?'})",
         f"Task: {_one_line(job.title, 120)}",
     ]
+    if job.session_id and job.state in TERMINAL:
+        # What a follow-up needs: a later turn has nowhere else to get it from.
+        body.append(
+            f"Session: {_one_line(job.session_id, 100)} (to follow up: code_start on the same "
+            "computer and project with it as resume_session)"
+        )
     if job.branch or job.pr_url:
         body.append(f"Branch: {job.branch or '?'}; pull request: {job.pr_url or 'none'}")
     if job.todos:

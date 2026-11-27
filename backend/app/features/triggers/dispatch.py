@@ -9,13 +9,15 @@ For each event and each enabled trigger of its type:
 1. Not after its expiry; a webhook event only for the trigger it was sent to.
 2. The filter matches the event's data.
 3. Loop protection: not when the trigger's own automation (or chat) caused the event,
-   and nothing at depth 3 or more (logged on the trigger).
+   and no automation at depth 3 or more (logged on the trigger).
 4. With a debounce, the firing waits until the window after the first event closes and
    then carries the newest event and how many there were.
 5. No overlapping runs: while the automation's run (or the chat's) is working, the
    firing waits and goes out once it ends, as one firing however many events came.
-6. Limits: the trigger's own per hour, and the global ceiling (Settings section
-   "automations"); a firing over either is dropped and counted on the trigger.
+6. Limits: the trigger's own per hour, the global ceiling and, for a wake-me, the
+   chat's budget of wake-ups in 24 hours (the last two: Settings section
+   "automations"); a firing over any is dropped and counted on the trigger. For a chat
+   out of wake-ups the user also gets a notification, after the pass committed.
 7. "Pause all": nothing fires; events that arrive meanwhile are dropped (as schedules
    skip what came due while paused).
 
@@ -31,18 +33,22 @@ triggers in different orders (each in the order of its own events) and could dea
 """
 
 import logging
+import uuid
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from functools import partial
 from typing import Any
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_sessionmaker
 from app.core.errors import AppError, Conflict
 from app.features.automations import service as automations
 from app.features.automations.models import Automation
+from app.features.conversations.models import Conversation
+from app.features.notifications import service as notifications
 from app.features.runs.models import ACTIVE_STATUSES, Run
 from app.features.triggers import catalogue, matching, render, wake
 from app.features.triggers.events import DISPATCH_JOB
@@ -56,6 +62,24 @@ BATCH = 200  # events per pass
 # is simpler than locking each pass's triggers up front in id order, and costs nothing
 # that matters: a pass is short, and the passes are a few seconds apart at most.
 LOCK_KEY = 0x74726967
+
+
+@dataclass
+class _OutOfWakes:
+    """A chat whose wake-up budget stopped a firing: what to tell the user."""
+
+    conversation_id: uuid.UUID
+    event_type: str
+    budget: int
+
+
+@dataclass
+class _Limits:
+    """What one pass holds every firing to (Settings section "automations")."""
+
+    all_per_hour: int
+    wakes_per_chat: int
+    out_of_wakes: list[_OutOfWakes] = field(default_factory=list)  # told after the commit
 
 
 def _now() -> datetime:
@@ -122,6 +146,70 @@ async def _firings_last_hour(db: AsyncSession, now: datetime) -> int:
     return sum(len(matching.recent(list(f or []), now)) for f in fires)
 
 
+async def _wakes_last_day(db: AsyncSession, conversation_id: uuid.UUID, now: datetime) -> int:
+    """How often events woke the chat in the last 24 hours. Counted from the runs, so
+    deleting or replacing its triggers doesn't give a chat more."""
+    count = await db.scalar(
+        select(func.count())
+        .select_from(Run)
+        .where(
+            Run.conversation_id == conversation_id,
+            Run.created_at > now - matching.DAY,
+            Run.parent_run_id.is_(None),
+            Run.automation_id.is_(None),
+            Run.options.has_key("event"),
+        )
+    )
+    return int(count or 0)
+
+
+def _drop_out_of_wakes(
+    trigger: Trigger, event: TriggerEvent, now: datetime, limits: _Limits
+) -> None:
+    """Drop a wake-me firing over the chat's budget. The user is told once a day per
+    trigger (again if it fired in between), not for every further event."""
+    assert trigger.conversation_id is not None
+    reason = f"over this chat's limit of {limits.wakes_per_chat} wake-ups in 24 hours"
+    last = trigger.last_dropped_at
+    told = (
+        trigger.last_drop_reason == reason
+        and last is not None
+        and now - last < matching.DAY
+        and (trigger.last_fired_at is None or trigger.last_fired_at < last)
+    )
+    _drop(trigger, reason, now)
+    if not told:
+        limits.out_of_wakes.append(
+            _OutOfWakes(trigger.conversation_id, event.type, limits.wakes_per_chat)
+        )
+
+
+async def _tell(out_of_wakes: list[_OutOfWakes]) -> None:
+    """Notify the user of the chats that ran out of wake-ups. In sessions of its own:
+    a notification commits, which a pass must not do halfway."""
+    for chat in out_of_wakes:
+        known = catalogue.get(chat.event_type)
+        what = known.label if known else chat.event_type
+        try:
+            async with get_sessionmaker()() as db:
+                conversation = await db.get(Conversation, chat.conversation_id)
+                if conversation is None:
+                    continue
+                await notifications.create(
+                    db,
+                    title=f"No more wake-ups for “{conversation.title}”",
+                    body=f"Events woke this chat {chat.budget} times in the last 24 hours, "
+                    f"the most allowed, so this one did not: {what}. Send a message in the "
+                    "chat to go on.",
+                    level="warning",
+                    kind="agent",
+                    link=f"/c/{chat.conversation_id}",
+                )
+        except Exception:  # noqa: BLE001 - the pass is done: a lost notice must not fail it
+            ctx = {"conversation_id": str(chat.conversation_id)}
+            log.warning("wake-up limit notice not sent", extra={"ctx": ctx}, exc_info=True)
+
+
 def _event_info(event: TriggerEvent, trigger: Trigger, count: int) -> dict[str, Any]:
     """What the run (options["event"]) and the chat's event card keep of the event."""
     return {
@@ -150,17 +238,29 @@ async def _start(db: AsyncSession, trigger: Trigger, event: TriggerEvent, count:
 
 
 async def _fire(
-    db: AsyncSession, trigger: Trigger, event: TriggerEvent, count: int, now: datetime, ceiling: int
+    db: AsyncSession,
+    trigger: Trigger,
+    event: TriggerEvent,
+    count: int,
+    now: datetime,
+    limits: _Limits,
 ) -> str:
     """Fire now, or keep waiting while its run is busy. Returns fired | waiting | dropped."""
     if await _busy(db, trigger):
         _wait(trigger, event, count, now, since=trigger.pending_since or now - timedelta(days=1))
         return "waiting"
+    if (
+        trigger.conversation_id is not None
+        and await _wakes_last_day(db, trigger.conversation_id, now) >= limits.wakes_per_chat
+    ):
+        _drop_out_of_wakes(trigger, event, now, limits)
+        return "dropped"
     if matching.over_limit(list(trigger.recent_fires or []), trigger.max_per_hour, now):
         _drop(trigger, f"over its limit of {trigger.max_per_hour} an hour", now)
         return "dropped"
-    if await _firings_last_hour(db, now) >= ceiling:
-        _drop(trigger, f"over the limit of {ceiling} firings an hour for all triggers", now)
+    if await _firings_last_hour(db, now) >= limits.all_per_hour:
+        reason = f"over the limit of {limits.all_per_hour} firings an hour for all triggers"
+        _drop(trigger, reason, now)
         return "dropped"
     try:
         # (start_run and the chat refuse before they change anything.)
@@ -222,7 +322,7 @@ async def _guarded[T](
 
 
 async def _consider(
-    db: AsyncSession, trigger: Trigger, event: TriggerEvent, now: datetime, ceiling: int
+    db: AsyncSession, trigger: Trigger, event: TriggerEvent, now: datetime, limits: _Limits
 ) -> None:
     known = catalogue.get(event.type)
     if _expired(trigger, now) or known is None:
@@ -240,7 +340,7 @@ async def _consider(
         conversation_id=str(trigger.conversation_id) if trigger.conversation_id else None,
     )
     if reason is not None:
-        if event.depth >= matching.MAX_DEPTH:
+        if trigger.automation_id is not None and event.depth >= matching.MAX_DEPTH:
             _drop(trigger, reason, now)
         else:
             _log("trigger not fired: its own change", trigger, event_id=str(event.id))
@@ -263,7 +363,7 @@ async def _consider(
             run_at=now + timedelta(seconds=trigger.debounce_s + 1),
         )
         return
-    await _fire(db, trigger, event, 1, now, ceiling)
+    await _fire(db, trigger, event, 1, now, limits)
 
 
 async def _triggers_for(db: AsyncSession, event_type: str) -> list[Trigger]:
@@ -293,15 +393,16 @@ async def _dispatch_events(now: datetime) -> int:
         if not taken:
             return 0
         settings = await automations.protections(db)
-        ceiling = settings.max_trigger_firings_per_hour
+        limits = _Limits(settings.max_trigger_firings_per_hour, settings.max_wakes_per_chat_per_day)
         for event in taken:
             event.dispatched_at = now
             if settings.paused:
                 continue  # "Pause all": nothing fires
             for trigger in await _triggers_for(db, event.type):
-                step = partial(_consider, db, trigger, event, now, ceiling)
+                step = partial(_consider, db, trigger, event, now, limits)
                 await _guarded(db, trigger, event.id, now, step)
         await db.commit()
+    await _tell(limits.out_of_wakes)
     return len(taken)
 
 
@@ -313,7 +414,7 @@ async def _fire_waiting(now: datetime) -> int:
         if settings.paused:
             return 0
         await _serialise(db)
-        ceiling = settings.max_trigger_firings_per_hour
+        limits = _Limits(settings.max_trigger_firings_per_hour, settings.max_wakes_per_chat_per_day)
         waiting = list(
             await db.scalars(
                 select(Trigger)
@@ -326,14 +427,17 @@ async def _fire_waiting(now: datetime) -> int:
             assert trigger.pending_since is not None
             if trigger.pending_since + timedelta(seconds=trigger.debounce_s) > now:
                 continue  # its window is still open
-            step = partial(_fire_waiting_one, db, trigger, now, ceiling)
+            step = partial(_fire_waiting_one, db, trigger, now, limits)
             if await _guarded(db, trigger, trigger.pending_event_id, now, step) == "fired":
                 fired += 1
         await db.commit()
+    await _tell(limits.out_of_wakes)
     return fired
 
 
-async def _fire_waiting_one(db: AsyncSession, trigger: Trigger, now: datetime, ceiling: int) -> str:
+async def _fire_waiting_one(
+    db: AsyncSession, trigger: Trigger, now: datetime, limits: _Limits
+) -> str:
     """Fire one waiting firing, or forget it when its event is gone or the trigger or its
     owner is off. Returns fired | waiting | dropped | forgotten."""
     event = (
@@ -347,7 +451,7 @@ async def _fire_waiting_one(db: AsyncSession, trigger: Trigger, now: datetime, c
     ):
         _clear_waiting(trigger)
         return "forgotten"
-    return await _fire(db, trigger, event, max(trigger.pending_count, 1), now, ceiling)
+    return await _fire(db, trigger, event, max(trigger.pending_count, 1), now, limits)
 
 
 async def dispatch(now: datetime | None = None) -> int:

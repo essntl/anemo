@@ -696,14 +696,17 @@ hour at most, once only, and until when. The run gets the event as data, never a
 instructions, and the run log says which event started each run. Every rail of a
 scheduled run applies: its tools, notifications, model, limits, state note, approvals,
 and never two runs at once (events that come while it runs start one more run after
-it). An automation's own changes never start it again, chains of triggers stop after
+it). An automation's own changes never start it again, chains of automations stop after
 three steps, and **Pause all** stops triggers too.
 
 In a chat, the assistant can be asked to **wake you when something happens** ("tell me
 when this Claude Code job is done"): when it does, the chat goes on by itself, with a
 card that shows the event (not as your message). Such a wait ends after one firing and
 after 24 hours unless the assistant asked for longer (at most 30 days); the Automations
-page lists the chats that wait, and **Stop waiting** cancels one. The assistant can
+page lists the chats that wait, and **Stop waiting** cancels one. In the turn an event
+started, the assistant can ask to be woken again, so it can keep working with a Claude
+Code job on its own: check the result, send a follow-up, wait, and so on. A chat is woken
+at most 25 times in 24 hours; when that stops it, you get a notification. The assistant can
 propose an automation with its triggers in one step, which you confirm as you confirm a
 schedule.
 

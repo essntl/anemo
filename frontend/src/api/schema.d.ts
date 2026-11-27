@@ -6502,6 +6502,11 @@ export interface components {
              * @default 60
              */
             max_trigger_firings_per_hour: number;
+            /**
+             * Max Wakes Per Chat Per Day
+             * @default 25
+             */
+            max_wakes_per_chat_per_day: number;
         };
         /**
          * AutomationToolOut

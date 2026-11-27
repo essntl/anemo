@@ -89,7 +89,8 @@ class Trigger(Base, IdMixin, TimestampMixin):
     last_event_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     # When it fired in the last hour (ISO times, oldest first): the rate limit.
     recent_fires: Mapped[list[str]] = mapped_column(JSONB, default=list, server_default="[]")
-    # Firings dropped by a limit (its own, the global ceiling, the depth cap).
+    # Firings dropped by a limit (its own, the global ceiling, the depth cap, the
+    # chat's wake-up budget).
     dropped_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     last_dropped_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_drop_reason: Mapped[str | None] = mapped_column(String(200))

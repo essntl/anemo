@@ -69,6 +69,9 @@ class AutomationSettings(BaseModel):
     # Event triggers, all together: firings beyond this many in an hour are dropped
     # (each trigger also has its own limit).
     max_trigger_firings_per_hour: int = Field(60, ge=1, le=1000)
+    # "Wake me": a chat is woken at most this often in any 24 hours. A woken chat may
+    # set its next wake-me, so this is what ends a chain that would go on forever.
+    max_wakes_per_chat_per_day: int = Field(25, ge=1, le=1000)
 
 
 class FocusSettings(BaseModel):

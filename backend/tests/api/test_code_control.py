@@ -14,15 +14,17 @@ from app.features.code_sessions import control
 from app.features.code_sessions.models import CodeJob
 from app.features.devices import relay
 from app.features.notifications.models import Notification
+from app.features.triggers import dispatch
 from app.policy.presets import CATEGORY_BY_CAP
 from app.providers.adapters.fake import FakeAdapter
 from app.providers.base import Done, TextDelta
 from app.tools.builtin import code as code_tools
 from tests.api.test_agent import agent_turn, call, script, setup, timeline
-from tests.api.test_code_sessions import announce, init, result, say, send
+from tests.api.test_code_sessions import SESSION, announce, init, result, say, send
 from tests.api.test_devices import add
 from tests.api.test_devices_ws import roundtrip, welcomed
 from tests.api.test_extension_events import WsClient
+from tests.api.test_trigger_rewake import woken
 from tests.conftest import requires_db
 
 pytestmark = requires_db
@@ -475,6 +477,7 @@ async def test_an_agent_starts_a_job_and_follows_it(authed, device_side):
     assert secret_tail not in content and len(content) < 3000
     assert "Fixed in https://github.com/essntl/anemo/pull/9" in content
     assert "API-equivalent cost $1.25" in content
+    assert f"Session: {job.session_id} " in content and "resume_session" in content
     assert status["result_data"]["code_report"]["job"] == str(job.id)
 
     # The report reaches the model once per chat: later calls say it is unchanged,
@@ -493,6 +496,53 @@ async def test_an_agent_starts_a_job_and_follows_it(authed, device_side):
     assert "Fixed in" not in again["result"] and code_tools.REPORT_UNCHANGED in again["result"]
     assert "done" in again["result"] and "code_report" not in again["result_data"]
     assert "Fixed in https://github.com/essntl/anemo/pull/9" in full["result"]
+    await ws.disconnect()
+
+
+async def test_a_chat_follows_its_jobs_up_by_itself(authed, device_side):
+    # The loop of docs/specs/16-event-triggers.md §4.2: a job ends and wakes the chat,
+    # the agent reads the result, resumes the session and waits again; nobody approves.
+    _, ws = await computer(authed, "Desk PC")
+    cid = await setup(authed)
+    keys = [KEY, "20261124-110000-lp01", "20261124-120000-lp02", "20261124-130000-lp03"]
+    wait = call("create_trigger", event="code_job.ended", filter={"conversation_id": cid})
+    start = {"device": "desk pc", "project": "anemo"}
+    prompt = "get the tests green"
+    script(
+        prompt,
+        [call("code_start", **start, prompt="Fix the tests"), Done("tool_use")],
+        [wait, Done("tool_use")],
+        [TextDelta("Waiting."), Done("end")],
+    )
+    await agent_turn(authed, cid, prompt)
+
+    for ended, following in zip(keys, keys[1:], strict=False):
+        await announce(ws, ended, prompt="Fix the tests")
+        await send(ws, (1, init()), (2, result(result="2 tests still fail")), key=ended)
+        await dispatch.dispatch()
+        device_side.answers["code_start"] = {**STARTED, "job_id": following}
+        run = await woken(
+            authed,
+            cid,
+            prompt,
+            [call("code_status", job_id=ended), Done("tool_use")],
+            [
+                call("code_start", **start, prompt="Fix the rest", resume_session=SESSION),
+                Done("tool_use"),
+            ],
+            [wait, Done("tool_use")],
+            [TextDelta("Waiting again."), Done("end")],
+        )
+        assert run.status == "completed" and run.options["event"]["type"] == "code_job.ended"
+        calls = (await timeline(authed, str(run.id)))["tool_calls"]
+        assert [(c["tool_name"], c["status"]) for c in calls] == [
+            ("code_status", "succeeded"),
+            ("code_start", "succeeded"),
+            ("create_trigger", "succeeded"),
+        ], calls
+        # What a follow-up needs is in the status: no later turn has it otherwise.
+        assert f"Session: {SESSION}" in calls[0]["result"]
+        assert device_side.sent[-1][1]["resume_session"] == SESSION
     await ws.disconnect()
 
 

@@ -1,10 +1,11 @@
 import { expect, test } from '@playwright/test'
-import { confirmWith, fakeModels, login, signOutAfterEach } from './helpers'
+import { confirmWith, fakeModels, login, newChat, send, signOutAfterEach } from './helpers'
 
 /*
  * Event triggers (docs/specs/16-event-triggers.md) in a real browser: an automation that
  * runs only on events gets a trigger from the Automations page, a new task fires it, and
- * its run shows in the run log with the event that started it.
+ * its run shows in the run log with the event that started it. And a chat that asked to
+ * be woken sets its next wake-me in the turn the event started.
  *
  * The automation's runs use the fake provider's demo agent (never a real model), and
  * everything made here is deleted again.
@@ -78,5 +79,35 @@ test('triggers: a new task starts the automation, and its run says which event',
         expect((await page.request.delete(`/api/automations/${automationId}`)).status()).not.toBe(409)
       }).toPass({ timeout: 30_000 })
     }
+  }
+})
+
+test('triggers: a woken chat waits for the next event by itself', async ({ page }) => {
+  const word = `e2e-watch-${suffix()}`
+  await login(page)
+  const models = await fakeModels(page.request)
+  let chatId: string | null = null
+  const tasks: string[] = []
+  try {
+    await newChat(page, 'Agent', models.agent)
+    await send(page, `watch for tasks titled ${word}`)
+    const watching = page.getByText(/Watching\. This chat will be woken on/)
+    await expect(watching).toHaveCount(1)
+    await expect(page).toHaveURL(/\/c\//)
+    chatId = new URL(page.url()).pathname.split('/').pop() ?? null
+
+    // Twice: the second time only because the first woken turn set a new wake-me.
+    for (const round of [1, 2]) {
+      const task = await page.request.post('/api/tasks', { data: { title: word } })
+      tasks.push(((await task.json()) as { id: string }).id)
+      await expect(page.getByText('An event woke this chat')).toHaveCount(round, { timeout: 60_000 })
+      await expect(watching).toHaveCount(round + 1, { timeout: 60_000 })
+    }
+    const waiting = (await (await page.request.get(`/api/triggers?conversation_id=${chatId}`)).json()) as { enabled: boolean }[]
+    expect(waiting.map((t) => t.enabled)).toEqual([false, false, true])
+  } finally {
+    // Deleting the chat takes its triggers with it.
+    if (chatId) await page.request.delete(`/api/conversations/${chatId}`)
+    for (const id of tasks) await page.request.delete(`/api/tasks/${id}`)
   }
 })

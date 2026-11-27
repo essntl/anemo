@@ -9,7 +9,9 @@ Enabled only when ENABLE_FAKE_PROVIDER=true (or ENV=test). Behaviour by model:
   agent      a tiny tool-using agent: plans, lists the workspace, then summarizes
              (asked to "ask me" something: asks the user a question, then repeats
              the answer; asked to "rename task <id> to <title>": renames that task
-             with update_task, for the activity log's e2e test)
+             with update_task, for the activity log's e2e test; asked to "watch for
+             tasks titled <word>": sets a wake-me for such a task, and sets the next
+             one when it wakes the chat, for the triggers' e2e test)
   no-tools   refuses any request that carries tools (like a server without tool
              calling), otherwise echoes
   scripted   replays FakeAdapter.scripts[<first user text>] (tests only). A script is a
@@ -46,6 +48,7 @@ from app.providers.base import (
 TURN_CONTEXT_OPEN = "<turn_context>"  # see runtime/turn_context.py
 _SHELL_ON = re.compile(r"on (.+?) run: (.+)", re.I | re.S)
 _RENAME_TASK = re.compile(r"rename task ([0-9a-f-]{36}) to (.+)", re.IGNORECASE)
+_WATCH_TASKS = re.compile(r"watch for tasks titled ([\w-]+)", re.IGNORECASE)
 _STOPWORDS = {"the", "a", "an", "is", "are", "to", "of", "and", "i", "my", "in", "do", "what"}
 
 
@@ -221,8 +224,17 @@ class FakeAdapter:
         # "postpone my tasks: <words>": the tasks matching the words move to a Friday in
         # one update_tasks call (the e2e test of a batch approval).
         postpone = re.match(r"postpone my tasks: (.+)", _last_user_text(req).strip(), re.I)
+        # Found in the user's message, and later in the woken turn's trigger note.
+        watch = _WATCH_TASKS.search(_last_user_text(req))
         if not req.tools:
             yield TextDelta("(The agent model needs Agent mode to use tools.)")
+        elif watch and not answers:
+            wake = {"event": "task.created", "filter": {"title": watch[1]}, "note": watch[0]}
+            yield ToolCall("watch1", "create_trigger", wake)
+            yield Done("tool_use")
+            return
+        elif watch:
+            yield TextDelta(f"Watching. {answers[-1]}")
         elif postpone and not answers:
             yield ToolCall("bulk1", "list_tasks", {"query": postpone.group(1)})
             yield Done("tool_use")
