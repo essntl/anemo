@@ -11,8 +11,7 @@ from app.core.db import get_sessionmaker
 from app.features.audit.models import AuditLog
 from app.features.auth import tokens
 from app.features.auth.models import ApiToken, AuthSession
-from app.features.devices import service, shared_screen
-from app.features.devices import profiles
+from app.features.devices import profiles, service, shared_screen
 from app.features.devices.models import Device
 from tests.conftest import requires_db
 
