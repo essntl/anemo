@@ -7,10 +7,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.features.settings.models import AppSetting
 from app.features.settings.sections import SECTIONS, GeneralSettings
 
+# db.info key: the sections that have a row, once load_all has read them all.
+_LOADED = "app_settings_loaded"
+
+
+async def load_all(db: AsyncSession) -> None:
+    """Read every settings row in one query, so the get_section calls that follow in this
+    session need none (code that reads many sections, e.g. a run's snapshot)."""
+    rows = await db.scalars(select(AppSetting))
+    db.info[_LOADED] = {r.section for r in rows}
+
 
 async def get_section[M: BaseModel](db: AsyncSession, model: type[M], name: str) -> M:
     """Stored values merged over defaults; unknown/old keys are ignored."""
-    row = await db.get(AppSetting, name)
+    loaded: set[str] | None = db.info.get(_LOADED)
+    # After load_all, a section without a row needs no query, and one with a row is in
+    # the session already (db.get reads it again only if a commit expired it).
+    row = None if loaded is not None and name not in loaded else await db.get(AppSetting, name)
     stored = row.value if row else {}
     known = {k: v for k, v in stored.items() if k in model.model_fields}
     try:
@@ -38,6 +51,8 @@ async def put_section(db: AsyncSession, name: str, value: BaseModel) -> None:
     data = value.model_dump(mode="json")
     if row is None:
         db.add(AppSetting(section=name, value=data))
+        if _LOADED in db.info:
+            db.info[_LOADED].add(name)
     else:
         row.value = data
     await db.flush()
