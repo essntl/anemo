@@ -233,21 +233,26 @@ export function WidgetGrid({ layout, editing, shown, available = () => true, act
         })}
       </div>
 
-      {editing && (
-        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-card border border-dashed border-border-strong px-4 py-3" aria-label={t('Add a widget')} role="group">
-          <span className="mr-1 text-[11.5px] font-semibold uppercase tracking-wider text-muted">{t('Add a widget')}</span>
-          {hidden.length === 0 ? (
-            <span className="text-[13px] text-muted">{t('Every widget is on the page. Hide one with its eye button.')}</span>
-          ) : (
-            hidden.map((w) => (
-              <button key={w.id} type="button" onClick={() => actions.setHidden(w.id, false)}
-                className="flex h-8 items-center gap-1 rounded-full bg-surface-2 px-3 text-[13px] font-medium hover:bg-surface-hover pointer-coarse:h-10">
-                <Plus className="h-3.5 w-3.5" /> {t(WIDGETS[w.id].name)}
-              </button>
-            ))
-          )}
-        </div>
-      )}
+      {editing && <AddWidgets hidden={hidden} onShow={(id) => actions.setHidden(id, false)} />}
     </>
+  )
+}
+
+/** While editing: the hidden widgets, to put back on the page. */
+export function AddWidgets({ hidden, onShow }: { hidden: WidgetLayout[]; onShow: (id: WidgetId) => void }) {
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-2 rounded-card border border-dashed border-border-strong px-4 py-3" aria-label={t('Add a widget')} role="group">
+      <span className="mr-1 text-[11.5px] font-semibold uppercase tracking-wider text-muted">{t('Add a widget')}</span>
+      {hidden.length === 0 ? (
+        <span className="text-[13px] text-muted">{t('Every widget is on the page. Hide one with its eye button.')}</span>
+      ) : (
+        hidden.map((w) => (
+          <button key={w.id} type="button" onClick={() => onShow(w.id)}
+            className="flex h-8 items-center gap-1 rounded-full bg-surface-2 px-3 text-[13px] font-medium hover:bg-surface-hover pointer-coarse:h-10">
+            <Plus className="h-3.5 w-3.5" /> {t(WIDGETS[w.id].name)}
+          </button>
+        ))
+      )}
+    </div>
   )
 }

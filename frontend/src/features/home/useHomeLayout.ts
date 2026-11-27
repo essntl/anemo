@@ -6,7 +6,7 @@ import { type AllSettings, settingsKey, useSettings } from '@/features/settings/
 import { layoutFor, type WidgetLayout } from './layout'
 
 const toSaved = (layout: WidgetLayout[]) =>
-  layout.map((w) => ({ id: w.id, w: w.w, h: w.h, hidden: !!w.hidden, pinned: !!w.pinned, options: w.options ?? {} }))
+  layout.map((w) => ({ id: w.id, w: w.w, h: w.h, hidden: !!w.hidden, pinned: !!w.pinned, options: w.options ?? {}, grid: w.grid ?? null }))
 
 /**
  * The Home layout from the server for this screen (phone or wider), and a way to
