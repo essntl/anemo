@@ -1,0 +1,29 @@
+# CI only (ci.yml): image builds read and write Docker's layer cache in GitHub's cache, so
+# a Dockerfile step whose inputs did not change (uv sync, npm ci, apt-get) is not run again.
+# Added with COMPOSE_FILE=docker-compose.yml:.github/ci/compose-cache.yml. Services that
+# share an image share a scope. The backend job's dev image: compose-cache-dev.yml.
+x-backend-cache: &backend-cache
+  cache_from: [type=gha,scope=backend]
+  cache_to: [type=gha,scope=backend,mode=max]
+x-sandbox-cache: &sandbox-cache
+  cache_from: [type=gha,scope=sandbox]
+  cache_to: [type=gha,scope=sandbox,mode=max]
+
+services:
+  migrate: { build: *backend-cache }
+  app: { build: *backend-cache }
+  worker: { build: *backend-cache }
+  sandbox: { build: *sandbox-cache }
+  sandbox-net: { build: *sandbox-cache }
+  mcp-host:
+    build:
+      cache_from: [type=gha,scope=mcp-host]
+      cache_to: [type=gha,scope=mcp-host,mode=max]
+  browser:
+    build:
+      cache_from: [type=gha,scope=browser]
+      cache_to: [type=gha,scope=browser,mode=max]
+  claude-runner:
+    build:
+      cache_from: [type=gha,scope=claude-runner]
+      cache_to: [type=gha,scope=claude-runner,mode=max]

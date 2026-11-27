@@ -1,0 +1,9 @@
+# CI only: the backend job's dev image (INSTALL_DEV) in GitHub's cache; see compose-cache.yml.
+x-dev-cache: &dev-cache
+  cache_from: [type=gha,scope=backend-dev]
+  cache_to: [type=gha,scope=backend-dev,mode=max]
+
+services:
+  migrate: { build: *dev-cache }
+  app: { build: *dev-cache }
+  worker: { build: *dev-cache }
