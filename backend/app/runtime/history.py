@@ -134,7 +134,7 @@ async def _load(
 
 async def _newest(
     db: AsyncSession,
-    base: Select[tuple[ChatMessage]],
+    base: Select[ChatMessage],
     before_seq: int,
     with_context: bool,
     max_tokens: int,
