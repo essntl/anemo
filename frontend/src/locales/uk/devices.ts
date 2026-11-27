@@ -95,6 +95,8 @@ const messages: Messages = {
   "{category} in {profile}": "{category} у «{profile}»",
   "{name} (copy)": "{name} (копія)",
   "{n} device | {n} devices": "{n} пристрій | {n} пристрої | {n} пристроїв",
+  "Waiting for confirmation on {name}: it keeps the old permissions until someone allows the change there.": "Очікує підтвердження на «{name}»: до того там діють старі дозволи.",
+  "This computer’s Anemo Desktop doesn’t check commands itself yet; update it for work folders to apply to the shell.": "Anemo Desktop на цьому комп’ютері ще не перевіряє команди сам; оновіть його, щоб робочі теки діяли й для командного рядка.",
 }
 
 export default messages

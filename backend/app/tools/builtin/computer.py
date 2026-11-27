@@ -1213,6 +1213,11 @@ class ComputerShell(Tool):
                 why = f" ({rule})" if rule else ""
                 risk = _risk_of(analysis)
                 network = network or bool(analysis.get("network"))
+            elif blocked is None and level == "folders" and not is_powershell(kind):
+                # macOS has no analyser yet (spec 25 §10): on Scoped every zsh/bash command
+                # the rating doesn't call safe asks; read-only ones go through.
+                decision = "ask" if rating.risk != "safe" else None
+                reason = f"profile {device.get('profile_name')}: no analyser for {shell} yet"
             elif blocked is None and level == "folders":
                 decision, reason = None, None  # the old rules decide, as Trusted (legacy)
                 why += NOT_CHECKED

@@ -30099,6 +30099,27 @@
             },
             "type": "array",
             "title": "Grants"
+          },
+          "device_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Version"
+          },
+          "waiting_for_confirmation": {
+            "type": "boolean",
+            "title": "Waiting For Confirmation",
+            "default": false
+          },
+          "analyser": {
+            "type": "boolean",
+            "title": "Analyser",
+            "default": false
           }
         },
         "type": "object",
