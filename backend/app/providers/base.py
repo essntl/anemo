@@ -181,7 +181,7 @@ class ChatRequest(BaseModel):
     # adapters ignore this field; it lets session-holding adapters recognise it.
     turn_context: str | None = None
     # claude_code: Claude Code compacts its session near this many tokens (Settings >
-    # Chat behaviour; the API providers' chats are compacted by Anemo instead).
+    # General > Long chats; the API providers' chats are compacted by Anemo instead).
     compact_window: int | None = None
 
 

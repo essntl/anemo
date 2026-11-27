@@ -176,7 +176,7 @@ class AgentRun:
         self.session_key = session_key
         self.turn_context = turn_context
         self.reasoning_effort = reasoning_effort
-        # Claude Code's own auto-compact window (Settings > Chat behaviour), set in drive().
+        # Claude Code's own auto-compact window (Settings > General > Long chats), set in drive().
         self.compact_window: int | None = None
         # For a sub-agent: the policies of the agents above it (it may do no more).
         self.ancestors = ancestors or []

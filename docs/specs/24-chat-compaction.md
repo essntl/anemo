@@ -147,7 +147,7 @@ size is shown, from 85 %).
    1M-token model doesn't carry 700k tokens before it summarizes. Its own summary prompt stays.
 6. Frontend: the divider (`CompactionDivider`), the composer's `/compact` (sent on Enter,
    never as a message; the slash menu entry comes with item 2c), the warning, and the two
-   settings in Settings > Chat behaviour.
+   settings in Settings > General > Long chats.
 
 ## 5. Claude Code runner chats
 

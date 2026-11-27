@@ -135,7 +135,7 @@ def child_env(source: dict[str, str]) -> dict[str, str]:
 def settings_json(compact_window: int | None = None) -> str:
     """The settings every process gets. `compact_window`: Claude Code compacts the
     conversation when it nears this many tokens (`autoCompactWindow`; Anemo's Settings >
-    Chat behaviour, docs/specs/24-chat-compaction.md §5). None: Claude Code's own."""
+    General > Long chats, docs/specs/24-chat-compaction.md §5). None: Claude Code's own."""
     settings = dict(SETTINGS)
     if compact_window is not None:
         settings["autoCompactWindow"] = compact_window
