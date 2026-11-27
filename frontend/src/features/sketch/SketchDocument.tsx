@@ -10,7 +10,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, Download, FolderInput, History, Link2, ListPlus, MessageSquare, Pencil, ScanText, Trash2 } from 'lucide-react'
+import { AlertTriangle, Download, FolderInput, History, Link2, ListPlus, MessageSquare, Pencil, Pin, PinOff, ScanText, Trash2 } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { Button } from '@/components/ui/Button'
@@ -176,6 +176,7 @@ export function SketchSession({ doc, server, onServerChanged, onLoadOther, list 
           { label: t('Transcribe'), icon: <ScanText />, onSelect: () => void transcribe() },
           { label: t('New task'), icon: <ListPlus />, onSelect: () => setNewTask(true) },
           { label: t('Copy link'), icon: <Link2 />, onSelect: () => void copyLink() },
+          { label: actions.pinned ? t('Unpin') : t('Pin to the top'), icon: actions.pinned ? <PinOff /> : <Pin />, onSelect: actions.togglePin },
           { label: t('Rename file'), icon: <Pencil />, onSelect: () => void actions.rename() },
           { label: t('Move to project or folder'), icon: <FolderInput />, onSelect: () => void actions.moveToFolder() },
           { label: t('Download .md'), icon: <Download />, download: downloadUrl(server.path) },

@@ -62,5 +62,6 @@ const messages: Messages = {
   "Disabled": "Выключено",
   "On": "Вкл.",
   "Off": "Выкл.",
+  "now": "сейчас",
 }
 export default messages

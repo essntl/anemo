@@ -10,7 +10,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
-import { Code2, Download, FolderInput, History, Link2, ListPlus, MessageSquare, Pencil, Trash2, Type } from 'lucide-react'
+import { Code2, Download, FolderInput, History, Link2, ListPlus, MessageSquare, Pencil, Pin, PinOff, Trash2, Type } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { toast } from '@/components/ui/toast'
@@ -129,6 +129,7 @@ function EditorSession({ doc, server, onServerChanged, onLoadOther, list }: Sess
           { label: t('Ask the assistant'), icon: <MessageSquare />, onSelect: askAi },
           { label: mode === 'rich' ? t('Edit as Markdown') : t('Edit as rich text'), icon: mode === 'rich' ? <Code2 /> : <Type />,
             onSelect: () => (mode === 'rich' ? switchMode('source') : richIsLossy ? toast({ message: t('This document uses HTML or footnotes, which only the Markdown editor keeps.') }) : switchMode('rich')) },
+          { label: actions.pinned ? t('Unpin') : t('Pin to the top'), icon: actions.pinned ? <PinOff /> : <Pin />, onSelect: actions.togglePin },
           { label: t('Rename file'), icon: <Pencil />, onSelect: () => void actions.rename() },
           { label: t('Move to project or folder'), icon: <FolderInput />, onSelect: () => void actions.moveToFolder() },
           { label: t('Share'), icon: <Link2 />, onSelect: () => askShare({ kind: 'document', id: doc.id, title: server.title }) },

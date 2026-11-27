@@ -196,3 +196,51 @@ export async function updateMentions(id: string, oldPath: string, items: { kind:
     }),
   )
 }
+
+/** Pinned documents of a project, or (null) outside projects: the most recently pinned first. */
+export const pinsKey = (projectId: string | null) => ['documents', 'pins', projectId ?? 'outside'] as const
+
+export function usePins(projectId: string | null) {
+  return useQuery({
+    queryKey: pinsKey(projectId),
+    queryFn: async () =>
+      unwrap(await api.GET('/api/documents/pins', { params: { query: projectId ? { project_id: projectId } : {} } })).document_ids,
+  })
+}
+
+export function useSetPinned(projectId: string | null) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (v: { id: string; pinned: boolean }) =>
+      unwrap(
+        await api.PUT('/api/documents/{document_id}/pin', {
+          params: { path: { document_id: v.id } },
+          body: { project_id: projectId, pinned: v.pinned },
+        }),
+      ).document_ids,
+    onSuccess: (ids) => qc.setQueryData(pinsKey(projectId), ids),
+  })
+}
+
+/**
+ * Archive (status: archived) or unarchive (status: active) a document from the list: the
+ * server rewrites its front matter through the normal save, so it gets a revision.
+ */
+export function useArchiveDocument() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (v: { id: string; archived: boolean }) =>
+      unwrap(
+        await api.PUT('/api/documents/{document_id}/properties', {
+          params: { path: { document_id: v.id } },
+          body: { set: { status: v.archived ? 'archived' : 'active' }, base_hash: null, create_values: false },
+        }),
+      ),
+    onSuccess: (doc) => {
+      qc.setQueryData(documentKey(doc.id), doc)
+      void qc.invalidateQueries({ queryKey: documentsKey })
+      void qc.invalidateQueries({ queryKey: ['properties'] })
+      void qc.invalidateQueries({ queryKey: ['views'] })
+    },
+  })
+}
