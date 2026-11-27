@@ -1,4 +1,4 @@
-import { useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState, Fragment, type DragEvent, type KeyboardEvent, type ReactNode, type Ref, type RefObject } from 'react'
+import { lazy, Suspense, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState, Fragment, type DragEvent, type KeyboardEvent, type ReactNode, type Ref, type RefObject } from 'react'
 import * as Popover from '@radix-ui/react-popover'
 import { Link } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
@@ -12,8 +12,6 @@ import { useDictationMessageBox } from '@/features/dictation/useDictationMessage
 import { type Skill, useSlashSkills } from '@/features/profiles/api'
 import { matchesShortcut, SHORTCUTS } from '@/features/shortcuts/registry'
 import { SkillIcon } from '@/features/skills/icons'
-import { sketchForChat } from '@/features/sketch/ensurePreview'
-import { SketchPickerDialog } from '@/features/sketch/SketchPickerDialog'
 import { localSkills, matchSkills, slashQuery, typedCommand } from '@/features/skills/slash'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
@@ -24,6 +22,13 @@ import { canReadClipboard, clipboardImages, isTextField, pastedFiles } from '../
 import { MAX_ATTACHMENTS, type UploadedAttachment, useAttachments } from '../useAttachments'
 import { AttachmentChip } from './AttachmentChip'
 import { type ChatRef, ChatPickerDialog, MAX_REFERENCES, ReferenceChip } from './ChatReference'
+
+// Opened now and then: loaded when first opened, with the sketch renderer it needs.
+const SketchPickerDialog = lazy(() =>
+  import('@/features/sketch/SketchPickerDialog').then((m) => ({ default: m.SketchPickerDialog })),
+)
+const sketchForChat = (...args: Parameters<typeof import('@/features/sketch/ensurePreview').sketchForChat>) =>
+  import('@/features/sketch/ensurePreview').then((m) => m.sketchForChat(...args))
 
 /** What a page can ask the message box to do. */
 export interface ComposerHandle {
@@ -668,8 +673,10 @@ export function Composer({
       </div>
       <Lingering value={pickingSketch}>
         {() => (
-          <SketchPickerDialog onClose={() => setPickingSketch(false)}
-            onPick={(sketch) => files.addMade(`${sketch.title}.png`, () => sketchForChat(sketch.id, queryClient))} />
+          <Suspense fallback={null}>
+            <SketchPickerDialog onClose={() => setPickingSketch(false)}
+              onPick={(sketch) => files.addMade(`${sketch.title}.png`, () => sketchForChat(sketch.id, queryClient))} />
+          </Suspense>
         )}
       </Lingering>
       <Lingering value={picking}>
