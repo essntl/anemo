@@ -63,6 +63,9 @@ export function HomePage() {
   // Settings > Appearance > Full width (or this page's own button): the free grid.
   const fullWidth = useFullWidth('home')
   const off = (w: WidgetLayout) => !!w.hidden || !widgetAvailable(w.id, offPages)
+  // "Needs you" hides itself while empty (unless pinned).
+  const showsNow = (item: WidgetLayout) => item.id !== 'needs' || !!item.pinned || (needs.ready && needs.rows.length > 0)
+  const gridPlacesOf = (l: WidgetLayout[]) => placesOf(l, off, (w) => !showsNow(w))
 
   const actions: GridActions = {
     move: (id, to) => update((l) => moveWidget(l, id, to)),
@@ -74,12 +77,12 @@ export function HomePage() {
   // where they are shown (until then they follow the slots, gridPlaces.placesOf).
   const onGrid = (l: WidgetLayout[]) => l.filter((w) => !off(w)).map((w) => w.id)
   const gridActions: FreeGridActions = {
-    place: (id, place, cols) => update((l) => withPlaces(l, moveTo(placesOf(l, off), onGrid(l), id, toFullGrid(place, cols)))),
+    place: (id, place, cols) => update((l) => withPlaces(l, moveTo(gridPlacesOf(l), onGrid(l), id, toFullGrid(place, cols)))),
     setHidden: (id, hidden) => update((l) => {
-      const placed = withPlaces(l, placesOf(l, off))
+      const placed = withPlaces(l, gridPlacesOf(l))
       if (hidden) return patchWidget(placed, id, { hidden })
       // Back where it was (what is there now moves down), or the first free spot of its slot size.
-      const places = placesOf(placed, off)
+      const places = gridPlacesOf(placed)
       const item = placed.find((w) => w.id === id)!
       const taken = [...places].filter(([other]) => other !== id).map(([, p]) => p)
       const place = item.grid ?? firstFree({ w: Math.min(item.w, 3) * 4, h: item.h * 2 }, taken)
@@ -148,9 +151,8 @@ export function HomePage() {
       )}
 
       {ready && fullWidth && (
-        <FreeGrid layout={layout} places={placesOf(layout, off)} editing={editing} actions={gridActions} render={render}
-          available={(item) => widgetAvailable(item.id, offPages)}
-          shown={(item) => item.id !== 'needs' || !!item.pinned || (needs.ready && needs.rows.length > 0)} />
+        <FreeGrid layout={layout} places={gridPlacesOf(layout)} editing={editing} actions={gridActions} render={render}
+          available={(item) => widgetAvailable(item.id, offPages)} shown={showsNow} />
       )}
       {ready && !fullWidth && (
         <WidgetGrid layout={layout} editing={editing} actions={actions} render={render}

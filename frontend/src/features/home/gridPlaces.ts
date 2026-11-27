@@ -86,17 +86,27 @@ export function firstFree(size: { w: number; h: number }, others: Place[], cols 
 /**
  * Every widget's place on the 12-column grid: its saved one, else where its slot is.
  * Widgets left out by `skip` (hidden ones) are not laid out but keep a saved place.
+ * `later`: widgets the usual grid doesn't show right now ("Needs you" while empty); they
+ * are left out of the slots, as the page shows them, and get the first free spot after.
  */
-export function placesOf(layout: WidgetLayout[], skip: (item: WidgetLayout) => boolean = (w) => !!w.hidden): Places {
+export function placesOf(
+  layout: WidgetLayout[],
+  skip: (item: WidgetLayout) => boolean = (w) => !!w.hidden,
+  later: (item: WidgetLayout) => boolean = () => false,
+): Places {
   const places: Places = new Map()
   const shown = layout.filter((w) => !skip(w))
-  // The widgets that were never placed take their slots, as the usual grid would show them
-  // all; when every widget is new to the grid that is exactly the page as it was.
+  // When no widget was placed yet, they take their slots as the usual grid shows them:
+  // exactly the page as it was.
   const unplaced = shown.filter((w) => !w.grid)
   if (unplaced.length === shown.length) {
-    autoPlace(shown, 3).forEach((p, i) => {
-      places.set(shown[i].id, { x: p.x * SLOT_COLS, y: p.y * SLOT_ROWS, w: p.w * SLOT_COLS, h: p.h * SLOT_ROWS })
+    const slotted = shown.filter((w) => !later(w))
+    autoPlace(slotted, 3).forEach((p, i) => {
+      places.set(slotted[i].id, { x: p.x * SLOT_COLS, y: p.y * SLOT_ROWS, w: p.w * SLOT_COLS, h: p.h * SLOT_ROWS })
     })
+    for (const w of shown.filter(later)) {
+      places.set(w.id, firstFree({ w: Math.min(w.w, 3) * SLOT_COLS, h: w.h * SLOT_ROWS }, [...places.values()]))
+    }
   } else {
     for (const w of shown) if (w.grid) places.set(w.id, clampPlace(w.grid))
     // One added since the grid was arranged: the first free spot of its slot size.

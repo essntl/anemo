@@ -7,7 +7,8 @@ import { closeHoles, GRID_COLS, moveTo, type Place, type Places, reflow, rowsUse
 import { WIDGETS, type WidgetId, type WidgetLayout } from './layout'
 import { AddWidgets } from './WidgetGrid'
 
-/** A row of the free grid; two rows and their gap are one slot of the usual grid (9.5rem). */
+/** A row of the free grid at least; two rows and their gap are one slot of the usual grid
+ *  (9.5rem). Like the slots, a row grows when a widget's content needs more. */
 const ROW_REM = 4.25
 const GAP_PX = 16
 /** Below this width the grid shows half as many columns (places are scaled, gridPlaces.reflow). */
@@ -28,7 +29,30 @@ interface Gesture {
   top: number
   from: Place
   colStep: number
-  rowStep: number
+  /** Where each row starts and ends (px from the grid's top) when it started. */
+  rows: { start: number; end: number }[]
+}
+
+/** The rows' tops and bottoms as laid out now, and a short row's size for those below. */
+function rowTracks(grid: HTMLElement): { start: number; end: number }[] {
+  const sizes = getComputedStyle(grid).gridTemplateRows.split(' ').map(parseFloat).filter((n) => !Number.isNaN(n))
+  const out: { start: number; end: number }[] = []
+  let at = 0
+  for (const size of sizes) {
+    out.push({ start: at, end: at + size })
+    at += size + GAP_PX
+  }
+  return out
+}
+
+/** The row (index) whose top or bottom is nearest `px`, past the last one at a short row's pace. */
+function nearestRow(rows: { start: number; end: number }[], px: number, edge: 'start' | 'end'): number {
+  const short = ROW_REM * parseFloat(getComputedStyle(document.documentElement).fontSize || '16')
+  const last = rows[rows.length - 1] ?? { start: -short - GAP_PX, end: -GAP_PX }
+  const at = (i: number) => (i < rows.length ? rows[i][edge] : last[edge] + (i - rows.length + 1) * (short + GAP_PX))
+  let best = 0
+  for (let i = 1; i < rows.length + 50; i++) if (Math.abs(at(i) - px) < Math.abs(at(best) - px)) best = i
+  return best
 }
 
 /**
@@ -72,11 +96,6 @@ export function FreeGrid({ layout, places, editing, shown, available = () => tru
   if (gesture && preview) display = moveTo(display, ids, gesture.id, preview, cols)
   const rows = rowsUsed(display.values()) + (editing ? 4 : 0)
 
-  function steps() {
-    const grid = gridRef.current!
-    const rowStep = grid.querySelector<HTMLElement>('[data-grid-row-probe]')?.offsetHeight ?? ROW_REM * 16
-    return { colStep: (grid.clientWidth + GAP_PX) / cols, rowStep: rowStep + GAP_PX }
-  }
 
   function start(e: PointerEvent<HTMLElement>, id: WidgetId, kind: Gesture['kind']) {
     const from = display.get(id)
@@ -85,7 +104,7 @@ export function FreeGrid({ layout, places, editing, shown, available = () => tru
     e.preventDefault()
     e.stopPropagation()
     e.currentTarget.setPointerCapture(e.pointerId)
-    setGesture({ id, kind, x: e.clientX, y: e.clientY, top: grid.getBoundingClientRect().top, from, ...steps() })
+    setGesture({ id, kind, x: e.clientX, y: e.clientY, top: grid.getBoundingClientRect().top, from, colStep: (grid.clientWidth + GAP_PX) / cols, rows: rowTracks(grid) })
     setPreview(from)
   }
 
@@ -98,10 +117,15 @@ export function FreeGrid({ layout, places, editing, shown, available = () => tru
     if (e.clientY < 90) scroller?.scrollBy(0, -14)
     else if (e.clientY > window.innerHeight - 72) scroller?.scrollBy(0, 14)
     const dx = Math.round((e.clientX - g.x) / g.colStep)
-    const dy = Math.round((e.clientY - g.y + (g.top - grid.getBoundingClientRect().top)) / g.rowStep)
+    const dyPx = e.clientY - g.y + (g.top - grid.getBoundingClientRect().top)
+    // Rows can be of different heights: go by where the widget's top (or bottom) would be.
     const next = g.kind === 'move'
-      ? { ...g.from, x: Math.max(0, Math.min(cols - g.from.w, g.from.x + dx)), y: Math.max(0, g.from.y + dy) }
-      : { ...g.from, w: Math.max(2, Math.min(cols - g.from.x, g.from.w + dx)), h: Math.max(2, Math.min(12, g.from.h + dy)) }
+      ? { ...g.from, x: Math.max(0, Math.min(cols - g.from.w, g.from.x + dx)), y: nearestRow(g.rows, (g.rows[g.from.y]?.start ?? 0) + dyPx, 'start') }
+      : {
+          ...g.from,
+          w: Math.max(2, Math.min(cols - g.from.x, g.from.w + dx)),
+          h: Math.max(2, Math.min(12, nearestRow(g.rows, (g.rows[g.from.y + g.from.h - 1]?.end ?? 0) + dyPx, 'end') - g.from.y + 1)),
+        }
     if (!preview || next.x !== preview.x || next.y !== preview.y || next.w !== preview.w || next.h !== preview.h) setPreview(next)
   }
 
@@ -149,15 +173,13 @@ export function FreeGrid({ layout, places, editing, shown, available = () => tru
 
   const gridStyle: CSSProperties = {
     gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-    gridTemplateRows: `repeat(${Math.max(rows, 1)}, ${ROW_REM}rem)`,
+    gridTemplateRows: `repeat(${Math.max(rows, 1)}, minmax(${ROW_REM}rem, auto))`,
     gap: GAP_PX,
   }
 
   return (
     <>
       <div ref={gridRef} data-testid="widget-grid" data-grid="free" data-cols={cols} className="relative grid" style={gridStyle}>
-        {/* One row's height, measured for dragging (it follows the root font size). */}
-        <div data-grid-row-probe aria-hidden className="pointer-events-none invisible" style={{ gridColumn: '1 / 2', gridRow: '1 / 2' }} />
         {editing && gesture && preview && (
           <div aria-hidden className="rounded-card border-2 border-dashed border-accent bg-accent-soft"
             style={{ gridColumn: `${preview.x + 1} / span ${preview.w}`, gridRow: `${preview.y + 1} / span ${preview.h}` }} />
@@ -184,11 +206,11 @@ export function FreeGrid({ layout, places, editing, shown, available = () => tru
               }}
               onPointerMove={onMove} onPointerUp={end} onPointerCancel={end}
               className={cn(
-                'relative flex min-w-0 flex-col overflow-hidden rounded-card border border-border bg-card shadow-soft transition-[box-shadow,opacity]',
+                'relative flex min-w-0 flex-col rounded-card border border-border bg-card shadow-soft transition-[box-shadow,opacity]',
                 editing && 'cursor-grab select-none outline-2 outline-offset-2 outline-dashed active:cursor-grabbing focus-visible:outline-solid',
                 editing && (active ? 'z-20 opacity-90 shadow-float outline-transparent' : 'outline-border-strong focus-visible:outline-accent'),
               )}>
-              <div inert={editing} className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+              <div inert={editing} className="flex min-h-0 flex-1 flex-col">
                 {render(item)}
               </div>
 

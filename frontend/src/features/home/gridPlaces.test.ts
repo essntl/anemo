@@ -102,3 +102,19 @@ describe('the free grid', () => {
     expect(out.find((w) => w.id === 'music')?.grid).toBeNull()
   })
 })
+
+describe('the free grid, from the slots as shown', () => {
+  it('leaves out a widget that hides itself, as the usual grid does, and gives it a free spot after', () => {
+    const layout = normalizeLayout(DEFAULT_LAYOUT)
+    const places = placesOf(layout, (w) => !!w.hidden, (w) => w.id === 'needs')
+    // Without "Needs you", Ask Anemo comes up beside Music (as on the page).
+    expect(places.get('music')).toEqual({ x: 0, y: 4, w: 4, h: 2 })
+    expect(places.get('ask')).toEqual({ x: 4, y: 4, w: 8, h: 2 })
+    const needs = places.get('needs')!
+    for (const [id, p] of places) {
+      if (id === 'needs') continue
+      const overlap = needs.x < p.x + p.w && p.x < needs.x + needs.w && needs.y < p.y + p.h && p.y < needs.y + needs.h
+      expect(overlap, id).toBe(false)
+    }
+  })
+})

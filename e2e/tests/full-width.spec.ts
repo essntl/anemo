@@ -22,19 +22,41 @@ async function savedLayout(page: Page): Promise<Saved[]> {
   return ((await (await page.request.get('/api/settings')).json()).home as { layout: Saved[] }).layout
 }
 
-/** Drags from the middle of `from` by whole grid cells (`cols` columns, `rows` rows). */
-async function dragBy(page: Page, from: Locator, cols: number, rows: number) {
+/** The grid's rows as laid out now: where each starts and ends, from the grid's top. */
+async function rowTracks(page: Page): Promise<{ start: number; end: number }[]> {
+  return page.getByTestId('widget-grid').evaluate((grid) => {
+    const sizes = getComputedStyle(grid).gridTemplateRows.split(' ').map(parseFloat)
+    let at = 0
+    return sizes.map((size) => {
+      const row = { start: at, end: at + size }
+      at += size + 16
+      return row
+    })
+  })
+}
+
+/**
+ * Drags `handle` by whole cells: `cols` columns, and `rows` rows from the widget's top
+ * (moving, `place` is where it is) or from its bottom (resizing). Rows grow with their
+ * content, so the distance comes from the grid's real rows.
+ */
+async function dragBy(page: Page, handle: Locator, place: number[], cols: number, rows: number, edge: 'start' | 'end') {
   const grid = (await page.getByTestId('widget-grid').boundingBox())!
-  const colStep = (grid.width + 16) / 12
-  const rowStep = 68 + 16 // 4.25rem rows and their gap
-  const box = (await from.boundingBox())!
-  const x = box.x + Math.min(box.width / 2, 40)
-  const y = box.y + Math.min(box.height / 2, 40)
-  await page.mouse.move(x, y)
+  const tracks = await rowTracks(page)
+  const [, y, , h] = place
+  const row = edge === 'start' ? y : y + h - 1
+  const dy = tracks[row + rows][edge] - tracks[row][edge]
+  const dx = (cols * (grid.width + 16)) / 12
+  const box = (await handle.boundingBox())!
+  const px = box.x + Math.min(box.width / 2, 40)
+  const py = box.y + Math.min(box.height / 2, 40)
+  await page.mouse.move(px, py)
   await page.mouse.down()
-  await page.mouse.move(x + cols * colStep, y + rows * rowStep, { steps: 12 })
+  await page.mouse.move(px + dx, py + dy, { steps: 12 })
   await page.mouse.up()
 }
+
+const parse = async (widget: Locator) => (await placeOf(widget))!.split(',').map(Number)
 
 test('full width: the setting, a page button, and Home as a free grid', async ({ page }) => {
   await login(page)
@@ -99,8 +121,8 @@ test('full width: the setting, a page button, and Home as a free grid', async ({
     expect(await overlapsFocus()).toBe(false) // Today moved down out of its way
 
     // The mouse: drag Music 5 columns right and 2 rows down; it snaps to the cells.
-    const [mx, my] = (await placeOf(music))!.split(',').map(Number)
-    await dragBy(page, music, 5, 2)
+    const [mx, my] = await parse(music)
+    await dragBy(page, music, await parse(music), 5, 2, 'start')
     const moved = `${mx + 5},${my + 2},4,2`
     await expect(music).toHaveAttribute('data-place', moved)
     for (const other of await page.locator('[data-widget]').all()) {
@@ -110,7 +132,7 @@ test('full width: the setting, a page button, and Home as a free grid', async ({
     }
 
     // Resize it from its corner: 2 columns wider, 1 row taller.
-    await dragBy(page, music.locator('[data-resize]'), 2, 1)
+    await dragBy(page, music.locator('[data-resize]'), await parse(music), 2, 1, 'end')
     const resized = { x: mx + 5, y: my + 2, w: 6, h: 3 }
     await expect(music).toHaveAttribute('data-place', `${resized.x},${resized.y},6,3`)
     await page.getByRole('button', { name: 'Done' }).click()
