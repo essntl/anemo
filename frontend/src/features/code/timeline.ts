@@ -19,6 +19,7 @@
  *   user with isReplay         → a message the user sent while the job ran, where Claude
  *                                Code took it in (§15); the first one is the prompt itself
  *   command_lifecycle, control_request, control_response → nothing (bookkeeping of §15)
+ *   tool_progress              → nothing (a running call already shows it is running)
  */
 import type { Schemas } from '@/api/client'
 import { t } from '@/lib/i18n'
@@ -219,7 +220,7 @@ function blocksOf(event: Json): Json[] {
  * Event types that are bookkeeping, not something the job did: kept in the stored log,
  * left out of the timeline.
  */
-export const HIDDEN_EVENT_TYPES: ReadonlySet<string> = new Set(['rate_limit_event', 'command_lifecycle', 'control_request', 'control_response'])
+export const HIDDEN_EVENT_TYPES: ReadonlySet<string> = new Set(['rate_limit_event', 'command_lifecycle', 'control_request', 'control_response', 'tool_progress'])
 
 /** The timeline of one job's events (in any order; sorted by seq here). */
 export function buildTimeline(events: readonly CodeEvent[]): TimelineItem[] {

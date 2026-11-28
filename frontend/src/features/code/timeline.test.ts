@@ -258,6 +258,21 @@ describe('bookkeeping events', () => {
     const dropped = items[1]
     expect(dropped.kind === 'dropped' && dropped.count).toBe(2)
   })
+
+  it('leaves tool_progress out, also inside a sub-agent', () => {
+    at = 0
+    const progress = (parent: string | null) =>
+      ev({ type: 'tool_progress', tool_use_id: 'toolu_task', tool_name: 'Task', parent_tool_use_id: parent, elapsed_time_seconds: 3 })
+    const items = buildTimeline([
+      toolUse('toolu_task', 'Task', { description: 'Look around', prompt: 'Look.' }),
+      progress(null), progress(null),
+      toolUse('toolu_sub', 'Bash', { command: 'ls' }, 'toolu_task'),
+      progress('toolu_task'),
+      ev({ type: 'tool_progress', anemo_trimmed: 'too large' }, { trimmed: true }),
+    ])
+    expect(items.map((i) => i.kind)).toEqual(['tool'])
+    expect(call(items, 'Task').children.map((c) => c.kind)).toEqual(['tool'])
+  })
 })
 
 describe('messages sent while the job ran (§15)', () => {
