@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { login, signOutAfterEach, useHomeLayout } from './helpers'
+import { ignoreAppEvents, login, signOutAfterEach, useHomeLayout } from './helpers'
 
 /*
  * Home: rearranging and resizing widgets, by mouse and keyboard; the layout is saved
@@ -20,6 +20,9 @@ async function savedLayout(page: Page): Promise<Layout[]> {
 const order = (page: Page) => page.locator('[data-widget]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.widget))
 
 test('rearrange and resize widgets; the layout is saved', async ({ page }) => {
+  // Other workers' notifications (an agent's question, a finished run) would pop up over
+  // the grid here and catch the mouse drag; this test doesn't need the event stream.
+  await ignoreAppEvents(page)
   await login(page)
   await useHomeLayout()
   const before = (await (await page.request.get('/api/settings')).json()).home
@@ -131,6 +134,7 @@ const statusOf = async (page: Page, tag: string, title: string) => (await ours(p
 test('move, reorder and open tasks on the Home board', async ({ page }) => {
   const tag = `e2eboard${Math.random().toString(36).slice(2, 8)}`
   const [first, second, third] = ['Paint the hall', 'Fix the tap', 'Call the plumber'].map((t) => `E2E ${t} ${tag}`)
+  await ignoreAppEvents(page) // no other worker's notice over the board while dragging
   await login(page)
   await useHomeLayout()
   const before = (await (await page.request.get('/api/settings')).json()).home

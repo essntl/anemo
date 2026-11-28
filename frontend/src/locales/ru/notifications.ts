@@ -84,7 +84,6 @@ const messages: Messages = {
   "Waits for an event": "Ждёт события",
   "Nothing is running. Claude Code jobs, automations and chats waiting for an event show up here.": "Ничего не выполняется. Здесь появляются задания Claude Code, автоматизации и чаты, ждущие события.",
   "Open history": "Открыть историю",
-  "Open chat": "Открыть чат",
   "Nothing of this kind": "Ничего такого",
   "Choose Everything to see the rest.": "Выберите «Всё», чтобы увидеть остальное.",
   "Keys: ↑ ↓ to move, Enter to open, M to mark as read, Delete to dismiss.": "Клавиши: ↑ ↓ – переходить, Enter – открыть, M – отметить прочитанным, Delete – убрать.",
