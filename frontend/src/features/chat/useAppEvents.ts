@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
+import { api } from '@/api/client'
 import { toast } from '@/components/ui/toast'
 import { approvalsKey } from '@/features/agents/api'
 import { automationsKey } from '@/features/automations/api'
@@ -8,6 +9,7 @@ import { codeKey, codeUsageKey } from '@/features/code/api'
 import { type CodeJobNotice, noticeCodeJob } from '@/features/code/codeJobNotices'
 import { mcpKey } from '@/features/mcp/api'
 import { notificationsKey } from '@/features/notifications/api'
+import { type NotificationEvent, notificationToast } from '@/features/notifications/banner'
 import { isQuiet } from '@/features/island/alerts'
 import { showDesktopNotification } from '@/features/notifications/desktop'
 import { t } from '@/lib/i18n'
@@ -105,7 +107,7 @@ export function useAppEvents() {
     // A new notification (a reminder, an automation's result, ...): show it as a
     // desktop notification when the tab is in the background, else as a notice here.
     source.addEventListener('notification', ((e: MessageEvent<string>) => {
-      const note = JSON.parse(e.data) as { id: string; title: string; body: string; link: string | null; kind?: string }
+      const note = JSON.parse(e.data) as NotificationEvent
       void qc.invalidateQueries({ queryKey: notificationsKey })
       // The focus timer already chimed and told the user in this browser.
       if (note.kind === 'focus') return
@@ -115,7 +117,11 @@ export function useAppEvents() {
       if (showDesktopNotification(note, open)) return
       // About what is on screen already (e.g. the agent's question in the open chat).
       if (note.link && window.location.pathname === note.link) return
-      toast({ message: note.title, duration: 10_000, action: { label: t('Open'), onClick: open } })
+      toast(notificationToast(note, () => {
+        // Opened from the banner: it counts as read, as opening it in the Inbox does.
+        void api.POST('/api/notifications/read', { body: { ids: [note.id] } }).then(() => qc.invalidateQueries({ queryKey: notificationsKey }))
+        open()
+      }))
     }) as EventListener)
     source.addEventListener('notifications.changed', () => void qc.invalidateQueries({ queryKey: notificationsKey }))
     return () => {

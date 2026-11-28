@@ -1,6 +1,12 @@
 import type { Messages } from '@/lib/i18n'
 
 const messages: Messages = {
+  "Open chat": "Открыть чат",
+  "View job": "Посмотреть задание",
+  "View run": "Посмотреть запуск",
+  "Open document": "Открыть документ",
+  "Open automations": "Открыть автоматизации",
+  "Open Inbox": "Открыть входящие",
   "Allow once": "Разрешить один раз",
   "Needs you": "Ждёт вас",
   "This browser does not support desktop notifications. On an iPhone or iPad, use push notifications instead.": "Этот браузер не поддерживает уведомления на рабочем столе. На iPhone или iPad используйте push-уведомления.",

@@ -71,5 +71,8 @@ const messages: Messages = {
   "{n} B": "{n} Б",
   "{n} KB": "{n} КБ",
   "{n} MB": "{n} МБ",
+  "Notices": "Сповіщення",
+  "Show fewer": "Показати менше",
+  "+{n} more | +{n} more": "Ще {n} | Ще {n} | Ще {n}",
 }
 export default messages
