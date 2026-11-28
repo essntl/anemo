@@ -25,7 +25,7 @@ test('search: Ctrl+K finds a task and a page, the results page filters by kind',
     await expect(page).toHaveURL(/\/calendar$/)
 
     // Find the task; Enter opens it.
-    await page.getByRole('button', { name: 'Search everything' }).click()
+    await page.locator('aside[data-plugin-anchor="sidebar"]').getByRole('button', { name: 'Search', exact: true }).click()
     await box.fill(word)
     const hit = page.getByRole('option', { name: new RegExp(title) })
     await expect(hit).toBeVisible()

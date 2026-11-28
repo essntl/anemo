@@ -22,7 +22,6 @@ import { useProfile } from '@/features/profile/profile'
 import { ConversationList } from '@/features/chat/components/ConversationList'
 import { usePalette } from '@/features/search/paletteStore'
 import { shortcutText } from '@/features/shortcuts/registry'
-import { ShortcutKeys } from '@/features/shortcuts/ShortcutKeys'
 import { ViewLinks } from '@/features/views/ViewLinks'
 import { PluginLinks } from '@/features/plugins/slots'
 import { cn } from '@/lib/cn'
@@ -139,7 +138,7 @@ export function SidebarRail({ className }: { className?: string }) {
       <Button variant="primary" size="icon" className="mt-2 shrink-0" aria-label={t('New chat')} title={t('New chat')} onClick={() => navigate('/')}>
         <Plus className="h-4 w-4" />
       </Button>
-      <button type="button" aria-label={t('Search everything')} title={t('Search everything ({keys})', { keys: shortcutText('app.search') })} onClick={() => openSearch(true)} className={button}>
+      <button type="button" aria-label={t('Search')} title={t('Search ({keys})', { keys: shortcutText('app.search') })} onClick={() => openSearch(true)} className={button}>
         <Search className="h-4 w-4" />
       </button>
       <RailLink to="/chats" label={t('All chats')} icon={<MessagesSquare />} />
@@ -158,6 +157,7 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
   const profile = useProfile()
   const logout = useLogout()
   const openSearch = usePalette((s) => s.setOpen)
+  const searchTitle = t('Search ({keys})', { keys: shortcutText('app.search') })
   const setCollapsed = useSidebar((s) => s.setCollapsed)
   const { pathname } = useLocation()
   // A page from "More" that you are on joins the list while you are there.
@@ -172,11 +172,18 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
         <NavLink to="/home" title={t('Home')} aria-label={t('Anemo, go to Home')}
           className="-m-1 flex min-w-0 flex-1 items-center gap-2 rounded-control p-1">
           <Logo className="h-7 w-7 shrink-0 text-accent pointer-coarse:h-9 pointer-coarse:w-9" />
-          <span className="ml-0.5 text-[18px] font-bold tracking-tight pointer-coarse:text-[22px]">Anemo</span>
+          {/* In the phone menu the header holds four buttons (search, Inbox, Settings, close):
+              the mark alone leaves them their touch size. */}
+          <span className={cn('ml-0.5 text-[18px] font-bold tracking-tight pointer-coarse:text-[22px]', onClose && 'sr-only')}>Anemo</span>
         </NavLink>
         {onClose ? (
           // On a phone the Inbox and Settings sit up here, so the chats get the room.
           <>
+            {/* On a phone the search takes the screen, so the menu makes way for it. */}
+            <button type="button" aria-label={t('Search')} title={searchTitle} onClick={() => { onClose(); openSearch(true) }}
+              className="flex h-10 w-10 items-center justify-center rounded-control text-muted hover:bg-surface-hover hover:text-text">
+              <Search className="h-5 w-5" />
+            </button>
             <HeaderLink to="/notifications" label={t('Inbox')} icon={<Inbox />} badge={<InboxBadge />} />
             <HeaderLink to="/settings" label={t('Settings')} icon={<Settings />} />
             <button type="button" aria-label={t('Close menu')} onClick={onClose}
@@ -185,10 +192,16 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
             </button>
           </>
         ) : (
-          <button type="button" aria-label={t('Hide the sidebar')} title={t('Hide the sidebar ({keys})', { keys: shortcutText('app.sidebar') })} onClick={() => setCollapsed(true)}
-            className={ICON_BUTTON}>
-            <PanelLeftClose className="h-4 w-4" />
-          </button>
+          <>
+            {/* Search everything (also Ctrl+K): chats by title and text, documents, files, tasks, … */}
+            <button type="button" aria-label={t('Search')} title={searchTitle} onClick={() => openSearch(true)} className={ICON_BUTTON}>
+              <Search className="h-4 w-4" />
+            </button>
+            <button type="button" aria-label={t('Hide the sidebar')} title={t('Hide the sidebar ({keys})', { keys: shortcutText('app.sidebar') })} onClick={() => setCollapsed(true)}
+              className={ICON_BUTTON}>
+              <PanelLeftClose className="h-4 w-4" />
+            </button>
+          </>
         )}
       </div>
 
@@ -198,15 +211,6 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
       <Button variant="primary" className="mt-2.5 w-full shrink-0 justify-center" icon={<Plus className="h-4 w-4" />} onClick={() => navigate('/')}>
         {t('New chat')}
       </Button>
-      {/* Search everything (also Ctrl+K): chats by title and text, documents, files, tasks, … */}
-      <button type="button" aria-label={t('Search everything')} title={t('Search everything ({keys})', { keys: shortcutText('app.search') })}
-        // On a phone the search takes the screen, so the menu makes way for it.
-        onClick={() => { onClose?.(); openSearch(true) }}
-        className="mt-2 flex h-10 w-full shrink-0 items-center gap-2 rounded-control border border-border-strong bg-surface px-3 text-left text-[13px] text-subtle hover:border-muted pointer-coarse:h-11 pointer-coarse:text-[15px]">
-        <Search className="h-4 w-4 shrink-0" />
-        <span className="min-w-0 flex-1 truncate">{t('Search or jump to…')}</span>
-        <ShortcutKeys id="app.search" className="pointer-coarse:hidden" />
-      </button>
 
       {/* The pages (desktop): the pinned ones, then the rest behind "More". */}
       {!onClose && (
