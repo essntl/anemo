@@ -1,5 +1,5 @@
 import { useMemorySummary } from '@/features/memory/api'
-import { useNotificationSummary } from '@/features/notifications/api'
+import { useInboxCount } from '@/features/notifications/useInboxCount'
 import { useRunsSummary } from '@/features/runs/api'
 import { cn } from '@/lib/cn'
 import { plural, t } from '@/lib/i18n'
@@ -33,20 +33,18 @@ export function MemoryBadge() {
 }
 
 /**
- * What waits in the Inbox, as one count: approvals and paused runs, and unread
- * notifications. Amber while something needs a decision. (Memory suggestions are not
- * counted here: they have their own count on Memory, under More.)
+ * The Inbox's badge: amber with the number of things that wait for a decision
+ * (approvals, questions, reviews, failed automations) while there are any; otherwise the
+ * accent colour with the number of unread notifications. The tooltip names both.
  */
 export function InboxBadge() {
-  const waiting = useRunsSummary().data?.waiting ?? 0
-  const unread = useNotificationSummary().data?.unread ?? 0
-  const total = waiting + unread
-  if (!total) return null
-  const decide = waiting
+  const { decisions, unread } = useInboxCount()
+  if (!decisions && !unread) return null
+  const shown = decisions || unread
   return (
-    <span title={[decide && plural(decide, '{n} needs you', '{n} need you'), unread && t('{n} unread', { n: unread })].filter(Boolean).join(', ')}
-      className={cn('flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold', decide ? 'bg-warning text-white' : 'bg-accent text-accent-contrast')}>
-      {total > 99 ? '99+' : total}
+    <span title={[decisions && plural(decisions, '{n} needs you', '{n} need you'), unread && t('{n} unread', { n: unread })].filter(Boolean).join(', ')}
+      className={cn('flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold', decisions ? 'bg-warning text-white' : 'bg-accent text-accent-contrast')}>
+      {shown > 99 ? '99+' : shown}
     </span>
   )
 }

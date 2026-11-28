@@ -307,6 +307,34 @@ async def test_the_answer_shows_where_the_agent_stopped_to_ask(authed):
     assert [m["answer"] for m in marks] == ["Downtown"] and marks[0]["at"] == len("Let me look.")
 
 
+async def test_a_waiting_question_lists_its_options_and_chat(authed):
+    """The Inbox answers a question in place: the list has its options and its chat."""
+    cid = await setup(authed)
+    await authed.patch(f"/api/conversations/{cid}", json={"title": "Lunch plans"})
+    script(
+        "lunch where",
+        [
+            call("ask_user", question="Where?", options=["Downtown", "", "Harbour"], multiple=True),
+            Done("tool_use"),
+        ],
+        [TextDelta("Booked it."), Done("end")],
+    )
+    await agent_turn(authed, cid, "lunch where")
+    [approval] = (await authed.get("/api/approvals")).json()
+    assert approval["kind"] == "question" and approval["summary"] == "Where?"
+    assert approval["options"] == ["Downtown", "Harbour"] and approval["multiple"] is True
+    assert approval["conversation_title"] == "Lunch plans"
+
+
+async def test_an_approval_lists_no_options(authed):
+    cid = await setup(authed, **{"fs.read": "ask"})
+    script("read it", [call("read_file", path="notes/todo.md"), Done("tool_use")], [Done("end")])
+    await agent_turn(authed, cid, "read it")
+    [approval] = (await authed.get("/api/approvals")).json()
+    assert approval["tool_name"] == "read_file"
+    assert approval["options"] == [] and approval["multiple"] is False
+
+
 async def test_the_user_can_leave_the_question_to_the_agent(authed):
     cid = await setup(authed)
     script(

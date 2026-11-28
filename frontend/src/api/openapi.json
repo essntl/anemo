@@ -36681,6 +36681,30 @@
           "tool_name": {
             "type": "string",
             "title": "Tool Name"
+          },
+          "conversation_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Title"
+          },
+          "options": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Options",
+            "default": []
+          },
+          "multiple": {
+            "type": "boolean",
+            "title": "Multiple",
+            "default": false
           }
         },
         "type": "object",

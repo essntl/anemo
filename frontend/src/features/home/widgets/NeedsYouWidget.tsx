@@ -1,5 +1,5 @@
 import { Link } from 'react-router'
-import { AlarmClock, Brain, Clock, Inbox, Pin, PinOff, ShieldQuestion, Sparkles } from 'lucide-react'
+import { AlarmClock, Brain, Clock, FileCheck2, Inbox, MessageCircleQuestion, Pin, PinOff, ShieldQuestion, Sparkles } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 import { t } from '@/lib/i18n'
@@ -10,13 +10,15 @@ import { MoreLink, WidgetHeader } from './parts'
 
 const ICON: Record<NeedsRow['kind'], ReactNode> = {
   approval: <ShieldQuestion />,
+  question: <MessageCircleQuestion />,
+  review: <FileCheck2 />,
   memory: <Brain />,
   automation: <Clock />,
   overdue: <AlarmClock />,
   update: <Sparkles />,
 }
 
-/** Needs you: approvals, memory suggestions, failed automations, overdue tasks. */
+/** Needs you: approvals, questions, reviews, memory suggestions, failed automations, overdue tasks. */
 export function NeedsYouWidget({ item, onPin }: { item: WidgetLayout; onPin: (pinned: boolean) => void }) {
   const { rows } = useNeedsYou()
   const n = ROWS[item.h] + 1

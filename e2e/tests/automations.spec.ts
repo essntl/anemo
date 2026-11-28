@@ -111,7 +111,7 @@ test('a reminder arrives as a notification and opens what it is about', async ({
     await page.goto('/notifications')
     // The worker checks for due reminders every half minute.
     // (Scoped to the page: the same text also appears in a pop-up notice.)
-    const row = page.locator('main div.rounded-card', { hasText: `Reminder: ${title}` })
+    const row = page.locator('main li[data-note]', { hasText: `Reminder: ${title}` })
     await expect(row).toBeVisible({ timeout: 60_000 })
     await expect(row.getByLabel('Unread')).toBeVisible()
     await row.getByRole('button', { name: 'Open', exact: true }).click()

@@ -20,6 +20,7 @@ from app.core.errors import AppError, Conflict, NotFound
 from app.events import bus
 from app.features.activity import service as activity
 from app.features.audit import service as audit
+from app.features.conversations.models import Conversation
 from app.features.devices import profiles as device_profiles
 from app.features.devices import service as devices_service
 from app.features.devices.models import Device
@@ -139,6 +140,20 @@ async def timeline(run_id: uuid.UUID, db: Db) -> TimelineOut:
 class PendingApprovalOut(ApprovalOut):
     conversation_id: uuid.UUID | None
     tool_name: str
+    # The chat it waits in (the Inbox says where), and for a question (ask_user) its
+    # suggested answers, so it can be answered without opening the chat.
+    conversation_title: str | None = None
+    options: list[str] = []
+    multiple: bool = False
+
+
+def _question_options(call: ToolCall) -> tuple[list[str], bool]:
+    """A question's suggested answers as the agent gave them (strings only), and
+    whether several may be picked."""
+    args = call.args or {}
+    raw = args.get("options")
+    options = [o for o in raw if isinstance(o, str) and o.strip()] if isinstance(raw, list) else []
+    return options, bool(args.get("multiple"))
 
 
 @router.get("/approvals", response_model=list[PendingApprovalOut])
@@ -146,20 +161,27 @@ async def list_approvals(
     db: Db, status: Literal["pending"] = Query("pending")
 ) -> list[PendingApprovalOut]:
     rows = await db.execute(
-        select(Approval, Run.conversation_id, ToolCall.tool_name)
+        select(Approval, Run.conversation_id, ToolCall, Conversation.title)
         .join(Run, Run.id == Approval.run_id)
         .join(ToolCall, ToolCall.id == Approval.tool_call_id)
+        .outerjoin(Conversation, Conversation.id == Run.conversation_id)
         .where(Approval.status == status)
         .order_by(Approval.created_at)
     )
-    return [
-        PendingApprovalOut(
-            **ApprovalOut.model_validate(a, from_attributes=True).model_dump(),
-            conversation_id=cid,
-            tool_name=name,
+    out: list[PendingApprovalOut] = []
+    for a, cid, call, title in rows.all():
+        options, multiple = _question_options(call) if a.kind == "question" else ([], False)
+        out.append(
+            PendingApprovalOut(
+                **ApprovalOut.model_validate(a, from_attributes=True).model_dump(),
+                conversation_id=cid,
+                tool_name=call.tool_name,
+                conversation_title=title,
+                options=options,
+                multiple=multiple,
+            )
         )
-        for a, cid, name in rows.all()
-    ]
+    return out
 
 
 class DecisionIn(BaseModel):
